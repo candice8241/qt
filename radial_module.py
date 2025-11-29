@@ -349,16 +349,17 @@ class AzimuthalIntegrationModule(GUIBase):
                     background-color: {self.colors['card_bg']};
                 }}
                 QRadioButton::indicator {{
-                    width: 15px;
-                    height: 15px;
+                    width: 10px;
+                    height: 10px;
                     border: 1.5px solid #999999;
                     border-radius: 2px;
-                    background-color: white;
+                    background-color: {self.colors['primary']};
                 }}
                 QRadioButton::indicator:checked {{
+                    border: 1.5px solid #999999;
+                    border-radius: 2px;
                     background-color: {self.colors['primary']};
-                    border-color: {self.colors['primary']};
-                    image: none;
+                    image: url(point.png);
                 }}
             """)
             radio.toggled.connect(lambda checked, text=option: setattr(self, 'unit', text) if checked else None)
@@ -553,16 +554,16 @@ class AzimuthalIntegrationModule(GUIBase):
         formats_grid_layout.setSpacing(5)
 
         format_options = [
-            ('XY Format', 'format_xy', True),
-            ('DAT Format', 'format_dat', False),
-            ('CHI Format', 'format_chi', False),
-            ('CSV Format', 'format_csv', False),
-            ('SVG Plot', 'format_svg', False),
-            ('PNG Plot', 'format_png', False)
+            ('xy', 'format_xy', True),
+            ('dat', 'format_dat', False),
+            ('chi', 'format_chi', False),
+            ('csv', 'format_csv', False),
+            ('svg', 'format_svg', False),
+            ('png', 'format_png', False)
         ]
 
         # Create 2-column layout
-        for i in range(0, len(format_options), 2):
+        for i in range(0, len(format_options), 3):
             row_widget = QWidget()
             row_widget.setStyleSheet(f"background-color: {self.colors['card_bg']};")
             row_layout = QHBoxLayout(row_widget)
@@ -574,23 +575,25 @@ class AzimuthalIntegrationModule(GUIBase):
             cb1 = QCheckBox(label1)
             cb1.setChecked(default1)
             cb1.setFont(QFont('Arial', 9))
-            cb1.setFixedWidth(120)  # 固定宽度以对齐
+            cb1.setFixedWidth(45)  # 固定宽度以对齐
             cb1.setStyleSheet(f"""
                 QCheckBox {{
                     color: #666666;
                     background-color: {self.colors['card_bg']};
                 }}
                 QCheckBox::indicator {{
-                    width: 12px;
-                    height: 12px;
+                    width: 10px;
+                    height: 10px;
                     border: 1.5px solid #999999;
                     border-radius: 2px;
-                    background-color: white;
+                    background-color: {self.colors['primary']};
                 }}
                 QCheckBox::indicator:checked {{
                     background-color: {self.colors['primary']};
-                    border-color: {self.colors['primary']};
-                    image: none;
+                    border: 1.5px solid #999999;
+                    border-radius: 2px;
+                    
+                    image: url(check.png);
                 }}
             """)
             cb1.stateChanged.connect(lambda state, v=var1: setattr(self, v, state == Qt.CheckState.Checked.value))
@@ -602,23 +605,24 @@ class AzimuthalIntegrationModule(GUIBase):
                 cb2 = QCheckBox(label2)
                 cb2.setChecked(default2)
                 cb2.setFont(QFont('Arial', 9))
-                cb2.setFixedWidth(120)  # 固定宽度以对齐
+                cb2.setFixedWidth(45)  # 固定宽度以对齐
                 cb2.setStyleSheet(f"""
                     QCheckBox {{
                         color: #666666;
                         background-color: {self.colors['card_bg']};
                     }}
                     QCheckBox::indicator {{
-                        width: 12px;
-                        height: 12px;
+                        width: 10px;
+                        height: 10px;
                         border: 1.5px solid #999999;
                         border-radius: 2px;
-                        background-color: white;
+                        background-color: {self.colors['primary']};
                     }}
                     QCheckBox::indicator:checked {{
+                        border: 1.5px solid #999999;
+                        border-radius: 2px;
                         background-color: {self.colors['primary']};
-                        border-color: {self.colors['primary']};
-                        image: none;
+                        image:  url(check.png);
                     }}
                 """)
                 cb2.stateChanged.connect(lambda state, v=var2: setattr(self, v, state == Qt.CheckState.Checked.value))

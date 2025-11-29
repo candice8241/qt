@@ -260,87 +260,13 @@ class PowderXRDModule(GUIBase):
         self.create_folder_input(left_layout, "Output Directory:", "output_dir")
         self.create_text_input(left_layout, "Dataset Directory:", "dataset_path", placeholder="entry/data/data", with_browse=True)
 
-        params_row = QWidget()
-        params_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        params_row_layout = QHBoxLayout(params_row)
-        params_row_layout.setContentsMargins(0, 6, 0, 6)
-        params_row_layout.setSpacing(16)
-
-        npt_container = QWidget()
-        npt_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        npt_layout = QVBoxLayout(npt_container)
-        npt_layout.setContentsMargins(0, 0, 0, 0)
-
-        npt_label = QLabel("Number of Points")
-        npt_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        npt_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
-        npt_layout.addWidget(npt_label)
-
-        self.npt_spinbox = CustomSpinbox(from_=500, to=10000, value=4000,
-                                         increment=500, width=110, parent=npt_container)
-        self.npt_spinbox.valueChanged.connect(lambda v: setattr(self, 'npt', int(v)))
-        npt_layout.addWidget(self.npt_spinbox)
-        params_row_layout.addWidget(npt_container)
-
-        unit_container = QWidget()
-        unit_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        unit_layout = QVBoxLayout(unit_container)
-        unit_layout.setContentsMargins(0, 0, 0, 0)
-        unit_layout.setSpacing(4)
-
-        unit_label = QLabel("Unit")
-        unit_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        unit_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
-        unit_layout.addWidget(unit_label, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        unit_radios = QWidget()
-        unit_radios.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        unit_radios_layout = QHBoxLayout(unit_radios)
-        unit_radios_layout.setContentsMargins(0, 0, 0, 0)
-        unit_radios_layout.setSpacing(10)
-
-        self.unit_group = QButtonGroup(unit_radios)
-        unit_options = ['2θ (°)', 'q (A⁻¹)', 'r (mm)']
-        for option in unit_options:
-            radio = QRadioButton(option)
-            radio.setChecked(option == '2θ (°)')
-            radio.setFont(QFont('Arial', 9))
-            radio.setStyleSheet(f"""
-                QRadioButton {{
-                    color: {self.colors['text_dark']};
-                    background-color: {self.colors['card_bg']};
-                }}
-                QRadioButton::indicator {{
-                    width: 10px;
-                    height: 10px;
-                    border: 1.5px solid #999999;
-                    border-radius: 2px;
-                    background-color:{self.colors['primary']};
-                }}
-                QRadioButton::indicator:checked {{
-                    background-color: {self.colors['primary']};
-                    border: 1.5px solid #999999;
-                    border-radius: 2px;
-                    image: url(point.png);
-                }}
-            """)
-            radio.toggled.connect(lambda checked, text=option: setattr(self, 'unit', text) if checked else None)
-            self.unit_group.addButton(radio)
-            unit_radios_layout.addWidget(radio)
-
-        unit_layout.addWidget(unit_radios)
-        params_row_layout.addWidget(unit_container)
-        params_row_layout.addStretch()
-
-        left_layout.addWidget(params_row)
-
-        # Add Run Integration button centered in left panel
+        # Add Run Integration button centered
         run_int_btn_row = QWidget()
         run_int_btn_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         run_int_btn_layout = QHBoxLayout(run_int_btn_row)
         run_int_btn_layout.setContentsMargins(0, 15, 0, 0)
         run_int_btn_layout.setSpacing(0)
-
+        
         run_int_btn_layout.addStretch()
         run_int_btn = ModernButton(
             "Run Integration",
@@ -365,39 +291,117 @@ class PowderXRDModule(GUIBase):
         right_layout.setSpacing(12)
 
         output_card = self.create_card_frame(None)
+        output_card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {self.colors['card_bg']};
+                border: 2px solid #888888;
+                border-radius: 8px;
+            }}
+        """)
         output_layout = QVBoxLayout(output_card)
         output_layout.setContentsMargins(15, 12, 15, 12)
         output_layout.setSpacing(8)
 
-        output_title = QLabel("Output Options")
-        output_title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        output_title.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
-        output_layout.addWidget(output_title)
+        # Number of Points - horizontal layout
+        npt_row = QWidget()
+        npt_row.setStyleSheet(f"background-color: transparent; border: none;")
+        npt_layout = QHBoxLayout(npt_row)
+        npt_layout.setContentsMargins(0, 0, 0, 8)
+        npt_layout.setSpacing(10)
+
+        npt_label = QLabel("Number of Points")
+        npt_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        npt_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: transparent; border: none;")
+        npt_layout.addWidget(npt_label)
+
+        from PyQt6.QtWidgets import QSpinBox
+        self.npt_spinbox = QSpinBox()
+        self.npt_spinbox.setRange(500, 10000)
+        self.npt_spinbox.setValue(4000)
+        self.npt_spinbox.setSingleStep(500)
+        self.npt_spinbox.setFixedWidth(80)
+        self.npt_spinbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.npt_spinbox.setFont(QFont('Arial', 9))
+        self.npt_spinbox.setStyleSheet(f"""
+            QSpinBox {{
+                background-color: white;
+                color: #444444;
+                border: 2px solid #AAAAAA;
+                padding: 3px;
+            }}
+            QSpinBox::up-button, QSpinBox::down-button {{
+                width: 0px;
+                border: none;
+            }}
+        """)
+        self.npt_spinbox.valueChanged.connect(lambda v: setattr(self, 'npt', int(v)))
+        npt_layout.addWidget(self.npt_spinbox)
+        npt_layout.addStretch()
+        output_layout.addWidget(npt_row)
+
+        # Unit - vertical layout, label on top, options below
+        unit_container = QWidget()
+        unit_container.setStyleSheet(f"background-color: transparent; border: none;")
+        unit_layout = QVBoxLayout(unit_container)
+        unit_layout.setContentsMargins(0, 0, 0, 16)
+        unit_layout.setSpacing(4)
+
+        unit_label = QLabel("Unit")
+        unit_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        unit_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: transparent; border: none;")
+        unit_layout.addWidget(unit_label)
+
+        # Radio buttons in horizontal layout
+        unit_radios_row = QWidget()
+        unit_radios_row.setStyleSheet(f"background-color: transparent; border: none;")
+        unit_radios_layout = QHBoxLayout(unit_radios_row)
+        unit_radios_layout.setContentsMargins(0, 0, 0, 0)
+        unit_radios_layout.setSpacing(10)
+
+        self.unit_group = QButtonGroup(unit_container)
+        unit_options = ['2θ (°)', 'q (A⁻¹)', 'r (mm)']
+        for option in unit_options:
+            radio = QRadioButton(option)
+            radio.setChecked(option == '2θ (°)')
+            radio.setFont(QFont('Arial', 9))
+            radio.setStyleSheet(f"""
+                QRadioButton {{
+                    color: {self.colors['text_dark']};
+                    background-color: transparent;
+                    border: none;
+                }}
+                QRadioButton::indicator {{
+                    width: 10px;
+                    height: 10px;
+                    border: 1.5px solid #999999;
+                    border-radius: 2px;
+                    background-color:{self.colors['primary']};
+                }}
+                QRadioButton::indicator:checked {{
+                    background-color: {self.colors['primary']};
+                    border: 1.5px solid #999999;
+                    border-radius: 2px;
+                    image: url(point.png);
+                }}
+            """)
+            radio.toggled.connect(lambda checked, text=option: setattr(self, 'unit', text) if checked else None)
+            self.unit_group.addButton(radio)
+            unit_radios_layout.addWidget(radio)
+
+        unit_radios_layout.addStretch()
+        unit_layout.addWidget(unit_radios_row)
+        output_layout.addWidget(unit_container)
 
         formats_label = QLabel("Select Output Formats:")
         formats_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         formats_label.setStyleSheet(f"color: #666666; background-color: {self.colors['card_bg']}; margin-bottom: 0px;")
         output_layout.addWidget(formats_label, alignment=Qt.AlignmentFlag.AlignLeft)
-        output_layout.setSpacing(2)  # Reduce spacing before next widget
 
-        # Create a container to hold the frame without stretching
+        # Format checkboxes without frame
         formats_container = QWidget()
         formats_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        formats_container_layout = QHBoxLayout(formats_container)
-        formats_container_layout.setContentsMargins(0, 0, 0, 0)
-        formats_container_layout.setSpacing(0)
-
-        # Create inner frame for format checkboxes
-        formats_frame = QFrame()
-        formats_frame.setStyleSheet(f"""
-            QFrame {{
-                background-color: {self.colors['card_bg']};
-                border: 2px solid {self.colors['border']};
-                border-radius: 4px;
-            }}
-        """)
-        formats_frame_layout = QVBoxLayout(formats_frame)
-        formats_frame_layout.setContentsMargins(10, 8, 10, 8)
+        formats_frame_layout = QVBoxLayout(formats_container)
+        formats_frame_layout.setContentsMargins(0, 8, 0, 8)
         formats_frame_layout.setSpacing(6)
 
         formats_row1 = QWidget()
@@ -476,10 +480,6 @@ class PowderXRDModule(GUIBase):
         formats_row2_layout.addStretch()
         formats_frame_layout.addWidget(formats_row2)
 
-        # Add frame to container and add stretch to keep border tight
-        formats_container_layout.addWidget(formats_frame)
-        formats_container_layout.addStretch()
-
         output_layout.addWidget(formats_container)
 
         stacked_box = QWidget()
@@ -488,6 +488,7 @@ class PowderXRDModule(GUIBase):
         stacked_layout.setContentsMargins(0, 12, 0, 0)
         stacked_layout.setSpacing(6)
 
+        # Add "Stacked Plot Options:" label
         stacked_options_label = QLabel("Stacked Plot Options:")
         stacked_options_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         stacked_options_label.setStyleSheet(f"color: #666666; background-color: {self.colors['card_bg']};")
@@ -519,24 +520,25 @@ class PowderXRDModule(GUIBase):
         stacked_layout.addWidget(self.stacked_plot_cb)
 
         offset_row = QWidget()
-        offset_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
+        offset_row.setStyleSheet(f"background-color: transparent; border: none;")
         offset_row_layout = QHBoxLayout(offset_row)
         offset_row_layout.setContentsMargins(0, 0, 0, 0)
         offset_row_layout.setSpacing(10)
 
         offset_label = QLabel("Offset:")
-        offset_label.setFont(QFont('Arial', 9))
-        offset_label.setStyleSheet(f"color: #666666; background-color: {self.colors['card_bg']};")
+        offset_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        offset_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: transparent; border: none;")
         offset_row_layout.addWidget(offset_label)
 
         self.offset_entry = QLineEdit("auto")
-        self.offset_entry.setFixedWidth(110)
+        self.offset_entry.setFixedWidth(70)
+        self.offset_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.offset_entry.setFont(QFont('Arial', 9))
         self.offset_entry.setStyleSheet(f"""
             QLineEdit {{
                 background-color: white;
                 color: {self.colors['text_dark']};
-                border: 1px solid {self.colors['border']};
+                border: 2px solid #AAAAAA;
                 padding: 3px;
             }}
         """)
@@ -545,18 +547,11 @@ class PowderXRDModule(GUIBase):
         offset_row_layout.addStretch()
         stacked_layout.addWidget(offset_row)
 
-        help_container = QWidget()
-        help_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        help_container_layout = QHBoxLayout(help_container)
-        help_container_layout.setContentsMargins(0, 0, 0, 0)
-        help_container_layout.setSpacing(0)
-
-        offset_help_text = QLabel("(use 'auto' or number for offset)")
-        offset_help_text.setFont(QFont('Arial', 8))
-        offset_help_text.setStyleSheet(f"color: #999999; background-color: {self.colors['card_bg']};")
-        help_container_layout.addWidget(offset_help_text)
-        help_container_layout.addStretch()
-        stacked_layout.addWidget(help_container)
+        # Add help text below offset
+        offset_help = QLabel("(use 'auto' or number for offset)")
+        offset_help.setFont(QFont('Arial', 8))
+        offset_help.setStyleSheet(f"color: #999999; background-color: transparent; border: none;")
+        stacked_layout.addWidget(offset_help)
 
         output_layout.addWidget(stacked_box)
 
@@ -570,10 +565,10 @@ class PowderXRDModule(GUIBase):
         output_card_container_layout.addWidget(output_card)
         output_card_container_layout.addStretch()
 
-        # Add vertical centering for output card
-        right_layout.addStretch()
+        # Add vertical centering for output card to align with left panel file inputs
+        right_layout.addStretch(1)
         right_layout.addWidget(output_card_container)
-        right_layout.addStretch()
+        right_layout.addStretch(2)
 
         columns.addWidget(left_panel, stretch=2)
         columns.addWidget(right_panel, stretch=1)
@@ -660,7 +655,7 @@ class PowderXRDModule(GUIBase):
         combined_frame.setStyleSheet(f"""
             QFrame {{
                 background-color: {self.colors['card_bg']};
-                border: 1.5px solid {self.colors['border']};
+                border: 2px solid #888888;
                 border-radius: 6px;
             }}
         """)
@@ -736,25 +731,36 @@ class PowderXRDModule(GUIBase):
         combined_frame_layout.addWidget(row1)
         combined_frame_layout.addWidget(row2)
 
-        # Wavelength section inside the same frame
+        # Wavelength section inside the same frame - label and input in same row, aligned left
+        wl_row = QWidget()
+        wl_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
+        wl_row_layout = QHBoxLayout(wl_row)
+        wl_row_layout.setContentsMargins(0, 0, 0, 0)
+        wl_row_layout.setSpacing(10)
+        
         wl_label = QLabel("Wavelength (Å)")
         wl_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         wl_label.setStyleSheet(f"color: {self.colors['text_dark']}; border: none;background-color: transparent;")
-        combined_frame_layout.addWidget(wl_label)
-
+        wl_row_layout.addWidget(wl_label)
+        
         self.phase_wavelength_entry = QLineEdit(str(self.phase_wavelength))
-        self.phase_wavelength_entry.setMaximumWidth(80)
+        self.phase_wavelength_entry.setFixedWidth(80)
+        self.phase_wavelength_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.phase_wavelength_entry.setFont(QFont('Arial', 9))
         self.phase_wavelength_entry.setStyleSheet(f"""
             QLineEdit {{
-                background-color: transparent;
-                color: #333;
-                border: none;
+                background-color: white;
+                color: {self.colors['text_dark']};
+                border: 2px solid #AAAAAA;
                 padding: 3px;
             }}
         """)
         self.phase_wavelength_entry.textChanged.connect(self._on_phase_wavelength_changed)
-        combined_frame_layout.addWidget(self.phase_wavelength_entry, alignment=Qt.AlignmentFlag.AlignLeft)
+        wl_row_layout.addWidget(self.phase_wavelength_entry)
+        
+        wl_row_layout.addStretch()
+        
+        combined_frame_layout.addWidget(wl_row)
 
         # Add frame to container with stretch on both sides to center it
         frame_container_layout.addStretch()
@@ -799,7 +805,7 @@ class PowderXRDModule(GUIBase):
             QLineEdit {{
                 background-color: white;
                 color: {self.colors['text_dark']};
-                border: 1px solid {self.colors['border']};
+                border: 2px solid #AAAAAA;
                 padding: 3px;
             }}
         """)
@@ -844,7 +850,7 @@ class PowderXRDModule(GUIBase):
             QLineEdit {{
                 background-color: white;
                 color: {self.colors['text_dark']};
-                border: 1px solid {self.colors['border']};
+                border: 2px solid #AAAAAA;
                 padding: 3px;
             }}
         """)
@@ -892,7 +898,7 @@ class PowderXRDModule(GUIBase):
                 QLineEdit {{
                     background-color: white;
                     color: {self.colors['text_dark']};
-                    border: 1px solid {self.colors['border']};
+                    border: 2px solid #AAAAAA;
                     padding: 3px;
                 }}
             """)
@@ -919,7 +925,7 @@ class PowderXRDModule(GUIBase):
                 QLineEdit {{
                     background-color: white;
                     color: {self.colors['text_dark']};
-                    border: 1px solid {self.colors['border']};
+                    border: 2px solid #AAAAAA;
                     padding: 3px;
                 }}
             """)
