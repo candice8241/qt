@@ -1,0 +1,114 @@
+{
+  "colors": {
+    "main_bg": "#F5F5F5",
+    "panel_white": "#FFFFFF",
+
+    "bg_section_bg": "#E7F5FF",
+    "smooth_section_bg": "#F3F0FF",
+    "results_section_bg": "#FFF9DB",
+
+    "bg_header": "#9775FA",
+    "smooth_header": "#228BE6",
+    "results_header": "#FF6B9D",
+
+    "btn_load": "#9B86BD",
+    "btn_nav": "#CBA6F7",
+    "btn_fit": "#E4B4E4",
+    "btn_reset": "#FA9999",
+    "btn_save": "#51CF66",
+    "btn_clear": "#FFB366",
+    "btn_undo": "#CBA6F7",
+    "btn_auto": "#CBA6F7",
+    "btn_overlap": "#AAAAAA",
+    "btn_batch": "#74C0FC",
+    "btn_settings": "#868E96",
+
+    "btn_select_bg": "#9775FA",
+    "btn_subtract_bg": "#51CF66",
+    "btn_clear_bg": "#FF6B6B",
+    "btn_auto_bg": "#74C0FC",
+
+    "btn_apply": "#51CF66",
+    "btn_reset_data": "#FF6B6B",
+
+    "text_dark": "#212529",
+    "text_light": "#868E96",
+    "text_white": "#FFFFFF",
+
+    "border_dark": "#495057",
+    "border_light": "#CED4DA",
+    "border_table": "#DEE2E6"
+  },
+
+  "fonts": {
+    "family": "Arial",
+    "sizes": {
+      "large": 14,
+      "header": 10,
+      "normal": 9,
+      "small": 8,
+      "icon": 14
+    }
+  },
+
+  "sections": {
+    "control_panel": {
+      "height": 55,
+      "bg_color": "#FFFFFF",
+      "border": "2px solid #DEE2E6"
+    },
+    "background": {
+      "height": 50,
+      "bg_color": "#E7F5FF",
+      "header_color": "#9775FA"
+    },
+    "smoothing": {
+      "height": 50,
+      "bg_color": "#F3F0FF",
+      "header_color": "#228BE6"
+    },
+    "results": {
+      "height": 120,
+      "bg_color": "#FFF9DB",
+      "header_color": "#FF6B9D"
+    }
+  },
+
+  "buttons": {
+    "control_panel": [
+      {"text": "Load File", "color": "btn_load"},
+      {"text": "◀", "color": "btn_nav", "width": 35},
+      {"text": "▶", "color": "btn_nav", "width": 35},
+      {"text": "Fit Peaks", "color": "btn_fit"},
+      {"text": "Reset", "color": "btn_reset"},
+      {"text": "Save Results", "color": "btn_save"},
+      {"text": "Clear Fit", "color": "btn_clear"},
+      {"text": "Undo", "color": "btn_undo"},
+      {"text": "Auto Find", "color": "btn_auto"},
+      {"text": "Overlap", "color": "btn_overlap"},
+      {"text": "Batch Auto Fit", "color": "btn_batch"},
+      {"text": "⚙", "color": "btn_settings", "width": 35}
+    ],
+    "background": [
+      {"text": "Select BG Points", "color": "btn_select_bg"},
+      {"text": "Subtract BG", "color": "btn_subtract_bg"},
+      {"text": "Clear BG", "color": "btn_clear_bg"},
+      {"text": "Auto Select BG", "color": "btn_auto_bg"}
+    ],
+    "smoothing": [
+      {"text": "Apply", "color": "btn_apply"},
+      {"text": "Reset Data", "color": "btn_reset_data"}
+    ]
+  },
+
+  "button_styles": {
+    "border": "2px solid #495057",
+    "border_radius": "4px",
+    "text_color": "#FFFFFF"
+  },
+
+  "table": {
+    "column_widths": [45, 90, 90, 90, 90, 75, 75, 55],
+    "headers": ["Peak", "2theta", "FWHM", "Area", "Amplitude", "Sigma", "Gamma", "Eta"]
+  }
+}
