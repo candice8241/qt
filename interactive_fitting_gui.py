@@ -571,6 +571,9 @@ class InteractiveFittingGUI(QWidget):
         # Set minimum size for proper display
         self.setMinimumSize(1400, 800)
 
+        # Set window title
+        self.setWindowTitle("Interactive XRD Peak Fitting Tool - Enhanced")
+
         # Modern clean color palette
         self.palette = {
             'background': '#F5F5F5',  # Light gray background
@@ -676,70 +679,76 @@ class InteractiveFittingGUI(QWidget):
         """
 
         # Load File button
-        load_btn = QPushButton("Load")
-        load_btn.setStyleSheet(btn_style + f"background-color: {self.palette['primary']}; color: white;")
+        load_btn = QPushButton("Load File")
+        load_btn.setStyleSheet(btn_style + f"background-color: #9B86BD; color: white;")
         load_btn.clicked.connect(self.load_data_file)
         control_layout.addWidget(load_btn)
 
         # Navigation buttons
         prev_btn = QPushButton("◀")
         prev_btn.setFixedWidth(35)
-        prev_btn.setStyleSheet(btn_style + f"background-color: {self.palette['info']}; color: white; min-width: 25px;")
+        prev_btn.setStyleSheet(btn_style + f"background-color: #CBA6F7; color: white; min-width: 25px;")
         prev_btn.clicked.connect(self.prev_file)
         control_layout.addWidget(prev_btn)
 
         next_btn = QPushButton("▶")
         next_btn.setFixedWidth(35)
-        next_btn.setStyleSheet(btn_style + f"background-color: {self.palette['info']}; color: white; min-width: 25px;")
+        next_btn.setStyleSheet(btn_style + f"background-color: #CBA6F7; color: white; min-width: 25px;")
         next_btn.clicked.connect(self.next_file)
         control_layout.addWidget(next_btn)
 
         # Fit Peaks button
         fit_btn = QPushButton("Fit Peaks")
-        fit_btn.setStyleSheet(btn_style + f"background-color: {self.palette['purple']}; color: white;")
+        fit_btn.setStyleSheet(btn_style + f"background-color: #E4B4E4; color: white;")
         fit_btn.clicked.connect(self.fit_all_peaks)
         control_layout.addWidget(fit_btn)
 
         # Reset button
         reset_btn = QPushButton("Reset")
-        reset_btn.setStyleSheet(btn_style + f"background-color: {self.palette['warning']}; color: #212529;")
+        reset_btn.setStyleSheet(btn_style + f"background-color: #FA9999; color: white;")
         reset_btn.clicked.connect(self.clear_peaks)
         control_layout.addWidget(reset_btn)
 
         # Save Results button
-        save_btn = QPushButton("Save")
+        save_btn = QPushButton("Save Results")
         save_btn.setStyleSheet(btn_style + f"background-color: {self.palette['success']}; color: white;")
         save_btn.clicked.connect(self.export_results)
         control_layout.addWidget(save_btn)
 
         # Clear Fit button
-        clear_btn = QPushButton("Clear")
-        clear_btn.setStyleSheet(btn_style + f"background-color: {self.palette['danger']}; color: white;")
+        clear_btn = QPushButton("Clear Fit")
+        clear_btn.setStyleSheet(btn_style + f"background-color: #FFB366; color: white;")
         clear_btn.clicked.connect(self.clear_peaks)
         control_layout.addWidget(clear_btn)
 
         # Undo button
         undo_btn = QPushButton("Undo")
-        undo_btn.setStyleSheet(btn_style + f"background-color: #CED4DA; color: #212529;")
+        undo_btn.setStyleSheet(btn_style + f"background-color: #CBA6F7; color: white;")
         undo_btn.clicked.connect(self.undo_action)
         control_layout.addWidget(undo_btn)
 
         # Auto Find button
         auto_btn = QPushButton("Auto Find")
-        auto_btn.setStyleSheet(btn_style + f"background-color: {self.palette['primary']}; color: white;")
+        auto_btn.setStyleSheet(btn_style + f"background-color: #CBA6F7; color: white;")
         auto_btn.clicked.connect(self.auto_detect_peaks)
         control_layout.addWidget(auto_btn)
 
         # Overlap button
         overlap_btn = QPushButton("Overlap")
-        overlap_btn.setStyleSheet(btn_style + f"background-color: {self.palette['info']}; color: white;")
+        overlap_btn.setStyleSheet(btn_style + f"background-color: #AAAAAA; color: white;")
         overlap_btn.clicked.connect(self.toggle_overlap_mode)
         control_layout.addWidget(overlap_btn)
 
-        # Batch button
-        batch_btn = QPushButton("Batch")
-        batch_btn.setStyleSheet(btn_style + f"background-color: #868E96; color: white;")
+        # Batch Auto Fit button
+        batch_btn = QPushButton("Batch Auto Fit")
+        batch_btn.setStyleSheet(btn_style + f"background-color: #74C0FC; color: white;")
         control_layout.addWidget(batch_btn)
+
+        # Settings gear icon button
+        settings_btn = QPushButton("⚙")
+        settings_btn.setFixedWidth(35)
+        settings_btn.setStyleSheet(btn_style + f"background-color: #868E96; color: white; min-width: 25px; font-size: 14pt;")
+        control_layout.addWidget(settings_btn)
 
         control_layout.addStretch()
 
@@ -786,13 +795,13 @@ class InteractiveFittingGUI(QWidget):
         """
 
         # Select BG Points
-        select_bg_btn = QPushButton("Select")
-        select_bg_btn.setStyleSheet(bg_btn_style + f"background-color: {self.palette['info']}; color: white;")
+        select_bg_btn = QPushButton("Select BG Points")
+        select_bg_btn.setStyleSheet(bg_btn_style + f"background-color: {self.palette['purple']}; color: white;")
         select_bg_btn.clicked.connect(self.toggle_bg_selection)
         bg_layout.addWidget(select_bg_btn)
 
         # Subtract BG
-        subtract_bg_btn = QPushButton("Subtract")
+        subtract_bg_btn = QPushButton("Subtract BG")
         subtract_bg_btn.setStyleSheet(bg_btn_style + f"background-color: {self.palette['success']}; color: white;")
         subtract_bg_btn.clicked.connect(self.subtract_background)
         self.background_cb = QCheckBox()  # Hidden for compatibility
@@ -801,21 +810,21 @@ class InteractiveFittingGUI(QWidget):
         bg_layout.addWidget(subtract_bg_btn)
 
         # Clear BG
-        clear_bg_btn = QPushButton("Clear")
+        clear_bg_btn = QPushButton("Clear BG")
         clear_bg_btn.setStyleSheet(bg_btn_style + f"background-color: {self.palette['danger']}; color: white;")
         clear_bg_btn.clicked.connect(self.clear_background)
         bg_layout.addWidget(clear_bg_btn)
 
         # Auto Select BG
-        auto_bg_btn = QPushButton("Auto")
-        auto_bg_btn.setStyleSheet(bg_btn_style + f"background-color: {self.palette['primary']}; color: white;")
+        auto_bg_btn = QPushButton("Auto Select BG")
+        auto_bg_btn.setStyleSheet(bg_btn_style + f"background-color: #74C0FC; color: white;")
         auto_bg_btn.clicked.connect(self.auto_select_background)
         bg_layout.addWidget(auto_bg_btn)
 
         bg_layout.addSpacing(10)
 
         # Fit Method
-        fit_label = QLabel("Method:")
+        fit_label = QLabel("Fit Method:")
         fit_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         fit_label.setStyleSheet(f"color: #212529; background: transparent;")
         bg_layout.addWidget(fit_label)
@@ -842,7 +851,7 @@ class InteractiveFittingGUI(QWidget):
         bg_layout.addSpacing(10)
 
         # Overlap FWHM×
-        overlap_label = QLabel("FWHM×:")
+        overlap_label = QLabel("Overlap FWHM×:")
         overlap_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         overlap_label.setStyleSheet(f"color: #212529; background: transparent;")
         bg_layout.addWidget(overlap_label)
@@ -862,8 +871,8 @@ class InteractiveFittingGUI(QWidget):
 
         bg_layout.addSpacing(10)
 
-        # Fit Window×
-        window_label = QLabel("Window×:")
+        # Fit Window
+        window_label = QLabel("Fit Window:")
         window_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         window_label.setStyleSheet(f"color: #212529; background: transparent;")
         bg_layout.addWidget(window_label)
@@ -1007,7 +1016,7 @@ class InteractiveFittingGUI(QWidget):
         smooth_layout.addWidget(apply_btn)
 
         # Reset Data button
-        reset_data_btn = QPushButton("Reset")
+        reset_data_btn = QPushButton("Reset Data")
         reset_data_btn.setStyleSheet(f"""
             QPushButton {{
                 font-family: Arial;
