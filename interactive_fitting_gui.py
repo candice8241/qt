@@ -16,7 +16,7 @@ Allows users to:
 
 import numpy as np
 import pandas as pd
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
                               QLineEdit, QComboBox, QCheckBox, QTextEdit, QSlider,
@@ -655,8 +655,8 @@ class InteractiveFittingGUI(QWidget):
         control_widget = QWidget()
         control_widget.setFixedHeight(45)  # More compact: 50 → 45
         control_widget.setAutoFillBackground(True)
-        # Lighter color for control panel
-        control_widget.setStyleSheet("QWidget { background-color: #E0D9FF; border-bottom: 2px solid #B794F6; }")
+        # Changed color, removed bottom border
+        control_widget.setStyleSheet("QWidget { background-color: #E8D5F0; }")
         control_layout = QHBoxLayout(control_widget)
         control_layout.setContentsMargins(6, 3, 6, 3)  # More compact: 6,4 → 6,3
         control_layout.setSpacing(2)  # More compact: 3 → 2
@@ -1145,28 +1145,7 @@ class InteractiveFittingGUI(QWidget):
         # self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
         plot_layout.addWidget(self.canvas)
 
-        # Toolbar - colorful
-        toolbar_frame = QWidget()
-        toolbar_frame.setStyleSheet("background-color: #E8D5FF;")
-        toolbar_layout = QVBoxLayout(toolbar_frame)
-        toolbar_layout.setContentsMargins(0, 0, 0, 0)
-        toolbar = NavigationToolbar2QT(self.canvas, toolbar_frame)
-        # Colorful toolbar
-        toolbar.setStyleSheet(f"""
-            QToolBar {{
-                background-color: #E8D5FF;
-                color: #4A148C;
-            }}
-            QToolButton {{
-                color: #4A148C;
-                background-color: transparent;
-            }}
-            QLabel {{
-                color: #4A148C;
-            }}
-        """)
-        toolbar_layout.addWidget(toolbar)
-        plot_layout.addWidget(toolbar_frame)
+        # Toolbar removed - no longer needed
 
         parent_layout.addWidget(plot_widget)
 
@@ -1562,7 +1541,7 @@ class InteractiveFittingGUI(QWidget):
         self.ax.set_ylabel('Intensity', fontsize=10, color='#4A148C', fontweight='normal')
         # Title: only show filename, not bold, smaller (11 - 2 = 9)
         self.ax.set_title(f'{self.current_file}', fontsize=9, color='#7B1FA2', fontweight='normal')
-        self.ax.legend(loc='best', fontsize=9, framealpha=0.9)
+        self.ax.legend(loc='best', fontsize=7, framealpha=0.9)  # Smaller legend: 9 → 7
         self.ax.grid(True, alpha=0.3, linestyle='--', color='#9575CD')
         
         # Colorful tick labels
