@@ -530,13 +530,14 @@ class PowderXRDModule(GUIBase):
         offset_row_layout.addWidget(offset_label)
 
         self.offset_entry = QLineEdit("auto")
-        self.offset_entry.setFixedWidth(110)
+        self.offset_entry.setFixedWidth(70)
+        self.offset_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.offset_entry.setFont(QFont('Arial', 9))
         self.offset_entry.setStyleSheet(f"""
             QLineEdit {{
                 background-color: white;
                 color: {self.colors['text_dark']};
-                border: 2px solid #666666;
+                border: 2px solid #AAAAAA;
                 padding: 3px;
             }}
         """)
@@ -743,13 +744,14 @@ class PowderXRDModule(GUIBase):
         combined_frame_layout.addWidget(wl_label)
 
         self.phase_wavelength_entry = QLineEdit(str(self.phase_wavelength))
-        self.phase_wavelength_entry.setMaximumWidth(80)
+        self.phase_wavelength_entry.setFixedWidth(80)
+        self.phase_wavelength_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.phase_wavelength_entry.setFont(QFont('Arial', 9))
         self.phase_wavelength_entry.setStyleSheet(f"""
             QLineEdit {{
-                background-color: transparent;
-                color: #333;
-                border: none;
+                background-color: white;
+                color: {self.colors['text_dark']};
+                border: 2px solid #AAAAAA;
                 padding: 3px;
             }}
         """)
@@ -799,7 +801,7 @@ class PowderXRDModule(GUIBase):
             QLineEdit {{
                 background-color: white;
                 color: {self.colors['text_dark']};
-                border: 2px solid #666666;
+                border: 2px solid #AAAAAA;
                 padding: 3px;
             }}
         """)
@@ -844,7 +846,7 @@ class PowderXRDModule(GUIBase):
             QLineEdit {{
                 background-color: white;
                 color: {self.colors['text_dark']};
-                border: 2px solid #666666;
+                border: 2px solid #AAAAAA;
                 padding: 3px;
             }}
         """)
@@ -892,7 +894,7 @@ class PowderXRDModule(GUIBase):
                 QLineEdit {{
                     background-color: white;
                     color: {self.colors['text_dark']};
-                    border: 2px solid #666666;
+                    border: 2px solid #AAAAAA;
                     padding: 3px;
                 }}
             """)
@@ -919,7 +921,7 @@ class PowderXRDModule(GUIBase):
                 QLineEdit {{
                     background-color: white;
                     color: {self.colors['text_dark']};
-                    border: 2px solid #666666;
+                    border: 2px solid #AAAAAA;
                     padding: 3px;
                 }}
             """)
