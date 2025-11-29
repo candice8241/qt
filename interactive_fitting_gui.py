@@ -1130,10 +1130,11 @@ class InteractiveFittingGUI(QWidget):
         self.ax = self.fig.add_subplot(111)
         self.ax.set_facecolor('#FFFFFF')  # White plot area
         self.ax.grid(True, alpha=0.3, linestyle='--', color='#9575CD')
-        self.ax.set_xlabel('2θ (degree)', fontsize=12, color='#4A148C', fontweight='bold')
-        self.ax.set_ylabel('Intensity', fontsize=12, color='#4A148C', fontweight='bold')
+        # Initial labels - smaller font (10 - 2 = 8pt)
+        self.ax.set_xlabel('2θ (degree)', fontsize=8, color='#4A148C', fontweight='bold')
+        self.ax.set_ylabel('Intensity', fontsize=8, color='#4A148C', fontweight='bold')
         self.ax.set_title('Click on peaks to select | Use toolbar or scroll to zoom/pan',
-                         fontsize=10, color='#7B1FA2')
+                         fontsize=8, color='#7B1FA2')
 
         # Canvas
         self.canvas = FigureCanvasQTAgg(self.fig)
@@ -1248,7 +1249,7 @@ class InteractiveFittingGUI(QWidget):
             # Plot data
             self.plot_data()
 
-            QMessageBox.information(self, "Success", f"Loaded {len(self.x_data)} data points")
+            # Remove the success dialog - no popup after loading
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to load data file:\n{str(e)}")
@@ -1283,7 +1284,10 @@ class InteractiveFittingGUI(QWidget):
             self.status_label.setText(f"Loaded: {self.current_file}")
 
     def on_plot_click(self, event):
-        """Handle plot click for manual peak or background selection"""
+        """Handle plot click for manual peak or background selection
+        Left click: Add peak/BG point
+        Right click: Remove peak/BG point
+        """
         if event.inaxes != self.ax:
             return
 
@@ -1299,30 +1303,38 @@ class InteractiveFittingGUI(QWidget):
         self.save_state_to_undo()
 
         if self.bg_selection_mode:
-            # Add background point
+            # Background point mode
             point = (self.x_data[idx], self.y_data[idx])
-            
-            # Check if clicking near existing point to remove it
             remove_threshold = 0.02 * (self.x_data.max() - self.x_data.min())
-            removed = False
-            for i, (px, py) in enumerate(self.bg_points):
-                if abs(px - self.x_data[idx]) < remove_threshold:
-                    self.bg_points.pop(i)
-                    removed = True
-                    break
             
-            if not removed:
-                self.bg_points.append(point)
-                self.bg_points.sort(key=lambda p: p[0])  # Sort by x coordinate
+            if event.button == 3:  # Right click - remove
+                removed = False
+                for i, (px, py) in enumerate(self.bg_points):
+                    if abs(px - self.x_data[idx]) < remove_threshold:
+                        self.bg_points.pop(i)
+                        removed = True
+                        break
+            elif event.button == 1:  # Left click - add
+                # Check if not too close to existing point
+                too_close = False
+                for px, py in self.bg_points:
+                    if abs(px - self.x_data[idx]) < remove_threshold:
+                        too_close = True
+                        break
+                if not too_close:
+                    self.bg_points.append(point)
+                    self.bg_points.sort(key=lambda p: p[0])
             
             self.plot_data()
         else:
-            # Add or remove peak
-            if idx in self.peaks:
-                self.peaks.remove(idx)
-            else:
-                self.peaks.append(idx)
-                self.peaks.sort()
+            # Peak mode
+            if event.button == 3:  # Right click - remove peak
+                if idx in self.peaks:
+                    self.peaks.remove(idx)
+            elif event.button == 1:  # Left click - add peak
+                if idx not in self.peaks:
+                    self.peaks.append(idx)
+                    self.peaks.sort()
 
             self.update_peak_table()
             self.plot_data()
@@ -1440,22 +1452,24 @@ class InteractiveFittingGUI(QWidget):
         # Plot raw data
         self.ax.plot(self.x_data, self.y_data, 'k-', linewidth=1, label='Raw Data', alpha=0.7)
 
-        # Plot background points if any
+        # Plot background points if any - smaller size, light blue color
         if self.bg_points:
             bg_x = [p[0] for p in self.bg_points]
             bg_y = [p[1] for p in self.bg_points]
-            self.ax.plot(bg_x, bg_y, 'bs', markersize=8, label=f'BG Points ({len(self.bg_points)})', alpha=0.7)
+            # Changed to light blue color, smaller size
+            self.ax.plot(bg_x, bg_y, 'o', color='#87CEEB', markersize=4, label=f'BG Points ({len(self.bg_points)})', alpha=0.8)
             
             # Plot background line if we have points
             if len(bg_x) > 1:
                 bg_line = np.interp(self.x_data, bg_x, bg_y)
-                self.ax.plot(self.x_data, bg_line, 'b--', linewidth=1.5, label='BG Fit', alpha=0.5)
+                self.ax.plot(self.x_data, bg_line, '--', color='#87CEEB', linewidth=1.5, label='BG Fit', alpha=0.5)
 
-        # Plot detected peaks
+        # Plot detected peaks - smaller five-pointed star
         if self.peaks:
             peak_x = self.x_data[self.peaks]
             peak_y = self.y_data[self.peaks]
-            self.ax.plot(peak_x, peak_y, 'r^', markersize=10, label=f'Detected Peaks ({len(self.peaks)})')
+            # Changed to star marker, much smaller size
+            self.ax.plot(peak_x, peak_y, '*', color='red', markersize=6, label=f'Detected Peaks ({len(self.peaks)})')
 
         # Plot fitted curves
         if self.peak_params:
@@ -1492,7 +1506,8 @@ class InteractiveFittingGUI(QWidget):
         self.ax.set_facecolor('#FFFFFF')  # White plot area
         self.ax.set_xlabel('2θ (degree)', fontsize=10, color='#4A148C', fontweight='bold')  # Reduced from 12 to 10
         self.ax.set_ylabel('Intensity', fontsize=10, color='#4A148C', fontweight='bold')  # Reduced from 12 to 10
-        self.ax.set_title(f'XRD Data: {self.current_file}', fontsize=13, color='#7B1FA2', fontweight='bold')
+        # Title: only show filename, not bold, smaller (13 - 2 = 11)
+        self.ax.set_title(f'{self.current_file}', fontsize=11, color='#7B1FA2', fontweight='normal')
         self.ax.legend(loc='best', fontsize=9, framealpha=0.9)
         self.ax.grid(True, alpha=0.3, linestyle='--', color='#9575CD')
         
