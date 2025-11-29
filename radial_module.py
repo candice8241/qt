@@ -400,10 +400,15 @@ class AzimuthalIntegrationModule(GUIBase):
         right_panel.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(12)
+        right_layout.setSpacing(0)
 
-        # Right panel centered card - 垂直居中对齐
-        right_layout.addStretch()
+        # 添加顶部间距，使右边容器相对于左边Browse区域垂直居中
+        # 左边标题约20px，5个输入框约250px，Browse区域中心约145px
+        # 右边容器高度约350px，所以需要向下偏移：145 - 350/2 + 20(标题) ≈ -30，但至少从标题后开始
+        # 实际调整：让右边从左边第2-3个输入框的位置开始，约80px
+        from PyQt6.QtWidgets import QSpacerItem, QSizePolicy
+        top_spacer = QSpacerItem(20, 80, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        right_layout.addItem(top_spacer)
 
         settings_card = self.create_card_frame(None)
         # 加深右边容器的框线
@@ -691,7 +696,9 @@ class AzimuthalIntegrationModule(GUIBase):
         
         settings_layout.addWidget(viz_grid)
 
-        right_layout.addWidget(settings_card, alignment=Qt.AlignmentFlag.AlignCenter)
+        right_layout.addWidget(settings_card, alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
+        
+        # 底部弹性空间，让整体布局更好
         right_layout.addStretch()
 
         # Add both panels to columns with stretch ratios
