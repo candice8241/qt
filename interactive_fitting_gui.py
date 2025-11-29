@@ -648,8 +648,7 @@ class InteractiveFittingGUI(QWidget):
         # 5. Plot area (takes remaining space)
         self.setup_plot_area(main_layout)
 
-        # 6. Info panel at bottom
-        self.setup_info_panel(main_layout)
+        # Info panel removed - no longer needed
 
     def setup_control_panel(self, parent_layout):
         """Setup top control panel - compact and uniform"""
@@ -754,12 +753,14 @@ class InteractiveFittingGUI(QWidget):
         batch_btn = QPushButton("Batch")
         batch_btn.setFixedWidth(50)
         batch_btn.setStyleSheet(btn_style + f"background-color: #D5D5FF; color: black;")
+        batch_btn.clicked.connect(self.show_batch_info)
         control_layout.addWidget(batch_btn)
 
         # Settings button (gear icon) - compact
         settings_btn = QPushButton("⚙")
         settings_btn.setFixedWidth(30)
         settings_btn.setStyleSheet(btn_style + f"background-color: #F5F5F5; color: black; min-width: 20px; font-size: 12pt;")
+        settings_btn.clicked.connect(self.show_settings_info)
         control_layout.addWidget(settings_btn)
 
         control_layout.addStretch()
@@ -1169,32 +1170,6 @@ class InteractiveFittingGUI(QWidget):
 
         parent_layout.addWidget(plot_widget)
 
-    def setup_info_panel(self, parent_layout):
-        """Setup info panel at bottom - compact and uniform"""
-        info_widget = QWidget()
-        info_widget.setFixedHeight(65)  # More compact: 75 → 65
-        info_widget.setAutoFillBackground(True)
-        info_widget.setStyleSheet("QWidget { background-color: #E3F2FF; }")  # Light blue tint
-        info_layout = QVBoxLayout(info_widget)
-        info_layout.setContentsMargins(6, 3, 6, 3)  # More compact: 8,4 → 6,3
-
-        # Info text area - match load row font
-        self.info_text = QTextEdit()
-        self.info_text.setReadOnly(True)
-        self.info_text.setFont(QFont('Arial', 8))  # Match load row: 9 → 8
-        self.info_text.setStyleSheet(f"""
-            QTextEdit {{
-                background-color: white;
-                color: #4A148C;
-                border: 2px solid #B794F6;
-                border-radius: 3px;
-            }}
-        """)
-        # Remove welcome text - leave empty
-        self.info_text.setText("")
-        info_layout.addWidget(self.info_text)
-
-        parent_layout.addWidget(info_widget)
 
     def on_mouse_move(self, event):
         """Display mouse coordinates in compact format"""
@@ -1534,8 +1509,8 @@ class InteractiveFittingGUI(QWidget):
         if self.bg_points:
             bg_x = [p[0] for p in self.bg_points]
             bg_y = [p[1] for p in self.bg_points]
-            # Changed to darker blue square, smaller size
-            self.ax.plot(bg_x, bg_y, 's', color='#4682B4', markersize=4, label=f'BG Points ({len(self.bg_points)})', alpha=0.8)
+            # Changed to darker blue square, smaller size (reduced from 4 to 3)
+            self.ax.plot(bg_x, bg_y, 's', color='#4682B4', markersize=3, label=f'BG Points ({len(self.bg_points)})', alpha=0.8)
             
             # Plot background line if we have points
             if len(bg_x) > 1:
@@ -1947,19 +1922,41 @@ class InteractiveFittingGUI(QWidget):
             # Cluster peaks
             labels, n_clusters = PeakClusterer.cluster_peaks(peak_positions, eps=eps)
             
-            # Display clustering results
-            QMessageBox.information(
-                self, 
-                "Overlap Detection", 
-                f"Found {n_clusters} peak groups from {len(self.peaks)} peaks\n"
-                f"Overlap threshold: {overlap_multiplier}× FWHM ({eps:.4f}°)"
-            )
+            # Update status label instead of popup
+            self.status_label.setText(f"Found {n_clusters} peak groups from {len(self.peaks)} peaks")
             
             # Store cluster labels for use in fitting
             self.peak_cluster_labels = labels
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Overlap detection failed:\n{str(e)}")
+
+    def show_batch_info(self):
+        """Show batch processing information"""
+        QMessageBox.information(
+            self,
+            "Batch Processing",
+            "Batch processing feature:\n\n"
+            "This feature allows you to automatically fit peaks for multiple files.\n"
+            "Please use the batch_integration.py script for batch processing.\n\n"
+            "Usage: python batch_integration.py"
+        )
+
+    def show_settings_info(self):
+        """Show settings information"""
+        msg = (
+            "Current Settings:\n\n"
+            f"Fit Method: {self.method_combo.currentText()}\n"
+            f"Overlap FWHM×: {self.overlap_entry.text()}\n"
+            f"Fit Window×: {self.fit_window_entry.text()}\n"
+            f"Background Subtraction: {'On' if self.background_cb.isChecked() else 'Off'}\n"
+            f"Smoothing: {'On' if self.smoothing_enable_cb.isChecked() else 'Off'}\n"
+        )
+        if self.smoothing_enable_cb.isChecked():
+            msg += f"Smoothing Method: {self.smooth_method_combo.currentText()}\n"
+            msg += f"Sigma/Window: {self.sigma_entry.text() if self.smooth_method_combo.currentText() == 'gaussian' else self.smooth_window_entry.text()}\n"
+        
+        QMessageBox.information(self, "Settings", msg)
 
 
 def main():
