@@ -534,9 +534,9 @@ class PowderXRDModule(GUIBase):
         self.offset_entry.setFont(QFont('Arial', 9))
         self.offset_entry.setStyleSheet(f"""
             QLineEdit {{
-                background-color: #E8E8E8;
+                background-color: white;
                 color: {self.colors['text_dark']};
-                border: 1px solid {self.colors['border']};
+                border: 2px solid #666666;
                 padding: 3px;
             }}
         """)
@@ -797,9 +797,9 @@ class PowderXRDModule(GUIBase):
         entry.setFont(QFont('Arial', 9))
         entry.setStyleSheet(f"""
             QLineEdit {{
-                background-color: #E8E8E8;
+                background-color: white;
                 color: {self.colors['text_dark']};
-                border: 1px solid {self.colors['border']};
+                border: 2px solid #666666;
                 padding: 3px;
             }}
         """)
@@ -842,9 +842,9 @@ class PowderXRDModule(GUIBase):
         entry.setFont(QFont('Arial', 9))
         entry.setStyleSheet(f"""
             QLineEdit {{
-                background-color: #E8E8E8;
+                background-color: white;
                 color: {self.colors['text_dark']};
-                border: 1px solid {self.colors['border']};
+                border: 2px solid #666666;
                 padding: 3px;
             }}
         """)
@@ -890,9 +890,9 @@ class PowderXRDModule(GUIBase):
             entry.setText(getattr(self, var_name, ""))
             entry.setStyleSheet(f"""
                 QLineEdit {{
-                    background-color: #E8E8E8;
+                    background-color: white;
                     color: {self.colors['text_dark']};
-                    border: 1px solid {self.colors['border']};
+                    border: 2px solid #666666;
                     padding: 3px;
                 }}
             """)
@@ -917,9 +917,9 @@ class PowderXRDModule(GUIBase):
             entry.setText(getattr(self, var_name, ""))
             entry.setStyleSheet(f"""
                 QLineEdit {{
-                    background-color: #E8E8E8;
+                    background-color: white;
                     color: {self.colors['text_dark']};
-                    border: 1px solid {self.colors['border']};
+                    border: 2px solid #666666;
                     padding: 3px;
                 }}
             """)
