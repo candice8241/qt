@@ -264,7 +264,7 @@ class PowderXRDModule(GUIBase):
         params_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         params_row_layout = QHBoxLayout(params_row)
         params_row_layout.setContentsMargins(0, 6, 0, 6)
-        params_row_layout.setSpacing(16)
+        params_row_layout.setSpacing(0)
 
         npt_container = QWidget()
         npt_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
@@ -281,6 +281,7 @@ class PowderXRDModule(GUIBase):
         self.npt_spinbox.valueChanged.connect(lambda v: setattr(self, 'npt', int(v)))
         npt_layout.addWidget(self.npt_spinbox, alignment=Qt.AlignmentFlag.AlignCenter)
         params_row_layout.addWidget(npt_container)
+        params_row_layout.addStretch()
 
         unit_container = QWidget()
         unit_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
@@ -343,7 +344,6 @@ class PowderXRDModule(GUIBase):
         )
         run_int_btn.setFont(QFont('Arial', 9))
         params_row_layout.addWidget(run_int_btn)
-        params_row_layout.addStretch()
 
         left_layout.addWidget(params_row)
         left_layout.addStretch()
@@ -356,6 +356,13 @@ class PowderXRDModule(GUIBase):
         right_layout.setSpacing(12)
 
         output_card = self.create_card_frame(None)
+        output_card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {self.colors['card_bg']};
+                border: 2px solid #888888;
+                border-radius: 8px;
+            }}
+        """)
         output_layout = QVBoxLayout(output_card)
         output_layout.setContentsMargins(15, 12, 15, 12)
         output_layout.setSpacing(8)
@@ -652,7 +659,7 @@ class PowderXRDModule(GUIBase):
         combined_frame.setStyleSheet(f"""
             QFrame {{
                 background-color: {self.colors['card_bg']};
-                border: 1.5px solid {self.colors['border']};
+                border: 2px solid #888888;
                 border-radius: 6px;
             }}
         """)
@@ -728,21 +735,20 @@ class PowderXRDModule(GUIBase):
         combined_frame_layout.addWidget(row1)
         combined_frame_layout.addWidget(row2)
 
-        # Wavelength section inside the same frame
+        # Wavelength section inside the same frame - label and input in same row
+        wl_row = QWidget()
+        wl_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
+        wl_row_layout = QHBoxLayout(wl_row)
+        wl_row_layout.setContentsMargins(0, 0, 0, 0)
+        wl_row_layout.setSpacing(10)
+        
+        wl_row_layout.addStretch()
+        
         wl_label = QLabel("Wavelength (Å)")
         wl_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         wl_label.setStyleSheet(f"color: {self.colors['text_dark']}; border: none;background-color: transparent;")
-        wl_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        combined_frame_layout.addWidget(wl_label)
-
-        # Create container for wavelength input to center it
-        wl_input_container = QWidget()
-        wl_input_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        wl_input_container_layout = QHBoxLayout(wl_input_container)
-        wl_input_container_layout.setContentsMargins(0, 0, 0, 0)
-        wl_input_container_layout.setSpacing(0)
+        wl_row_layout.addWidget(wl_label)
         
-        wl_input_container_layout.addStretch()
         self.phase_wavelength_entry = QLineEdit(str(self.phase_wavelength))
         self.phase_wavelength_entry.setFixedWidth(80)
         self.phase_wavelength_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -756,10 +762,11 @@ class PowderXRDModule(GUIBase):
             }}
         """)
         self.phase_wavelength_entry.textChanged.connect(self._on_phase_wavelength_changed)
-        wl_input_container_layout.addWidget(self.phase_wavelength_entry)
-        wl_input_container_layout.addStretch()
+        wl_row_layout.addWidget(self.phase_wavelength_entry)
         
-        combined_frame_layout.addWidget(wl_input_container)
+        wl_row_layout.addStretch()
+        
+        combined_frame_layout.addWidget(wl_row)
 
         # Add frame to container with stretch on both sides to center it
         frame_container_layout.addStretch()
