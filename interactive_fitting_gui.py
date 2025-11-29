@@ -1126,8 +1126,8 @@ class InteractiveFittingGUI(QWidget):
 
         # Create matplotlib figure
         self.fig = Figure(figsize=(12, 6), facecolor='#FFFFFF')  # Changed to white
-        # Fixed margins with more space for title at top
-        self.fig.subplots_adjust(left=0.10, right=0.98, top=0.93, bottom=0.12)
+        # Fixed margins with more space for title at top and Intensity label on left
+        self.fig.subplots_adjust(left=0.12, right=0.98, top=0.93, bottom=0.12)
         self.ax = self.fig.add_subplot(111)
         self.ax.set_facecolor('#FFFFFF')  # White plot area
         self.ax.grid(True, alpha=0.3, linestyle='--', color='#9575CD')
@@ -1372,11 +1372,14 @@ class InteractiveFittingGUI(QWidget):
             self.plot_data()
 
     def clear_peaks(self):
-        """Clear all detected peaks"""
+        """Clear all detected peaks and reset view"""
         self.save_state_to_undo()
         self.peaks = []
         self.peak_params = []
         self.update_peak_table()
+        # Reset view by setting limits to invalid values so plot_data won't restore them
+        self.ax.set_xlim(0, 1)
+        self.ax.set_ylim(0, 1)
         self.plot_data()
 
     def on_method_changed(self):
@@ -1505,9 +1508,9 @@ class InteractiveFittingGUI(QWidget):
         if self.peaks:
             peak_x = self.x_data[self.peaks]
             peak_y = self.y_data[self.peaks]
-            # Using custom star marker for sharper appearance
-            self.ax.plot(peak_x, peak_y, marker=(5, 1, 0), color='red', markersize=8, 
-                        linestyle='', label=f'Detected Peaks ({len(self.peaks)})')
+            # Using sharp star marker with darker red color
+            self.ax.plot(peak_x, peak_y, marker=(5, 2, 0), color='#DC143C', markersize=9, 
+                        linestyle='', label=f'Detected Peaks ({len(self.peaks)})', markeredgewidth=0.5)
 
         # Plot fitted curves
         if self.peak_params:
