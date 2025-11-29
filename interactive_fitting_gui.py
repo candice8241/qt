@@ -21,7 +21,7 @@ from matplotlib.figure import Figure
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
                               QLineEdit, QComboBox, QCheckBox, QTextEdit, QSlider,
                               QFileDialog, QMessageBox, QFrame, QGroupBox, QSplitter,
-                              QTableWidget, QTableWidgetItem, QHeaderView, QSpinBox)
+                              QTableWidget, QTableWidgetItem, QHeaderView, QSpinBox, QSizePolicy)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QDoubleValidator
 from scipy.optimize import curve_fit
@@ -568,8 +568,9 @@ class InteractiveFittingGUI(QWidget):
         # Remove standalone window flags to embed in main window
         # Do NOT use WA_DeleteOnClose to prevent deletion errors on re-opening
         
-        # Set minimum size for proper display
-        self.setMinimumSize(1400, 800)
+        # Set size constraints for proper display and prevent overflow
+        self.setMinimumSize(1200, 700)
+        self.setMaximumWidth(1600)  # Set right boundary to prevent UI overflow
 
         # Colorful vibrant palette (matching Image 1)
         self.palette = {
@@ -651,113 +652,122 @@ class InteractiveFittingGUI(QWidget):
         self.setup_info_panel(main_layout)
 
     def setup_control_panel(self, parent_layout):
-        """Setup top control panel - colorful and vibrant"""
+        """Setup top control panel - colorful and vibrant with compact sizing"""
         control_widget = QWidget()
-        control_widget.setFixedHeight(55)
+        control_widget.setFixedHeight(50)  # Reduced from 55
         control_widget.setAutoFillBackground(True)
         control_widget.setStyleSheet("QWidget { background-color: #C7BFFF; border-bottom: 2px solid #B794F6; }")
         control_layout = QHBoxLayout(control_widget)
-        control_layout.setContentsMargins(8, 5, 8, 5)
-        control_layout.setSpacing(4)
+        control_layout.setContentsMargins(6, 4, 6, 4)  # Reduced margins
+        control_layout.setSpacing(3)  # Reduced spacing
 
-        # Colorful button style with explicit text color
+        # Compact button style with smaller fonts and widths
         btn_style = """
             QPushButton {
                 font-family: Arial;
-                font-size: 10pt;
+                font-size: 8pt;
                 font-weight: bold;
                 border: 2px solid #9575CD;
-                border-radius: 5px;
-                padding: 6px 10px;
-                min-width: 70px;
+                border-radius: 4px;
+                padding: 4px 6px;
+                min-width: 50px;
             }
             QPushButton:hover {
                 opacity: 0.85;
             }
             QPushButton:pressed {
-                padding: 7px 9px 5px 11px;
+                padding: 5px 5px 3px 7px;
             }
         """
 
-        # Load File button
-        load_btn = QPushButton("Load File")
+        # Load File button - compact
+        load_btn = QPushButton("Load")
+        load_btn.setFixedWidth(55)
         load_btn.setStyleSheet(btn_style + f"background-color: #C77DFF; color: black; font-weight: bold;")
         load_btn.clicked.connect(self.load_data_file)
         control_layout.addWidget(load_btn)
 
-        # Navigation buttons
+        # Navigation buttons - compact
         prev_btn = QPushButton("◀")
-        prev_btn.setFixedWidth(35)
-        prev_btn.setStyleSheet(btn_style + f"background-color: #A5D8FF; color: black; min-width: 25px;")
+        prev_btn.setFixedWidth(30)
+        prev_btn.setStyleSheet(btn_style + f"background-color: #A5D8FF; color: black; min-width: 20px;")
         prev_btn.clicked.connect(self.prev_file)
         control_layout.addWidget(prev_btn)
 
         next_btn = QPushButton("▶")
-        next_btn.setFixedWidth(35)
-        next_btn.setStyleSheet(btn_style + f"background-color: #A5D8FF; color: black; min-width: 25px;")
+        next_btn.setFixedWidth(30)
+        next_btn.setStyleSheet(btn_style + f"background-color: #A5D8FF; color: black; min-width: 20px;")
         next_btn.clicked.connect(self.next_file)
         control_layout.addWidget(next_btn)
 
-        # Fit Peaks button
-        fit_btn = QPushButton("Fit Peaks")
+        # Fit Peaks button - compact
+        fit_btn = QPushButton("Fit")
+        fit_btn.setFixedWidth(50)
         fit_btn.setStyleSheet(btn_style + f"background-color: #D0BFFF; color: black;")
         fit_btn.clicked.connect(self.fit_all_peaks)
         control_layout.addWidget(fit_btn)
 
-        # Reset button
+        # Reset button - compact
         reset_btn = QPushButton("Reset")
+        reset_btn.setFixedWidth(55)
         reset_btn.setStyleSheet(btn_style + f"background-color: #FFC9A8; color: black;")
         reset_btn.clicked.connect(self.clear_peaks)
         control_layout.addWidget(reset_btn)
 
-        # Save Results button
-        save_btn = QPushButton("Save Results")
+        # Save Results button - compact
+        save_btn = QPushButton("Save")
+        save_btn.setFixedWidth(50)
         save_btn.setStyleSheet(btn_style + f"background-color: #A8E6CF; color: black;")
         save_btn.clicked.connect(self.export_results)
         control_layout.addWidget(save_btn)
 
-        # Clear Fit button
-        clear_btn = QPushButton("Clear Fit")
+        # Clear Fit button - compact
+        clear_btn = QPushButton("Clear")
+        clear_btn.setFixedWidth(50)
         clear_btn.setStyleSheet(btn_style + f"background-color: #FFB3BA; color: black;")
         clear_btn.clicked.connect(self.clear_peaks)
         control_layout.addWidget(clear_btn)
 
-        # Undo button
+        # Undo button - compact
         undo_btn = QPushButton("Undo")
+        undo_btn.setFixedWidth(50)
         undo_btn.setStyleSheet(btn_style + f"background-color: #E8D5F5; color: black;")
         undo_btn.clicked.connect(self.undo_action)
         control_layout.addWidget(undo_btn)
 
-        # Auto Find button
-        auto_btn = QPushButton("Auto Find")
+        # Auto Find button - compact
+        auto_btn = QPushButton("Auto")
+        auto_btn.setFixedWidth(50)
         auto_btn.setStyleSheet(btn_style + f"background-color: #B9DEFF; color: black;")
         auto_btn.clicked.connect(self.auto_detect_peaks)
         control_layout.addWidget(auto_btn)
 
-        # Overlap button
+        # Overlap button - compact
         overlap_btn = QPushButton("Overlap")
+        overlap_btn.setFixedWidth(60)
         overlap_btn.setStyleSheet(btn_style + f"background-color: #B9F2FF; color: black;")
         overlap_btn.clicked.connect(self.toggle_overlap_mode)
         control_layout.addWidget(overlap_btn)
 
-        # Batch Auto Fit button
-        batch_btn = QPushButton("Batch Auto Fit")
+        # Batch Auto Fit button - compact
+        batch_btn = QPushButton("Batch")
+        batch_btn.setFixedWidth(50)
         batch_btn.setStyleSheet(btn_style + f"background-color: #D5D5FF; color: black;")
         control_layout.addWidget(batch_btn)
 
-        # Settings button (gear icon)
+        # Settings button (gear icon) - compact
         settings_btn = QPushButton("⚙")
-        settings_btn.setFixedWidth(35)
-        settings_btn.setStyleSheet(btn_style + f"background-color: #F5F5F5; color: black; min-width: 25px; font-size: 14pt;")
+        settings_btn.setFixedWidth(30)
+        settings_btn.setStyleSheet(btn_style + f"background-color: #F5F5F5; color: black; min-width: 20px; font-size: 12pt;")
         control_layout.addWidget(settings_btn)
 
         control_layout.addStretch()
 
-        # Status label - more space for display
+        # Status label - adjusted for better visibility
         self.status_label = QLabel("Please load a file to start")
-        self.status_label.setFont(QFont('Arial', 11, QFont.Weight.Bold))
-        self.status_label.setStyleSheet(f"color: #4A148C; background: transparent; padding: 5px;")
-        self.status_label.setMinimumWidth(400)
+        self.status_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))  # Smaller font
+        self.status_label.setStyleSheet(f"color: #4A148C; background: transparent; padding: 3px;")
+        self.status_label.setMinimumWidth(250)  # Reduced width
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         control_layout.addWidget(self.status_label)
 
@@ -896,12 +906,15 @@ class InteractiveFittingGUI(QWidget):
 
         bg_layout.addStretch()
 
-        # Coordinate label (right side) - colorful
+        # Coordinate label (right side) - colorful with proper sizing
         self.coord_label = QLabel("")
-        self.coord_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        self.coord_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Smaller font
         self.coord_label.setStyleSheet(f"color: #00BCD4; background: transparent;")  # Cyan
-        self.coord_label.setMinimumWidth(300)
+        self.coord_label.setMinimumWidth(200)  # Reduced to fit better
+        self.coord_label.setMaximumWidth(350)  # Set max width to prevent overflow
         self.coord_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.coord_label.setWordWrap(False)  # Prevent wrapping
+        self.coord_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         bg_layout.addWidget(self.coord_label)
 
         parent_layout.addWidget(bg_widget)
@@ -1181,9 +1194,10 @@ class InteractiveFittingGUI(QWidget):
         parent_layout.addWidget(info_widget)
 
     def on_mouse_move(self, event):
-        """Display mouse coordinates"""
+        """Display mouse coordinates in compact format"""
         if event.inaxes == self.ax and event.xdata is not None:
-            self.coord_label.setText(f"2theta: {event.xdata:.4f}  Intensity: {event.ydata:.2f}")
+            # Compact format to fit better
+            self.coord_label.setText(f"2θ:{event.xdata:.3f} I:{event.ydata:.1f}")
         else:
             self.coord_label.setText("")
 
