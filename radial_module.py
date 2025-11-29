@@ -399,13 +399,21 @@ class AzimuthalIntegrationModule(GUIBase):
         right_panel = QWidget()
         right_panel.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         right_layout = QVBoxLayout(right_panel)
-        right_layout.setContentsMargins(0, 4, 0, 4)
+        right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(12)
 
-        # Right panel centered card
+        # Right panel centered card - 垂直居中对齐
         right_layout.addStretch()
 
         settings_card = self.create_card_frame(None)
+        # 加深右边容器的框线
+        settings_card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {self.colors['card_bg']};
+                border: 2px solid rgba(0, 0, 0, 0.4);
+                border-radius: 8px;
+            }}
+        """)
         settings_layout = QVBoxLayout(settings_card)
         settings_layout.setContentsMargins(15, 12, 15, 12)
         settings_layout.setSpacing(8)
@@ -766,7 +774,7 @@ class AzimuthalIntegrationModule(GUIBase):
             QLineEdit {{
                 background-color: white;
                 color: {self.colors['text_dark']};
-                border: 1.5px solid rgba(0, 0, 0, 0.6);
+                border: 1.5px solid rgba(0, 0, 0, 0.3);
                 padding: 3px;
             }}
         """)
@@ -781,7 +789,7 @@ class AzimuthalIntegrationModule(GUIBase):
             width=70, height=26,
             parent=container
         )
-        browse_btn.setFont(QFont('Arial', 8))  # 更小的字体
+        browse_btn.setFont(QFont('Arial', 9))  # 增大字号
         input_layout.addWidget(browse_btn)
         
         layout.addLayout(input_layout)
@@ -810,7 +818,7 @@ class AzimuthalIntegrationModule(GUIBase):
             QLineEdit {{
                 background-color: white;
                 color: {self.colors['text_dark']};
-                border: 1.5px solid rgba(0, 0, 0, 0.6);
+                border: 1.5px solid rgba(0, 0, 0, 0.3);
                 padding: 3px;
             }}
         """)
@@ -825,7 +833,7 @@ class AzimuthalIntegrationModule(GUIBase):
             width=70, height=26,
             parent=container
         )
-        browse_btn.setFont(QFont('Arial', 8))  # 更小的字体
+        browse_btn.setFont(QFont('Arial', 9))  # 增大字号
         input_layout.addWidget(browse_btn)
         
         layout.addLayout(input_layout)
@@ -856,7 +864,7 @@ class AzimuthalIntegrationModule(GUIBase):
             QLineEdit {{
                 background-color: white;
                 color: {self.colors['text_dark']};
-                border: 1.5px solid rgba(0, 0, 0, 0.6);
+                border: 1.5px solid rgba(0, 0, 0, 0.3);
                 padding: 3px;
             }}
         """)
@@ -873,7 +881,7 @@ class AzimuthalIntegrationModule(GUIBase):
             width=70, height=26,
             parent=container
         )
-        browse_btn.setFont(QFont('Arial', 8))  # 更小的字体
+        browse_btn.setFont(QFont('Arial', 9))  # 增大字号
         input_layout.addWidget(browse_btn)
         
         layout.addLayout(input_layout)
