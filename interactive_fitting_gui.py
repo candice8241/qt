@@ -16,12 +16,12 @@ Allows users to:
 
 import numpy as np
 import pandas as pd
-from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
                               QLineEdit, QComboBox, QCheckBox, QTextEdit, QSlider,
                               QFileDialog, QMessageBox, QFrame, QGroupBox, QSplitter,
-                              QTableWidget, QTableWidgetItem, QHeaderView, QSpinBox)
+                              QTableWidget, QTableWidgetItem, QHeaderView, QSpinBox, QSizePolicy)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont, QDoubleValidator
 from scipy.optimize import curve_fit
@@ -568,26 +568,31 @@ class InteractiveFittingGUI(QWidget):
         # Remove standalone window flags to embed in main window
         # Do NOT use WA_DeleteOnClose to prevent deletion errors on re-opening
         
-        # Set minimum size for proper display
-        self.setMinimumSize(1400, 800)
+        # Set size constraints for proper display and prevent overflow
+        self.setMinimumSize(1200, 700)
+        self.setMaximumWidth(1600)  # Set right boundary to prevent UI overflow
 
-        # Modern clean color palette
+        # Colorful vibrant palette (matching Image 1)
         self.palette = {
-            'background': '#F5F5F5',  # Light gray background
-            'panel_bg': '#FFFFFF',
-            'primary': '#5C7CFA',      # Modern blue
-            'success': '#51CF66',      # Green
-            'warning': '#FFD43B',      # Yellow
-            'danger': '#FF6B6B',       # Red
-            'info': '#74C0FC',         # Light blue
-            'purple': '#9775FA',       # Purple
-            'text_dark': '#212529',
-            'text_light': '#868E96',
-            'border': '#DEE2E6',
+            'background': '#D4CCFF',  # Light purple background
+            'panel_bg': '#E8E4FF',
+            'primary': '#B794F6',      # Purple
+            'success': '#7FD857',      # Bright green
+            'warning': '#FFB84D',      # Orange
+            'danger': '#FF8A80',       # Coral/pink
+            'info': '#64D2FF',         # Cyan/bright blue
+            'purple': '#C77DFF',       # Light purple
+            'text_dark': '#4A148C',    # Dark purple
+            'text_light': '#7B1FA2',   # Medium purple
+            'text_cyan': '#00BCD4',    # Cyan
+            'text_pink': '#FF4081',    # Pink
+            'text_red': '#F44336',     # Red
+            'text_yellow': '#FFEB3B',  # Yellow
+            'border': '#B794F6',
         }
 
-        # Set main window background
-        self.setStyleSheet("QWidget { background-color: #F5F5F5; }")
+        # Set main window background to colorful gradient
+        self.setStyleSheet("QWidget { background-color: #D4CCFF; }")
 
         # Data storage
         self.x_data = None
@@ -623,10 +628,10 @@ class InteractiveFittingGUI(QWidget):
         self.setup_ui()
 
     def setup_ui(self):
-        """Setup the user interface matching tkinter layout exactly"""
+        """Setup the user interface - compact layout"""
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(5, 5, 5, 5)
-        main_layout.setSpacing(3)  # Small spacing between panels
+        main_layout.setContentsMargins(3, 3, 3, 3)  # More compact: 5 → 3
+        main_layout.setSpacing(2)  # More compact: 3 → 2
 
         # 1. Top control panel - all main buttons
         self.setup_control_panel(main_layout)
@@ -643,157 +648,174 @@ class InteractiveFittingGUI(QWidget):
         # 5. Plot area (takes remaining space)
         self.setup_plot_area(main_layout)
 
-        # 6. Info panel at bottom
-        self.setup_info_panel(main_layout)
+        # Info panel removed - no longer needed
 
     def setup_control_panel(self, parent_layout):
-        """Setup top control panel - compact and modern"""
+        """Setup top control panel - compact and uniform"""
         control_widget = QWidget()
-        control_widget.setFixedHeight(55)
+        control_widget.setFixedHeight(45)  # More compact: 50 → 45
         control_widget.setAutoFillBackground(True)
-        control_widget.setStyleSheet("QWidget { background-color: #FFFFFF; border-bottom: 2px solid #DEE2E6; }")
+        # Changed color, removed bottom border
+        control_widget.setStyleSheet("QWidget { background-color: #E8D5F0; }")
         control_layout = QHBoxLayout(control_widget)
-        control_layout.setContentsMargins(8, 5, 8, 5)
-        control_layout.setSpacing(4)
+        control_layout.setContentsMargins(6, 3, 6, 3)  # More compact: 6,4 → 6,3
+        control_layout.setSpacing(2)  # More compact: 3 → 2
 
-        # Compact button style with explicit text color
+        # Compact button style with smaller fonts and widths
         btn_style = """
             QPushButton {
                 font-family: Arial;
-                font-size: 10pt;
+                font-size: 8pt;
                 font-weight: bold;
-                border: none;
+                border: 2px solid #9575CD;
                 border-radius: 4px;
-                padding: 6px 10px;
-                min-width: 70px;
+                padding: 4px 6px;
+                min-width: 50px;
             }
             QPushButton:hover {
-                opacity: 0.9;
+                opacity: 0.85;
             }
             QPushButton:pressed {
-                padding: 7px 9px 5px 11px;
+                padding: 5px 5px 3px 7px;
             }
         """
 
-        # Load File button
+        # Load File button - compact
         load_btn = QPushButton("Load")
-        load_btn.setStyleSheet(btn_style + f"background-color: {self.palette['primary']}; color: white;")
+        load_btn.setFixedWidth(55)
+        load_btn.setStyleSheet(btn_style + f"background-color: #C77DFF; color: black; font-weight: bold;")
         load_btn.clicked.connect(self.load_data_file)
         control_layout.addWidget(load_btn)
 
-        # Navigation buttons
+        # Navigation buttons - compact
         prev_btn = QPushButton("◀")
-        prev_btn.setFixedWidth(35)
-        prev_btn.setStyleSheet(btn_style + f"background-color: {self.palette['info']}; color: white; min-width: 25px;")
+        prev_btn.setFixedWidth(30)
+        prev_btn.setStyleSheet(btn_style + f"background-color: #A5D8FF; color: black; min-width: 20px;")
         prev_btn.clicked.connect(self.prev_file)
         control_layout.addWidget(prev_btn)
 
         next_btn = QPushButton("▶")
-        next_btn.setFixedWidth(35)
-        next_btn.setStyleSheet(btn_style + f"background-color: {self.palette['info']}; color: white; min-width: 25px;")
+        next_btn.setFixedWidth(30)
+        next_btn.setStyleSheet(btn_style + f"background-color: #A5D8FF; color: black; min-width: 20px;")
         next_btn.clicked.connect(self.next_file)
         control_layout.addWidget(next_btn)
 
-        # Fit Peaks button
-        fit_btn = QPushButton("Fit Peaks")
-        fit_btn.setStyleSheet(btn_style + f"background-color: {self.palette['purple']}; color: white;")
+        # Fit Peaks button - compact
+        fit_btn = QPushButton("Fit")
+        fit_btn.setFixedWidth(50)
+        fit_btn.setStyleSheet(btn_style + f"background-color: #D0BFFF; color: black;")
         fit_btn.clicked.connect(self.fit_all_peaks)
         control_layout.addWidget(fit_btn)
 
-        # Reset button
+        # Reset button - compact
         reset_btn = QPushButton("Reset")
-        reset_btn.setStyleSheet(btn_style + f"background-color: {self.palette['warning']}; color: #212529;")
+        reset_btn.setFixedWidth(55)
+        reset_btn.setStyleSheet(btn_style + f"background-color: #FFC9A8; color: black;")
         reset_btn.clicked.connect(self.clear_peaks)
         control_layout.addWidget(reset_btn)
 
-        # Save Results button
+        # Save Results button - compact
         save_btn = QPushButton("Save")
-        save_btn.setStyleSheet(btn_style + f"background-color: {self.palette['success']}; color: white;")
+        save_btn.setFixedWidth(50)
+        save_btn.setStyleSheet(btn_style + f"background-color: #A8E6CF; color: black;")
         save_btn.clicked.connect(self.export_results)
         control_layout.addWidget(save_btn)
 
-        # Clear Fit button
+        # Clear Fit button - compact
         clear_btn = QPushButton("Clear")
-        clear_btn.setStyleSheet(btn_style + f"background-color: {self.palette['danger']}; color: white;")
+        clear_btn.setFixedWidth(50)
+        clear_btn.setStyleSheet(btn_style + f"background-color: #FFB3BA; color: black;")
         clear_btn.clicked.connect(self.clear_peaks)
         control_layout.addWidget(clear_btn)
 
-        # Undo button
+        # Undo button - compact
         undo_btn = QPushButton("Undo")
-        undo_btn.setStyleSheet(btn_style + f"background-color: #CED4DA; color: #212529;")
+        undo_btn.setFixedWidth(50)
+        undo_btn.setStyleSheet(btn_style + f"background-color: #E8D5F5; color: black;")
         undo_btn.clicked.connect(self.undo_action)
         control_layout.addWidget(undo_btn)
 
-        # Auto Find button
-        auto_btn = QPushButton("Auto Find")
-        auto_btn.setStyleSheet(btn_style + f"background-color: {self.palette['primary']}; color: white;")
+        # Auto Find button - compact
+        auto_btn = QPushButton("Auto")
+        auto_btn.setFixedWidth(50)
+        auto_btn.setStyleSheet(btn_style + f"background-color: #B9DEFF; color: black;")
         auto_btn.clicked.connect(self.auto_detect_peaks)
         control_layout.addWidget(auto_btn)
 
-        # Overlap button
+        # Overlap button - compact
         overlap_btn = QPushButton("Overlap")
-        overlap_btn.setStyleSheet(btn_style + f"background-color: {self.palette['info']}; color: white;")
+        overlap_btn.setFixedWidth(60)
+        overlap_btn.setStyleSheet(btn_style + f"background-color: #B9F2FF; color: black;")
         overlap_btn.clicked.connect(self.toggle_overlap_mode)
         control_layout.addWidget(overlap_btn)
 
-        # Batch button
+        # Batch Auto Fit button - compact
         batch_btn = QPushButton("Batch")
-        batch_btn.setStyleSheet(btn_style + f"background-color: #868E96; color: white;")
+        batch_btn.setFixedWidth(50)
+        batch_btn.setStyleSheet(btn_style + f"background-color: #D5D5FF; color: black;")
+        batch_btn.clicked.connect(self.show_batch_info)
         control_layout.addWidget(batch_btn)
+
+        # Settings button (gear icon) - compact
+        settings_btn = QPushButton("⚙")
+        settings_btn.setFixedWidth(30)
+        settings_btn.setStyleSheet(btn_style + f"background-color: #F5F5F5; color: black; min-width: 20px; font-size: 12pt;")
+        settings_btn.clicked.connect(self.show_settings_info)
+        control_layout.addWidget(settings_btn)
 
         control_layout.addStretch()
 
-        # Status label - more space for display
+        # Status label - adjusted for better visibility
         self.status_label = QLabel("Please load a file to start")
-        self.status_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        self.status_label.setStyleSheet(f"color: #212529; background: transparent; padding: 5px;")
-        self.status_label.setMinimumWidth(400)
-        self.status_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.status_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))  # Smaller font
+        self.status_label.setStyleSheet(f"color: #4A148C; background: transparent; padding: 3px;")
+        self.status_label.setMinimumWidth(250)  # Reduced width
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         control_layout.addWidget(self.status_label)
 
         parent_layout.addWidget(control_widget)
 
     def setup_background_panel(self, parent_layout):
-        """Setup background panel - compact and modern"""
+        """Setup background panel - compact and uniform"""
         bg_widget = QWidget()
-        bg_widget.setFixedHeight(50)
+        bg_widget.setFixedHeight(45)  # More compact: 50 → 45
         bg_widget.setAutoFillBackground(True)
-        bg_widget.setStyleSheet("QWidget { background-color: #E7F5FF; }")  # Light blue tint
+        bg_widget.setStyleSheet("QWidget { background-color: #E3F2FF; }")  # Light blue tint
         bg_layout = QHBoxLayout(bg_widget)
-        bg_layout.setContentsMargins(8, 5, 8, 5)
-        bg_layout.setSpacing(4)
+        bg_layout.setContentsMargins(6, 3, 6, 3)  # More compact: 8,5 → 6,3
+        bg_layout.setSpacing(3)  # More compact: 4 → 3
 
-        # Background label
+        # Background label - compact font like control panel
         bg_label = QLabel("Background:")
-        bg_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        bg_label.setStyleSheet(f"color: #212529; background: transparent;")
+        bg_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Match load row font
+        bg_label.setStyleSheet(f"color: #00BCD4; background: transparent;")  # Cyan
         bg_layout.addWidget(bg_label)
 
-        # Compact button style with explicit text color
+        # Compact button style - match load row
         bg_btn_style = """
             QPushButton {
                 font-family: Arial;
-                font-size: 9pt;
+                font-size: 8pt;
                 font-weight: bold;
-                border: none;
-                border-radius: 3px;
-                padding: 5px 10px;
-                min-width: 60px;
+                border: 2px solid #7CB9E8;
+                border-radius: 4px;
+                padding: 3px 6px;
+                min-width: 50px;
             }
             QPushButton:hover {
-                opacity: 0.9;
+                opacity: 0.85;
             }
         """
 
         # Select BG Points
-        select_bg_btn = QPushButton("Select")
-        select_bg_btn.setStyleSheet(bg_btn_style + f"background-color: {self.palette['info']}; color: white;")
+        select_bg_btn = QPushButton("Select BG Points")
+        select_bg_btn.setStyleSheet(bg_btn_style + f"background-color: #A5D8FF; color: black;")
         select_bg_btn.clicked.connect(self.toggle_bg_selection)
         bg_layout.addWidget(select_bg_btn)
 
         # Subtract BG
-        subtract_bg_btn = QPushButton("Subtract")
-        subtract_bg_btn.setStyleSheet(bg_btn_style + f"background-color: {self.palette['success']}; color: white;")
+        subtract_bg_btn = QPushButton("Subtract BG")
+        subtract_bg_btn.setStyleSheet(bg_btn_style + f"background-color: #A8E6CF; color: black;")
         subtract_bg_btn.clicked.connect(self.subtract_background)
         self.background_cb = QCheckBox()  # Hidden for compatibility
         self.background_cb.setChecked(True)
@@ -801,227 +823,237 @@ class InteractiveFittingGUI(QWidget):
         bg_layout.addWidget(subtract_bg_btn)
 
         # Clear BG
-        clear_bg_btn = QPushButton("Clear")
-        clear_bg_btn.setStyleSheet(bg_btn_style + f"background-color: {self.palette['danger']}; color: white;")
+        clear_bg_btn = QPushButton("Clear BG")
+        clear_bg_btn.setStyleSheet(bg_btn_style + f"background-color: #FFB3BA; color: black;")
         clear_bg_btn.clicked.connect(self.clear_background)
         bg_layout.addWidget(clear_bg_btn)
 
         # Auto Select BG
-        auto_bg_btn = QPushButton("Auto")
-        auto_bg_btn.setStyleSheet(bg_btn_style + f"background-color: {self.palette['primary']}; color: white;")
+        auto_bg_btn = QPushButton("Auto Select BG")
+        auto_bg_btn.setStyleSheet(bg_btn_style + f"background-color: #B9E5FF; color: black;")
         auto_bg_btn.clicked.connect(self.auto_select_background)
         bg_layout.addWidget(auto_bg_btn)
 
         bg_layout.addSpacing(10)
 
-        # Fit Method
-        fit_label = QLabel("Method:")
-        fit_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        fit_label.setStyleSheet(f"color: #212529; background: transparent;")
+        # Fit Method - black text, compact font
+        fit_label = QLabel("Fit Method:")
+        fit_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Match load row font
+        fit_label.setStyleSheet(f"color: black; background: transparent;")  # Black text
         bg_layout.addWidget(fit_label)
 
         self.method_combo = QComboBox()
         self.method_combo.addItems(['pseudo_voigt', 'voigt'])
-        self.method_combo.setFont(QFont('Arial', 9))
+        self.method_combo.setFont(QFont('Arial', 8))  # Smaller font
         self.method_combo.setFixedWidth(110)
         self.method_combo.setStyleSheet(f"""
             QComboBox {{ 
                 padding: 3px; 
-                color: #212529;
+                color: black;
                 background-color: white;
-                border: 1px solid #CED4DA;
+                border: 2px solid #B794F6;
+                border-radius: 3px;
             }}
             QComboBox QAbstractItemView {{
-                color: #212529;
+                color: black;
                 background-color: white;
             }}
         """)
         self.method_combo.currentTextChanged.connect(self.on_method_changed)
         bg_layout.addWidget(self.method_combo)
 
-        bg_layout.addSpacing(10)
+        bg_layout.addSpacing(6)  # More compact: 10 → 6
 
-        # Overlap FWHM×
-        overlap_label = QLabel("FWHM×:")
-        overlap_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        overlap_label.setStyleSheet(f"color: #212529; background: transparent;")
+        # Overlap FWHM× - compact font
+        overlap_label = QLabel("FWHM×:")  # Shortened label
+        overlap_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Match load row font
+        overlap_label.setStyleSheet(f"color: #7B1FA2; background: transparent;")  # Purple
         bg_layout.addWidget(overlap_label)
 
         self.overlap_entry = QLineEdit("5.0")
-        self.overlap_entry.setFixedWidth(50)
-        self.overlap_entry.setFont(QFont('Arial', 9))
+        self.overlap_entry.setFixedWidth(45)  # Smaller: 50 → 45
+        self.overlap_entry.setFont(QFont('Arial', 8))  # Smaller font
         self.overlap_entry.setStyleSheet(f"""
             QLineEdit {{ 
-                padding: 3px; 
-                color: #212529;
+                padding: 2px; 
+                color: black;
                 background-color: white;
-                border: 1px solid #CED4DA;
+                border: 2px solid #B794F6;
+                border-radius: 3px;
             }}
         """)
         bg_layout.addWidget(self.overlap_entry)
 
-        bg_layout.addSpacing(10)
+        bg_layout.addSpacing(6)  # More compact: 10 → 6
 
-        # Fit Window×
-        window_label = QLabel("Window×:")
-        window_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        window_label.setStyleSheet(f"color: #212529; background: transparent;")
+        # Fit Window× - black text, compact font
+        window_label = QLabel("Window×:")  # Shortened label
+        window_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Match load row font
+        window_label.setStyleSheet(f"color: black; background: transparent;")  # Black text
         bg_layout.addWidget(window_label)
 
         self.fit_window_entry = QLineEdit("3.0")
-        self.fit_window_entry.setFixedWidth(50)
-        self.fit_window_entry.setFont(QFont('Arial', 9))
+        self.fit_window_entry.setFixedWidth(45)  # Smaller: 50 → 45
+        self.fit_window_entry.setFont(QFont('Arial', 8))  # Smaller font
         self.fit_window_entry.setStyleSheet(f"""
             QLineEdit {{ 
-                padding: 3px; 
-                color: #212529;
+                padding: 2px; 
+                color: black;
                 background-color: white;
-                border: 1px solid #CED4DA;
+                border: 2px solid #B794F6;
+                border-radius: 3px;
             }}
         """)
         bg_layout.addWidget(self.fit_window_entry)
 
-        bg_layout.addStretch()
+        bg_layout.addStretch()  # Use stretch instead of fixed spacing
 
-        # Coordinate label (right side) - more space
+        # Coordinate label (right side) - hidden by default, moved left
         self.coord_label = QLabel("")
-        self.coord_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        self.coord_label.setStyleSheet(f"color: #212529; background: transparent;")
-        self.coord_label.setMinimumWidth(300)
+        self.coord_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Smaller font
+        self.coord_label.setStyleSheet(f"color: #00BCD4; background: transparent;")  # Cyan
+        self.coord_label.setMinimumWidth(150)  # Reduced further
+        self.coord_label.setMaximumWidth(250)  # Smaller max width
         self.coord_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        self.coord_label.setWordWrap(False)  # Prevent wrapping
+        self.coord_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.coord_label.setVisible(False)  # Hide by default (no real-time display)
         bg_layout.addWidget(self.coord_label)
 
         parent_layout.addWidget(bg_widget)
 
     def setup_smoothing_panel(self, parent_layout):
-        """Setup smoothing panel - compact and modern"""
+        """Setup smoothing panel - compact and uniform"""
         smooth_widget = QWidget()
-        smooth_widget.setFixedHeight(50)
+        smooth_widget.setFixedHeight(45)  # More compact: 50 → 45
         smooth_widget.setAutoFillBackground(True)
-        smooth_widget.setStyleSheet("QWidget { background-color: #F3F0FF; }")  # Light purple tint
+        smooth_widget.setStyleSheet("QWidget { background-color: #F3E5FF; }")  # Light purple tint
         smooth_layout = QHBoxLayout(smooth_widget)
-        smooth_layout.setContentsMargins(8, 5, 8, 5)
-        smooth_layout.setSpacing(4)
+        smooth_layout.setContentsMargins(6, 3, 6, 3)  # More compact: 8,5 → 6,3
+        smooth_layout.setSpacing(3)  # More compact: 4 → 3
 
-        # Smoothing label
+        # Smoothing label - black text, compact font
         smooth_label = QLabel("Smoothing:")
-        smooth_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        smooth_label.setStyleSheet(f"color: #212529; background: transparent;")
+        smooth_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Match load row font
+        smooth_label.setStyleSheet(f"color: black; background: transparent;")  # Black text
         smooth_layout.addWidget(smooth_label)
 
         # Enable checkbox
         self.smoothing_enable_cb = QCheckBox("Enable")
-        self.smoothing_enable_cb.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        self.smoothing_enable_cb.setStyleSheet(f"color: #212529; background: transparent;")
+        self.smoothing_enable_cb.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Smaller font
+        self.smoothing_enable_cb.setStyleSheet(f"color: #4A148C; background: transparent;")
         smooth_layout.addWidget(self.smoothing_enable_cb)
 
-        smooth_layout.addSpacing(10)
+        smooth_layout.addSpacing(6)  # More compact: 10 → 6
 
-        # Method
+        # Method - compact font
         method_label = QLabel("Method:")
-        method_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        method_label.setStyleSheet(f"color: #212529; background: transparent;")
+        method_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Match load row font
+        method_label.setStyleSheet(f"color: #7B1FA2; background: transparent;")  # Purple
         smooth_layout.addWidget(method_label)
 
         self.smooth_method_combo = QComboBox()
         self.smooth_method_combo.addItems(['gaussian', 'savgol'])
-        self.smooth_method_combo.setFont(QFont('Arial', 9))
-        self.smooth_method_combo.setFixedWidth(100)
+        self.smooth_method_combo.setFont(QFont('Arial', 8))  # Smaller font
+        self.smooth_method_combo.setFixedWidth(90)  # More compact: 100 → 90
         self.smooth_method_combo.setStyleSheet(f"""
             QComboBox {{ 
-                padding: 3px; 
-                color: #212529;
+                padding: 2px; 
+                color: black;
                 background-color: white;
-                border: 1px solid #CED4DA;
+                border: 2px solid #B794F6;
+                border-radius: 3px;
             }}
             QComboBox QAbstractItemView {{
-                color: #212529;
+                color: black;
                 background-color: white;
             }}
         """)
         smooth_layout.addWidget(self.smooth_method_combo)
 
-        smooth_layout.addSpacing(10)
+        smooth_layout.addSpacing(6)  # More compact: 10 → 6
 
-        # Sigma
+        # Sigma - compact font
         sigma_label = QLabel("Sigma:")
-        sigma_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        sigma_label.setStyleSheet(f"color: #212529; background: transparent;")
+        sigma_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Match load row font
+        sigma_label.setStyleSheet(f"color: #4A148C; background: transparent;")
         smooth_layout.addWidget(sigma_label)
 
         self.sigma_entry = QLineEdit("2.0")
-        self.sigma_entry.setFixedWidth(50)
-        self.sigma_entry.setFont(QFont('Arial', 9))
+        self.sigma_entry.setFixedWidth(45)  # More compact: 50 → 45
+        self.sigma_entry.setFont(QFont('Arial', 8))  # Smaller font
         self.sigma_entry.setStyleSheet(f"""
             QLineEdit {{ 
-                padding: 3px; 
-                color: #212529;
+                padding: 2px; 
+                color: black;
                 background-color: white;
-                border: 1px solid #CED4DA;
+                border: 2px solid #B794F6;
+                border-radius: 3px;
             }}
         """)
         smooth_layout.addWidget(self.sigma_entry)
 
-        smooth_layout.addSpacing(10)
+        smooth_layout.addSpacing(6)  # More compact: 10 → 6
 
-        # Window
+        # Window - black text, compact font
         window_label = QLabel("Window:")
-        window_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        window_label.setStyleSheet(f"color: #212529; background: transparent;")
+        window_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Match load row font
+        window_label.setStyleSheet(f"color: black; background: transparent;")  # Black text
         smooth_layout.addWidget(window_label)
 
         self.smooth_window_entry = QLineEdit("11")
-        self.smooth_window_entry.setFixedWidth(50)
-        self.smooth_window_entry.setFont(QFont('Arial', 9))
+        self.smooth_window_entry.setFixedWidth(45)  # More compact: 50 → 45
+        self.smooth_window_entry.setFont(QFont('Arial', 8))  # Smaller font
         self.smooth_window_entry.setStyleSheet(f"""
             QLineEdit {{ 
-                padding: 3px; 
-                color: #212529;
+                padding: 2px; 
+                color: black;
                 background-color: white;
-                border: 1px solid #CED4DA;
+                border: 2px solid #B794F6;
+                border-radius: 3px;
             }}
         """)
         smooth_layout.addWidget(self.smooth_window_entry)
 
-        smooth_layout.addSpacing(10)
+        smooth_layout.addSpacing(6)  # More compact: 10 → 6
 
-        # Apply button
+        # Apply button - match load row style
         apply_btn = QPushButton("Apply")
         apply_btn.setStyleSheet(f"""
             QPushButton {{
                 font-family: Arial;
-                font-size: 9pt;
+                font-size: 8pt;
                 font-weight: bold;
-                background-color: {self.palette['success']};
-                color: white;
-                border: none;
-                border-radius: 3px;
-                padding: 5px 14px;
-                min-width: 55px;
+                background-color: #A8E6CF;
+                color: black;
+                border: 2px solid #7CB9A8;
+                border-radius: 4px;
+                padding: 3px 8px;
+                min-width: 50px;
             }}
             QPushButton:hover {{
-                opacity: 0.9;
+                opacity: 0.85;
             }}
         """)
         apply_btn.clicked.connect(self.apply_smoothing_to_data)
         smooth_layout.addWidget(apply_btn)
 
-        # Reset Data button
+        # Reset Data button - match load row style
         reset_data_btn = QPushButton("Reset")
         reset_data_btn.setStyleSheet(f"""
             QPushButton {{
                 font-family: Arial;
-                font-size: 9pt;
+                font-size: 8pt;
                 font-weight: bold;
-                background-color: {self.palette['danger']};
-                color: white;
-                border: none;
-                border-radius: 3px;
-                padding: 5px 14px;
-                min-width: 55px;
+                background-color: #FFB3BA;
+                color: black;
+                border: 2px solid #FF8A80;
+                border-radius: 4px;
+                padding: 3px 8px;
+                min-width: 50px;
             }}
             QPushButton:hover {{
-                opacity: 0.9;
+                opacity: 0.85;
             }}
         """)
         reset_data_btn.clicked.connect(self.reset_to_original_data)
@@ -1032,19 +1064,19 @@ class InteractiveFittingGUI(QWidget):
         parent_layout.addWidget(smooth_widget)
 
     def setup_results_panel(self, parent_layout):
-        """Setup results panel - compact and modern"""
+        """Setup results panel - compact and uniform"""
         results_widget = QWidget()
-        results_widget.setFixedHeight(120)
+        results_widget.setFixedHeight(110)  # More compact: 120 → 110
         results_widget.setAutoFillBackground(True)
         results_widget.setStyleSheet("QWidget { background-color: #FFF9DB; }")  # Light yellow tint
         results_layout = QVBoxLayout(results_widget)
-        results_layout.setContentsMargins(8, 4, 8, 4)
-        results_layout.setSpacing(3)
+        results_layout.setContentsMargins(6, 3, 6, 3)  # More compact: 8,4 → 6,3
+        results_layout.setSpacing(2)  # More compact: 3 → 2
 
-        # Results label
+        # Results label - compact font like load row
         results_label = QLabel("Fitting Results:")
-        results_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        results_label.setStyleSheet(f"color: #212529; background: transparent;")
+        results_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Match load row font
+        results_label.setStyleSheet(f"color: #FF6B00; background: transparent;")  # Orange
         results_layout.addWidget(results_label)
 
         # Results table
@@ -1063,17 +1095,20 @@ class InteractiveFittingGUI(QWidget):
         self.peak_table.setStyleSheet(f"""
             QTableWidget {{
                 background-color: white;
-                gridline-color: {self.palette['border']};
-                border: 1px solid {self.palette['border']};
+                gridline-color: #FFD88D;
+                border: 2px solid #FFD88D;
             }}
             QHeaderView::section {{
-                background-color: #F8F9FA;
-                color: {self.palette['text_dark']};
+                background-color: #FFF4CC;
+                color: #4A148C;
                 font-weight: bold;
                 font-family: Arial;
                 font-size: 8pt;
-                border: 1px solid {self.palette['border']};
+                border: 1px solid #FFD88D;
                 padding: 3px;
+            }}
+            QTableWidget::item {{
+                color: black;
             }}
         """)
         results_layout.addWidget(self.peak_table)
@@ -1081,92 +1116,120 @@ class InteractiveFittingGUI(QWidget):
         parent_layout.addWidget(results_widget)
 
     def setup_plot_area(self, parent_layout):
-        """Setup plot area - matches tkinter exactly"""
+        """Setup plot area - white background"""
         plot_widget = QWidget()
         plot_widget.setAutoFillBackground(True)
-        plot_widget.setStyleSheet("QWidget { background-color: white; }")
+        plot_widget.setStyleSheet("QWidget { background-color: #FFFFFF; }")  # Changed to white
         plot_layout = QVBoxLayout(plot_widget)
         plot_layout.setContentsMargins(5, 5, 5, 5)
         plot_layout.setSpacing(2)
 
         # Create matplotlib figure
-        self.fig = Figure(figsize=(12, 6), facecolor='white')
-        # Increase left margin to 0.12 to prevent label cutoff (从0.08增加到0.12)
-        self.fig.subplots_adjust(left=0.12, right=0.98, top=0.92, bottom=0.15)
+        self.fig = Figure(figsize=(12, 6), facecolor='#FFFFFF')  # Changed to white
+        # Fixed margins with more space for Intensity label on left
+        self.fig.subplots_adjust(left=0.18, right=0.98, top=0.93, bottom=0.12)
         self.ax = self.fig.add_subplot(111)
-        self.ax.set_facecolor('#F8F9FA')  # Light gray
-        self.ax.grid(True, alpha=0.3, linestyle='--', color='#ADB5BD')
-        self.ax.set_xlabel('2θ (degree)', fontsize=12, color=self.palette['text_dark'], fontweight='bold')
-        self.ax.set_ylabel('Intensity', fontsize=12, color=self.palette['text_dark'], fontweight='bold')
-        self.ax.set_title('Click on peaks to select | Use toolbar or scroll to zoom/pan',
-                         fontsize=10, color=self.palette['primary'])
+        self.ax.set_facecolor('#FFFFFF')  # White plot area
+        self.ax.grid(True, alpha=0.3, linestyle='--', color='#9575CD')
+        # Set initial axis ranges to avoid flashing when loading data
+        self.ax.set_xlim(0, 100)
+        self.ax.set_ylim(0, 1000)
+        # Initial labels - consistent with loaded data
+        self.ax.set_xlabel('2θ (degree)', fontsize=10, color='#4A148C', fontweight='normal')
+        self.ax.set_ylabel('Intensity', fontsize=10, color='#4A148C', fontweight='normal')
+        self.ax.set_title('Left click: add | Right click: remove | Scroll: zoom',
+                         fontsize=9, color='#7B1FA2', fontweight='normal')
+        # Set tick label colors
+        self.ax.tick_params(colors='#4A148C', which='both')
 
         # Canvas
         self.canvas = FigureCanvasQTAgg(self.fig)
         self.canvas.mpl_connect('button_press_event', self.on_plot_click)
-        self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
+        self.canvas.mpl_connect('scroll_event', self.on_scroll)  # Add scroll zoom
+        # Removed mouse move event - no real-time coordinate display
+        # self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
         plot_layout.addWidget(self.canvas)
 
-        # Toolbar - fix text visibility
-        toolbar_frame = QWidget()
-        toolbar_frame.setStyleSheet("background-color: #F5E6FA;")
-        toolbar_layout = QVBoxLayout(toolbar_frame)
-        toolbar_layout.setContentsMargins(0, 0, 0, 0)
-        toolbar = NavigationToolbar2QT(self.canvas, toolbar_frame)
-        # Fix toolbar text color to be visible (修复导航栏文字颜色)
-        toolbar.setStyleSheet(f"""
-            QToolBar {{
-                background-color: #F5E6FA;
-                color: {self.palette['text_dark']};
-            }}
-            QToolButton {{
-                color: {self.palette['text_dark']};
-                background-color: transparent;
-            }}
-            QLabel {{
-                color: {self.palette['text_dark']};
-            }}
-        """)
-        toolbar_layout.addWidget(toolbar)
-        plot_layout.addWidget(toolbar_frame)
+        # Toolbar removed - no longer needed
 
         parent_layout.addWidget(plot_widget)
 
-    def setup_info_panel(self, parent_layout):
-        """Setup info panel at bottom - compact and modern"""
-        info_widget = QWidget()
-        info_widget.setFixedHeight(75)
-        info_widget.setAutoFillBackground(True)
-        info_widget.setStyleSheet("QWidget { background-color: #E7F5FF; }")  # Light blue tint
-        info_layout = QVBoxLayout(info_widget)
-        info_layout.setContentsMargins(8, 4, 8, 4)
-
-        # Info text area
-        self.info_text = QTextEdit()
-        self.info_text.setReadOnly(True)
-        self.info_text.setFont(QFont('Arial', 9))
-        self.info_text.setStyleSheet(f"""
-            QTextEdit {{
-                background-color: white;
-                color: {self.palette['text_dark']};
-                border: 1px solid {self.palette['border']};
-                border-radius: 3px;
-            }}
-        """)
-        self.info_text.setText(
-            '💡 Welcome! Load your XRD data file to begin peak fitting.\n'
-            '🖱️ Click on peaks to select | Use toolbar to zoom/pan | Right labels show coordinates and status.'
-        )
-        info_layout.addWidget(self.info_text)
-
-        parent_layout.addWidget(info_widget)
 
     def on_mouse_move(self, event):
-        """Display mouse coordinates"""
+        """Display mouse coordinates in compact format"""
         if event.inaxes == self.ax and event.xdata is not None:
-            self.coord_label.setText(f"2theta: {event.xdata:.4f}  Intensity: {event.ydata:.2f}")
+            # Compact format to fit better
+            self.coord_label.setText(f"2θ:{event.xdata:.3f} I:{event.ydata:.1f}")
         else:
             self.coord_label.setText("")
+
+    def on_scroll(self, event):
+        """Handle mouse scroll for zooming"""
+        if event.inaxes != self.ax:
+            return
+        
+        # Get current axis limits
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+        
+        # Calculate zoom factor
+        zoom_factor = 0.9 if event.button == 'up' else 1.1
+        
+        # Get click position
+        xdata = event.xdata
+        ydata = event.ydata
+        
+        # Calculate new limits centered on cursor
+        x_range = xlim[1] - xlim[0]
+        y_range = ylim[1] - ylim[0]
+        
+        new_x_range = x_range * zoom_factor
+        new_y_range = y_range * zoom_factor
+        
+        # Keep cursor position fixed
+        x_ratio = (xdata - xlim[0]) / x_range if x_range > 0 else 0.5
+        y_ratio = (ydata - ylim[0]) / y_range if y_range > 0 else 0.5
+        
+        new_xlim = [xdata - new_x_range * x_ratio, xdata + new_x_range * (1 - x_ratio)]
+        new_ylim = [ydata - new_y_range * y_ratio, ydata + new_y_range * (1 - y_ratio)]
+        
+        self.ax.set_xlim(new_xlim)
+        self.ax.set_ylim(new_ylim)
+        self.canvas.draw()
+
+    def find_nearest_peak(self, idx, search_window=20):
+        """Find nearest peak position within search window"""
+        if self.y_data is None:
+            return idx
+        
+        # Define search window
+        left = max(0, idx - search_window)
+        right = min(len(self.y_data), idx + search_window)
+        
+        # Find local maximum
+        local_y = self.y_data[left:right]
+        if len(local_y) > 0:
+            local_max_idx = np.argmax(local_y)
+            return left + local_max_idx
+        
+        return idx
+
+    def find_nearest_minimum(self, idx, search_window=15):
+        """Find nearest minimum position within search window"""
+        if self.y_data is None:
+            return idx
+        
+        # Define search window
+        left = max(0, idx - search_window)
+        right = min(len(self.y_data), idx + search_window)
+        
+        # Find local minimum
+        local_y = self.y_data[left:right]
+        if len(local_y) > 0:
+            local_min_idx = np.argmin(local_y)
+            return left + local_min_idx
+        
+        return idx
 
     def load_data_file(self):
         """Load XRD data file"""
@@ -1212,7 +1275,7 @@ class InteractiveFittingGUI(QWidget):
             # Plot data
             self.plot_data()
 
-            QMessageBox.information(self, "Success", f"Loaded {len(self.x_data)} data points")
+            # Remove the success dialog - no popup after loading
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to load data file:\n{str(e)}")
@@ -1234,7 +1297,9 @@ class InteractiveFittingGUI(QWidget):
             self.update_peak_table()
             self.plot_data()
 
-            QMessageBox.information(self, "Success", f"Detected {len(self.peaks)} peaks")
+            # Remove the success dialog - no popup after auto detection
+            # Update status label instead
+            self.status_label.setText(f"Detected {len(self.peaks)} peaks")
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Peak detection failed:\n{str(e)}")
@@ -1247,7 +1312,10 @@ class InteractiveFittingGUI(QWidget):
             self.status_label.setText(f"Loaded: {self.current_file}")
 
     def on_plot_click(self, event):
-        """Handle plot click for manual peak or background selection"""
+        """Handle plot click for manual peak or background selection
+        Left click: Add peak/BG point (with auto-correction)
+        Right click: Remove peak/BG point
+        """
         if event.inaxes != self.ax:
             return
 
@@ -1263,40 +1331,60 @@ class InteractiveFittingGUI(QWidget):
         self.save_state_to_undo()
 
         if self.bg_selection_mode:
-            # Add background point
-            point = (self.x_data[idx], self.y_data[idx])
-            
-            # Check if clicking near existing point to remove it
+            # Background point mode - auto-correct to local minimum
             remove_threshold = 0.02 * (self.x_data.max() - self.x_data.min())
-            removed = False
-            for i, (px, py) in enumerate(self.bg_points):
-                if abs(px - self.x_data[idx]) < remove_threshold:
-                    self.bg_points.pop(i)
-                    removed = True
-                    break
             
-            if not removed:
-                self.bg_points.append(point)
-                self.bg_points.sort(key=lambda p: p[0])  # Sort by x coordinate
+            if event.button == 3:  # Right click - remove
+                removed = False
+                for i, (px, py) in enumerate(self.bg_points):
+                    if abs(px - self.x_data[idx]) < remove_threshold:
+                        self.bg_points.pop(i)
+                        removed = True
+                        break
+            elif event.button == 1:  # Left click - add with auto-correction
+                # Auto-correct to local minimum for background
+                corrected_idx = self.find_nearest_minimum(idx, search_window=15)
+                point = (self.x_data[corrected_idx], self.y_data[corrected_idx])
+                
+                # Check if not too close to existing point
+                too_close = False
+                for px, py in self.bg_points:
+                    if abs(px - self.x_data[corrected_idx]) < remove_threshold:
+                        too_close = True
+                        break
+                if not too_close:
+                    self.bg_points.append(point)
+                    self.bg_points.sort(key=lambda p: p[0])
             
             self.plot_data()
         else:
-            # Add or remove peak
-            if idx in self.peaks:
-                self.peaks.remove(idx)
-            else:
-                self.peaks.append(idx)
-                self.peaks.sort()
+            # Peak mode - auto-correct to local maximum
+            if event.button == 3:  # Right click - remove peak
+                # Find nearest peak to remove
+                remove_threshold = 0.02 * (self.x_data.max() - self.x_data.min())
+                for peak_idx in self.peaks[:]:
+                    if abs(self.x_data[peak_idx] - x_click) < remove_threshold:
+                        self.peaks.remove(peak_idx)
+                        break
+            elif event.button == 1:  # Left click - add peak with auto-correction
+                # Auto-correct to local maximum for peak
+                corrected_idx = self.find_nearest_peak(idx, search_window=20)
+                if corrected_idx not in self.peaks:
+                    self.peaks.append(corrected_idx)
+                    self.peaks.sort()
 
             self.update_peak_table()
             self.plot_data()
 
     def clear_peaks(self):
-        """Clear all detected peaks"""
+        """Clear all detected peaks and reset view"""
         self.save_state_to_undo()
         self.peaks = []
         self.peak_params = []
         self.update_peak_table()
+        # Reset view to default initial state
+        self.ax.set_xlim(0, 100)
+        self.ax.set_ylim(0, 1000)
         self.plot_data()
 
     def on_method_changed(self):
@@ -1399,27 +1487,37 @@ class InteractiveFittingGUI(QWidget):
         if self.x_data is None or self.y_data is None:
             return
 
+        # Save current view limits before clearing
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+        # Check if this is first load (default limits) or user has zoomed/panned
+        is_default_view = (xlim == (0, 100) and ylim == (0, 1000))
+        has_custom_limits = xlim != (0, 1) and ylim != (0, 1) and not is_default_view
+
         self.ax.clear()
 
         # Plot raw data
         self.ax.plot(self.x_data, self.y_data, 'k-', linewidth=1, label='Raw Data', alpha=0.7)
 
-        # Plot background points if any
+        # Plot background points if any - small square, darker blue
         if self.bg_points:
             bg_x = [p[0] for p in self.bg_points]
             bg_y = [p[1] for p in self.bg_points]
-            self.ax.plot(bg_x, bg_y, 'bs', markersize=8, label=f'BG Points ({len(self.bg_points)})', alpha=0.7)
+            # Changed to darker blue square, smaller size (reduced from 4 to 3)
+            self.ax.plot(bg_x, bg_y, 's', color='#4682B4', markersize=3, label=f'BG Points ({len(self.bg_points)})', alpha=0.8)
             
             # Plot background line if we have points
             if len(bg_x) > 1:
                 bg_line = np.interp(self.x_data, bg_x, bg_y)
-                self.ax.plot(self.x_data, bg_line, 'b--', linewidth=1.5, label='BG Fit', alpha=0.5)
+                self.ax.plot(self.x_data, bg_line, '--', color='#4682B4', linewidth=1.5, label='BG Fit', alpha=0.5)
 
-        # Plot detected peaks
+        # Plot detected peaks - red upward triangle
         if self.peaks:
             peak_x = self.x_data[self.peaks]
             peak_y = self.y_data[self.peaks]
-            self.ax.plot(peak_x, peak_y, 'r^', markersize=10, label=f'Detected Peaks ({len(self.peaks)})')
+            # Using upward triangle marker with red color
+            self.ax.plot(peak_x, peak_y, '^', color='red', markersize=8, 
+                        linestyle='', label=f'Detected Peaks ({len(self.peaks)})')
 
         # Plot fitted curves
         if self.peak_params:
@@ -1452,13 +1550,31 @@ class InteractiveFittingGUI(QWidget):
                 self.ax.plot(x_smooth, y_full, '--', linewidth=2, 
                            label=f'Peak {i+1} fit', alpha=0.8)
 
-        self.ax.set_xlabel('2θ (degree)', fontsize=12, fontweight='bold')
-        self.ax.set_ylabel('Intensity', fontsize=12, fontweight='bold')
-        self.ax.set_title(f'XRD Data: {self.current_file}', fontsize=13, fontweight='bold')
-        self.ax.legend(loc='best', fontsize=9)
-        self.ax.grid(True, alpha=0.3, linestyle='--')
+        # Apply consistent styling to axes (same for loaded and unloaded state)
+        self.ax.set_facecolor('#FFFFFF')  # White plot area
+        self.ax.set_xlabel('2θ (degree)', fontsize=10, color='#4A148C', fontweight='normal')
+        self.ax.set_ylabel('Intensity', fontsize=10, color='#4A148C', fontweight='normal')
+        # Title: show filename if loaded, otherwise show instructions
+        title_text = self.current_file if self.current_file else 'Left click: add | Right click: remove | Scroll: zoom'
+        self.ax.set_title(title_text, fontsize=9, color='#7B1FA2', fontweight='normal')
+        self.ax.legend(loc='best', fontsize=7, framealpha=0.9)
+        self.ax.grid(True, alpha=0.3, linestyle='--', color='#9575CD')
+        
+        # Colorful tick labels
+        self.ax.tick_params(colors='#4A148C', which='both')
+        for label in self.ax.get_xticklabels() + self.ax.get_yticklabels():
+            label.set_color('#4A148C')
 
-        self.fig.tight_layout()
+        # Restore previous view limits if they existed (don't reset zoom/pan)
+        # Or auto-fit to data if this is default view
+        if has_custom_limits:
+            self.ax.set_xlim(xlim)
+            self.ax.set_ylim(ylim)
+        elif is_default_view:
+            # First time loading data - auto-fit
+            self.ax.autoscale(enable=True, axis='both')
+
+        # Don't use tight_layout - keep fixed margins for consistent axis label positions
         self.canvas.draw()
 
     def update_peak_table(self):
@@ -1810,19 +1926,41 @@ class InteractiveFittingGUI(QWidget):
             # Cluster peaks
             labels, n_clusters = PeakClusterer.cluster_peaks(peak_positions, eps=eps)
             
-            # Display clustering results
-            QMessageBox.information(
-                self, 
-                "Overlap Detection", 
-                f"Found {n_clusters} peak groups from {len(self.peaks)} peaks\n"
-                f"Overlap threshold: {overlap_multiplier}× FWHM ({eps:.4f}°)"
-            )
+            # Update status label instead of popup
+            self.status_label.setText(f"Found {n_clusters} peak groups from {len(self.peaks)} peaks")
             
             # Store cluster labels for use in fitting
             self.peak_cluster_labels = labels
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Overlap detection failed:\n{str(e)}")
+
+    def show_batch_info(self):
+        """Show batch processing information"""
+        QMessageBox.information(
+            self,
+            "Batch Processing",
+            "Batch processing feature:\n\n"
+            "This feature allows you to automatically fit peaks for multiple files.\n"
+            "Please use the batch_integration.py script for batch processing.\n\n"
+            "Usage: python batch_integration.py"
+        )
+
+    def show_settings_info(self):
+        """Show settings information"""
+        msg = (
+            "Current Settings:\n\n"
+            f"Fit Method: {self.method_combo.currentText()}\n"
+            f"Overlap FWHM×: {self.overlap_entry.text()}\n"
+            f"Fit Window×: {self.fit_window_entry.text()}\n"
+            f"Background Subtraction: {'On' if self.background_cb.isChecked() else 'Off'}\n"
+            f"Smoothing: {'On' if self.smoothing_enable_cb.isChecked() else 'Off'}\n"
+        )
+        if self.smoothing_enable_cb.isChecked():
+            msg += f"Smoothing Method: {self.smooth_method_combo.currentText()}\n"
+            msg += f"Sigma/Window: {self.sigma_entry.text() if self.smooth_method_combo.currentText() == 'gaussian' else self.smooth_window_entry.text()}\n"
+        
+        QMessageBox.information(self, "Settings", msg)
 
 
 def main():
