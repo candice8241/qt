@@ -302,42 +302,56 @@ class PowderXRDModule(GUIBase):
         output_layout.setContentsMargins(15, 12, 15, 12)
         output_layout.setSpacing(8)
 
-        # Number of Points
+        # Number of Points - horizontal layout
         npt_container = QWidget()
         npt_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        npt_layout = QVBoxLayout(npt_container)
+        npt_layout = QHBoxLayout(npt_container)
         npt_layout.setContentsMargins(0, 0, 0, 8)
+        npt_layout.setSpacing(10)
 
         npt_label = QLabel("Number of Points")
         npt_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         npt_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
-        npt_layout.addWidget(npt_label, alignment=Qt.AlignmentFlag.AlignCenter)
+        npt_layout.addWidget(npt_label)
 
-        self.npt_spinbox = CustomSpinbox(from_=500, to=10000, value=4000,
-                                         increment=500, width=110, parent=npt_container)
+        from PyQt6.QtWidgets import QSpinBox
+        self.npt_spinbox = QSpinBox()
+        self.npt_spinbox.setRange(500, 10000)
+        self.npt_spinbox.setValue(4000)
+        self.npt_spinbox.setSingleStep(500)
+        self.npt_spinbox.setFixedWidth(80)
+        self.npt_spinbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.npt_spinbox.setFont(QFont('Arial', 9))
+        self.npt_spinbox.setStyleSheet(f"""
+            QSpinBox {{
+                background-color: white;
+                color: {self.colors['text_dark']};
+                border: 2px solid #AAAAAA;
+                padding: 3px;
+            }}
+            QSpinBox::up-button, QSpinBox::down-button {{
+                width: 0px;
+                border: none;
+            }}
+        """)
         self.npt_spinbox.valueChanged.connect(lambda v: setattr(self, 'npt', int(v)))
-        npt_layout.addWidget(self.npt_spinbox, alignment=Qt.AlignmentFlag.AlignCenter)
+        npt_layout.addWidget(self.npt_spinbox)
+        npt_layout.addStretch()
         output_layout.addWidget(npt_container)
 
-        # Unit
+        # Unit - horizontal layout, left aligned
         unit_container = QWidget()
         unit_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        unit_layout = QVBoxLayout(unit_container)
+        unit_layout = QHBoxLayout(unit_container)
         unit_layout.setContentsMargins(0, 0, 0, 8)
-        unit_layout.setSpacing(4)
+        unit_layout.setSpacing(10)
 
         unit_label = QLabel("Unit")
         unit_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         unit_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
-        unit_layout.addWidget(unit_label, alignment=Qt.AlignmentFlag.AlignCenter)
+        unit_layout.addWidget(unit_label)
 
-        unit_radios = QWidget()
-        unit_radios.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        unit_radios_layout = QHBoxLayout(unit_radios)
-        unit_radios_layout.setContentsMargins(0, 0, 0, 0)
-        unit_radios_layout.setSpacing(10)
-
-        self.unit_group = QButtonGroup(unit_radios)
+        self.unit_group = QButtonGroup(unit_container)
         unit_options = ['2θ (°)', 'q (A⁻¹)', 'r (mm)']
         for option in unit_options:
             radio = QRadioButton(option)
@@ -364,9 +378,9 @@ class PowderXRDModule(GUIBase):
             """)
             radio.toggled.connect(lambda checked, text=option: setattr(self, 'unit', text) if checked else None)
             self.unit_group.addButton(radio)
-            unit_radios_layout.addWidget(radio)
+            unit_layout.addWidget(radio)
 
-        unit_layout.addWidget(unit_radios)
+        unit_layout.addStretch()
         output_layout.addWidget(unit_container)
 
         formats_label = QLabel("Select Output Formats:")
@@ -504,12 +518,12 @@ class PowderXRDModule(GUIBase):
         self.offset_entry = QLineEdit("auto")
         self.offset_entry.setFixedWidth(70)
         self.offset_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.offset_entry.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        self.offset_entry.setFont(QFont('Arial', 9))
         self.offset_entry.setStyleSheet(f"""
             QLineEdit {{
-                background-color: transparent;
+                background-color: white;
                 color: {self.colors['text_dark']};
-                border: none;
+                border: 2px solid #AAAAAA;
                 padding: 3px;
             }}
         """)
