@@ -407,9 +407,9 @@ class AzimuthalIntegrationModule(GUIBase):
         # - 5个文件输入框，每个约50px = 250px
         # - Browse区域中点：25 + 250/2 = 150px
         # 右边容器从这里开始，需要向上偏移右边容器高度的一半，让中心对齐
-        # 调整为60px，使右边容器上移
+        # 调整为40px，继续上移
         from PyQt6.QtWidgets import QSpacerItem, QSizePolicy
-        top_spacer = QSpacerItem(20, 60, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        top_spacer = QSpacerItem(20, 40, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         right_layout.addItem(top_spacer)
 
         settings_card = self.create_card_frame(None)
