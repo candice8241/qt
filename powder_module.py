@@ -325,7 +325,7 @@ class PowderXRDModule(GUIBase):
         self.npt_spinbox.setStyleSheet(f"""
             QSpinBox {{
                 background-color: white;
-                color: {self.colors['text_dark']};
+                color: #444444;
                 border: 2px solid #AAAAAA;
                 padding: 3px;
             }}
@@ -343,7 +343,7 @@ class PowderXRDModule(GUIBase):
         unit_container = QWidget()
         unit_container.setStyleSheet(f"background-color: transparent; border: none;")
         unit_layout = QVBoxLayout(unit_container)
-        unit_layout.setContentsMargins(0, 0, 0, 8)
+        unit_layout.setContentsMargins(0, 0, 0, 16)
         unit_layout.setSpacing(4)
 
         unit_label = QLabel("Unit")
@@ -487,6 +487,12 @@ class PowderXRDModule(GUIBase):
         stacked_layout = QVBoxLayout(stacked_box)
         stacked_layout.setContentsMargins(0, 12, 0, 0)
         stacked_layout.setSpacing(6)
+
+        # Add "Stacked Plot Options:" label
+        stacked_options_label = QLabel("Stacked Plot Options:")
+        stacked_options_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        stacked_options_label.setStyleSheet(f"color: #666666; background-color: {self.colors['card_bg']};")
+        stacked_layout.addWidget(stacked_options_label)
 
         self.stacked_plot_cb = QCheckBox("Create Stacked Plot")
         self.stacked_plot_cb.setFont(QFont('Arial', 9))
