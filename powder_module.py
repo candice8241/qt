@@ -282,6 +282,19 @@ class PowderXRDModule(GUIBase):
         npt_layout.addWidget(self.npt_spinbox, alignment=Qt.AlignmentFlag.AlignCenter)
         params_row_layout.addWidget(npt_container)
         params_row_layout.addStretch()
+        
+        # Add Run Integration button in the same row
+        run_int_btn = ModernButton(
+            "Run Integration",
+            self.run_integration,
+            bg_color=self.colors['secondary'],
+            hover_color=self.colors['primary_hover'],
+            width=170, height=36,
+            parent=params_row
+        )
+        run_int_btn.setFont(QFont('Arial', 9))
+        params_row_layout.addWidget(run_int_btn)
+        params_row_layout.addStretch()
 
         unit_container = QWidget()
         unit_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
@@ -331,19 +344,6 @@ class PowderXRDModule(GUIBase):
 
         unit_layout.addWidget(unit_radios)
         params_row_layout.addWidget(unit_container)
-        params_row_layout.addStretch()
-        
-        # Add Run Integration button in the same row
-        run_int_btn = ModernButton(
-            "Run Integration",
-            self.run_integration,
-            bg_color=self.colors['secondary'],
-            hover_color=self.colors['primary_hover'],
-            width=170, height=36,
-            parent=params_row
-        )
-        run_int_btn.setFont(QFont('Arial', 9))
-        params_row_layout.addWidget(run_int_btn)
 
         left_layout.addWidget(params_row)
         left_layout.addStretch()
@@ -367,35 +367,16 @@ class PowderXRDModule(GUIBase):
         output_layout.setContentsMargins(15, 12, 15, 12)
         output_layout.setSpacing(8)
 
-        output_title = QLabel("Output Options")
-        output_title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        output_title.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
-        output_layout.addWidget(output_title)
-
         formats_label = QLabel("Select Output Formats:")
         formats_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         formats_label.setStyleSheet(f"color: #666666; background-color: {self.colors['card_bg']}; margin-bottom: 0px;")
         output_layout.addWidget(formats_label, alignment=Qt.AlignmentFlag.AlignLeft)
-        output_layout.setSpacing(2)  # Reduce spacing before next widget
 
-        # Create a container to hold the frame without stretching
+        # Format checkboxes without frame
         formats_container = QWidget()
         formats_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        formats_container_layout = QHBoxLayout(formats_container)
-        formats_container_layout.setContentsMargins(0, 0, 0, 0)
-        formats_container_layout.setSpacing(0)
-
-        # Create inner frame for format checkboxes
-        formats_frame = QFrame()
-        formats_frame.setStyleSheet(f"""
-            QFrame {{
-                background-color: {self.colors['card_bg']};
-                border: 2px solid {self.colors['border']};
-                border-radius: 4px;
-            }}
-        """)
-        formats_frame_layout = QVBoxLayout(formats_frame)
-        formats_frame_layout.setContentsMargins(10, 8, 10, 8)
+        formats_frame_layout = QVBoxLayout(formats_container)
+        formats_frame_layout.setContentsMargins(0, 8, 0, 8)
         formats_frame_layout.setSpacing(6)
 
         formats_row1 = QWidget()
@@ -474,10 +455,6 @@ class PowderXRDModule(GUIBase):
         formats_row2_layout.addStretch()
         formats_frame_layout.addWidget(formats_row2)
 
-        # Add frame to container and add stretch to keep border tight
-        formats_container_layout.addWidget(formats_frame)
-        formats_container_layout.addStretch()
-
         output_layout.addWidget(formats_container)
 
         stacked_box = QWidget()
@@ -485,11 +462,6 @@ class PowderXRDModule(GUIBase):
         stacked_layout = QVBoxLayout(stacked_box)
         stacked_layout.setContentsMargins(0, 12, 0, 0)
         stacked_layout.setSpacing(6)
-
-        stacked_options_label = QLabel("Stacked Plot Options:")
-        stacked_options_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        stacked_options_label.setStyleSheet(f"color: #666666; background-color: {self.colors['card_bg']};")
-        stacked_layout.addWidget(stacked_options_label)
 
         self.stacked_plot_cb = QCheckBox("Create Stacked Plot")
         self.stacked_plot_cb.setFont(QFont('Arial', 9))
@@ -543,19 +515,6 @@ class PowderXRDModule(GUIBase):
         offset_row_layout.addWidget(self.offset_entry)
         offset_row_layout.addStretch()
         stacked_layout.addWidget(offset_row)
-
-        help_container = QWidget()
-        help_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        help_container_layout = QHBoxLayout(help_container)
-        help_container_layout.setContentsMargins(0, 0, 0, 0)
-        help_container_layout.setSpacing(0)
-
-        offset_help_text = QLabel("(use 'auto' or number for offset)")
-        offset_help_text.setFont(QFont('Arial', 8))
-        offset_help_text.setStyleSheet(f"color: #999999; background-color: {self.colors['card_bg']};")
-        help_container_layout.addWidget(offset_help_text)
-        help_container_layout.addStretch()
-        stacked_layout.addWidget(help_container)
 
         output_layout.addWidget(stacked_box)
 
@@ -735,14 +694,12 @@ class PowderXRDModule(GUIBase):
         combined_frame_layout.addWidget(row1)
         combined_frame_layout.addWidget(row2)
 
-        # Wavelength section inside the same frame - label and input in same row
+        # Wavelength section inside the same frame - label and input in same row, aligned left
         wl_row = QWidget()
         wl_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         wl_row_layout = QHBoxLayout(wl_row)
         wl_row_layout.setContentsMargins(0, 0, 0, 0)
         wl_row_layout.setSpacing(10)
-        
-        wl_row_layout.addStretch()
         
         wl_label = QLabel("Wavelength (Å)")
         wl_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
