@@ -656,7 +656,8 @@ class InteractiveFittingGUI(QWidget):
         control_widget = QWidget()
         control_widget.setFixedHeight(50)  # Reduced from 55
         control_widget.setAutoFillBackground(True)
-        control_widget.setStyleSheet("QWidget { background-color: #C7BFFF; border-bottom: 2px solid #B794F6; }")
+        # Lighter color for control panel
+        control_widget.setStyleSheet("QWidget { background-color: #E0D9FF; border-bottom: 2px solid #B794F6; }")
         control_layout = QHBoxLayout(control_widget)
         control_layout.setContentsMargins(6, 4, 6, 4)  # Reduced margins
         control_layout.setSpacing(3)  # Reduced spacing
@@ -783,9 +784,9 @@ class InteractiveFittingGUI(QWidget):
         bg_layout.setContentsMargins(8, 5, 8, 5)
         bg_layout.setSpacing(4)
 
-        # Background label - colorful
+        # Background label - compact font like control panel
         bg_label = QLabel("Background:")
-        bg_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
+        bg_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Match load row font
         bg_label.setStyleSheet(f"color: #00BCD4; background: transparent;")  # Cyan
         bg_layout.addWidget(bg_label)
 
@@ -834,15 +835,15 @@ class InteractiveFittingGUI(QWidget):
 
         bg_layout.addSpacing(10)
 
-        # Fit Method - colorful
+        # Fit Method - black text, compact font
         fit_label = QLabel("Fit Method:")
-        fit_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        fit_label.setStyleSheet(f"color: #FF4081; background: transparent;")  # Pink
+        fit_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Match load row font
+        fit_label.setStyleSheet(f"color: black; background: transparent;")  # Black text
         bg_layout.addWidget(fit_label)
 
         self.method_combo = QComboBox()
         self.method_combo.addItems(['pseudo_voigt', 'voigt'])
-        self.method_combo.setFont(QFont('Arial', 9))
+        self.method_combo.setFont(QFont('Arial', 8))  # Smaller font
         self.method_combo.setFixedWidth(110)
         self.method_combo.setStyleSheet(f"""
             QComboBox {{ 
@@ -862,15 +863,15 @@ class InteractiveFittingGUI(QWidget):
 
         bg_layout.addSpacing(10)
 
-        # Overlap FWHM× - colorful
+        # Overlap FWHM× - compact font
         overlap_label = QLabel("Overlap FWHM×:")
-        overlap_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        overlap_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Match load row font
         overlap_label.setStyleSheet(f"color: #7B1FA2; background: transparent;")  # Purple
         bg_layout.addWidget(overlap_label)
 
         self.overlap_entry = QLineEdit("5.0")
         self.overlap_entry.setFixedWidth(50)
-        self.overlap_entry.setFont(QFont('Arial', 9))
+        self.overlap_entry.setFont(QFont('Arial', 8))  # Smaller font
         self.overlap_entry.setStyleSheet(f"""
             QLineEdit {{ 
                 padding: 3px; 
@@ -884,15 +885,15 @@ class InteractiveFittingGUI(QWidget):
 
         bg_layout.addSpacing(10)
 
-        # Fit Window× - colorful
+        # Fit Window× - black text, compact font
         window_label = QLabel("Fit Window×:")
-        window_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        window_label.setStyleSheet(f"color: #4A148C; background: transparent;")  # Dark purple
+        window_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Match load row font
+        window_label.setStyleSheet(f"color: black; background: transparent;")  # Black text
         bg_layout.addWidget(window_label)
 
         self.fit_window_entry = QLineEdit("3.0")
         self.fit_window_entry.setFixedWidth(50)
-        self.fit_window_entry.setFont(QFont('Arial', 9))
+        self.fit_window_entry.setFont(QFont('Arial', 8))  # Smaller font
         self.fit_window_entry.setStyleSheet(f"""
             QLineEdit {{ 
                 padding: 3px; 
@@ -904,17 +905,19 @@ class InteractiveFittingGUI(QWidget):
         """)
         bg_layout.addWidget(self.fit_window_entry)
 
-        bg_layout.addStretch()
+        # More spacing to push coordinate label left
+        bg_layout.addSpacing(20)  # Add spacing to move label left
 
-        # Coordinate label (right side) - colorful with proper sizing
+        # Coordinate label (right side) - hidden by default, moved left
         self.coord_label = QLabel("")
         self.coord_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Smaller font
         self.coord_label.setStyleSheet(f"color: #00BCD4; background: transparent;")  # Cyan
-        self.coord_label.setMinimumWidth(200)  # Reduced to fit better
-        self.coord_label.setMaximumWidth(350)  # Set max width to prevent overflow
+        self.coord_label.setMinimumWidth(150)  # Reduced further
+        self.coord_label.setMaximumWidth(250)  # Smaller max width
         self.coord_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         self.coord_label.setWordWrap(False)  # Prevent wrapping
-        self.coord_label.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        self.coord_label.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+        self.coord_label.setVisible(False)  # Hide by default (no real-time display)
         bg_layout.addWidget(self.coord_label)
 
         parent_layout.addWidget(bg_widget)
@@ -929,29 +932,29 @@ class InteractiveFittingGUI(QWidget):
         smooth_layout.setContentsMargins(8, 5, 8, 5)
         smooth_layout.setSpacing(4)
 
-        # Smoothing label - colorful
+        # Smoothing label - black text, compact font
         smooth_label = QLabel("Smoothing:")
-        smooth_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        smooth_label.setStyleSheet(f"color: #F44336; background: transparent;")  # Red
+        smooth_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Match load row font
+        smooth_label.setStyleSheet(f"color: black; background: transparent;")  # Black text
         smooth_layout.addWidget(smooth_label)
 
         # Enable checkbox
         self.smoothing_enable_cb = QCheckBox("Enable")
-        self.smoothing_enable_cb.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        self.smoothing_enable_cb.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Smaller font
         self.smoothing_enable_cb.setStyleSheet(f"color: #4A148C; background: transparent;")
         smooth_layout.addWidget(self.smoothing_enable_cb)
 
         smooth_layout.addSpacing(10)
 
-        # Method - colorful
+        # Method - compact font
         method_label = QLabel("Method:")
-        method_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        method_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Match load row font
         method_label.setStyleSheet(f"color: #7B1FA2; background: transparent;")  # Purple
         smooth_layout.addWidget(method_label)
 
         self.smooth_method_combo = QComboBox()
         self.smooth_method_combo.addItems(['gaussian', 'savgol'])
-        self.smooth_method_combo.setFont(QFont('Arial', 9))
+        self.smooth_method_combo.setFont(QFont('Arial', 8))  # Smaller font
         self.smooth_method_combo.setFixedWidth(100)
         self.smooth_method_combo.setStyleSheet(f"""
             QComboBox {{ 
@@ -970,15 +973,15 @@ class InteractiveFittingGUI(QWidget):
 
         smooth_layout.addSpacing(10)
 
-        # Sigma - colorful
+        # Sigma - compact font
         sigma_label = QLabel("Sigma:")
-        sigma_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        sigma_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Match load row font
         sigma_label.setStyleSheet(f"color: #4A148C; background: transparent;")
         smooth_layout.addWidget(sigma_label)
 
         self.sigma_entry = QLineEdit("2.0")
         self.sigma_entry.setFixedWidth(50)
-        self.sigma_entry.setFont(QFont('Arial', 9))
+        self.sigma_entry.setFont(QFont('Arial', 8))  # Smaller font
         self.sigma_entry.setStyleSheet(f"""
             QLineEdit {{ 
                 padding: 3px; 
@@ -992,15 +995,15 @@ class InteractiveFittingGUI(QWidget):
 
         smooth_layout.addSpacing(10)
 
-        # Window - colorful
+        # Window - black text, compact font
         window_label = QLabel("Window:")
-        window_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        window_label.setStyleSheet(f"color: #FF4081; background: transparent;")  # Pink
+        window_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Match load row font
+        window_label.setStyleSheet(f"color: black; background: transparent;")  # Black text
         smooth_layout.addWidget(window_label)
 
         self.smooth_window_entry = QLineEdit("11")
         self.smooth_window_entry.setFixedWidth(50)
-        self.smooth_window_entry.setFont(QFont('Arial', 9))
+        self.smooth_window_entry.setFont(QFont('Arial', 8))  # Smaller font
         self.smooth_window_entry.setStyleSheet(f"""
             QLineEdit {{ 
                 padding: 3px; 
@@ -1070,9 +1073,9 @@ class InteractiveFittingGUI(QWidget):
         results_layout.setContentsMargins(8, 4, 8, 4)
         results_layout.setSpacing(3)
 
-        # Results label - colorful
+        # Results label - compact font like load row
         results_label = QLabel("Fitting Results:")
-        results_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
+        results_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Match load row font
         results_label.setStyleSheet(f"color: #FF6B00; background: transparent;")  # Orange
         results_layout.addWidget(results_label)
 
@@ -1136,7 +1139,8 @@ class InteractiveFittingGUI(QWidget):
         # Canvas
         self.canvas = FigureCanvasQTAgg(self.fig)
         self.canvas.mpl_connect('button_press_event', self.on_plot_click)
-        self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
+        # Removed mouse move event - no real-time coordinate display
+        # self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
         plot_layout.addWidget(self.canvas)
 
         # Toolbar - colorful
@@ -1487,8 +1491,8 @@ class InteractiveFittingGUI(QWidget):
 
         # Apply colorful styling to axes
         self.ax.set_facecolor('#FFFFFF')  # White plot area
-        self.ax.set_xlabel('2θ (degree)', fontsize=12, color='#4A148C', fontweight='bold')
-        self.ax.set_ylabel('Intensity', fontsize=12, color='#4A148C', fontweight='bold')
+        self.ax.set_xlabel('2θ (degree)', fontsize=10, color='#4A148C', fontweight='bold')  # Reduced from 12 to 10
+        self.ax.set_ylabel('Intensity', fontsize=10, color='#4A148C', fontweight='bold')  # Reduced from 12 to 10
         self.ax.set_title(f'XRD Data: {self.current_file}', fontsize=13, color='#7B1FA2', fontweight='bold')
         self.ax.legend(loc='best', fontsize=9, framealpha=0.9)
         self.ax.grid(True, alpha=0.3, linestyle='--', color='#9575CD')
