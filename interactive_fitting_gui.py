@@ -571,23 +571,27 @@ class InteractiveFittingGUI(QWidget):
         # Set minimum size for proper display
         self.setMinimumSize(1400, 800)
 
-        # Modern clean color palette
+        # Colorful vibrant palette (matching Image 1)
         self.palette = {
-            'background': '#F5F5F5',  # Light gray background
-            'panel_bg': '#FFFFFF',
-            'primary': '#5C7CFA',      # Modern blue
-            'success': '#51CF66',      # Green
-            'warning': '#FFD43B',      # Yellow
-            'danger': '#FF6B6B',       # Red
-            'info': '#74C0FC',         # Light blue
-            'purple': '#9775FA',       # Purple
-            'text_dark': '#212529',
-            'text_light': '#868E96',
-            'border': '#DEE2E6',
+            'background': '#D4CCFF',  # Light purple background
+            'panel_bg': '#E8E4FF',
+            'primary': '#B794F6',      # Purple
+            'success': '#7FD857',      # Bright green
+            'warning': '#FFB84D',      # Orange
+            'danger': '#FF8A80',       # Coral/pink
+            'info': '#64D2FF',         # Cyan/bright blue
+            'purple': '#C77DFF',       # Light purple
+            'text_dark': '#4A148C',    # Dark purple
+            'text_light': '#7B1FA2',   # Medium purple
+            'text_cyan': '#00BCD4',    # Cyan
+            'text_pink': '#FF4081',    # Pink
+            'text_red': '#F44336',     # Red
+            'text_yellow': '#FFEB3B',  # Yellow
+            'border': '#B794F6',
         }
 
-        # Set main window background
-        self.setStyleSheet("QWidget { background-color: #F5F5F5; }")
+        # Set main window background to colorful gradient
+        self.setStyleSheet("QWidget { background-color: #D4CCFF; }")
 
         # Data storage
         self.x_data = None
@@ -647,28 +651,28 @@ class InteractiveFittingGUI(QWidget):
         self.setup_info_panel(main_layout)
 
     def setup_control_panel(self, parent_layout):
-        """Setup top control panel - compact and modern"""
+        """Setup top control panel - colorful and vibrant"""
         control_widget = QWidget()
         control_widget.setFixedHeight(55)
         control_widget.setAutoFillBackground(True)
-        control_widget.setStyleSheet("QWidget { background-color: #FFFFFF; border-bottom: 2px solid #DEE2E6; }")
+        control_widget.setStyleSheet("QWidget { background-color: #C7BFFF; border-bottom: 2px solid #B794F6; }")
         control_layout = QHBoxLayout(control_widget)
         control_layout.setContentsMargins(8, 5, 8, 5)
         control_layout.setSpacing(4)
 
-        # Compact button style with explicit text color
+        # Colorful button style with explicit text color
         btn_style = """
             QPushButton {
                 font-family: Arial;
                 font-size: 10pt;
                 font-weight: bold;
-                border: none;
-                border-radius: 4px;
+                border: 2px solid #9575CD;
+                border-radius: 5px;
                 padding: 6px 10px;
                 min-width: 70px;
             }
             QPushButton:hover {
-                opacity: 0.9;
+                opacity: 0.85;
             }
             QPushButton:pressed {
                 padding: 7px 9px 5px 11px;
@@ -676,124 +680,130 @@ class InteractiveFittingGUI(QWidget):
         """
 
         # Load File button
-        load_btn = QPushButton("Load")
-        load_btn.setStyleSheet(btn_style + f"background-color: {self.palette['primary']}; color: white;")
+        load_btn = QPushButton("Load File")
+        load_btn.setStyleSheet(btn_style + f"background-color: #C77DFF; color: black; font-weight: bold;")
         load_btn.clicked.connect(self.load_data_file)
         control_layout.addWidget(load_btn)
 
         # Navigation buttons
         prev_btn = QPushButton("◀")
         prev_btn.setFixedWidth(35)
-        prev_btn.setStyleSheet(btn_style + f"background-color: {self.palette['info']}; color: white; min-width: 25px;")
+        prev_btn.setStyleSheet(btn_style + f"background-color: #A5D8FF; color: black; min-width: 25px;")
         prev_btn.clicked.connect(self.prev_file)
         control_layout.addWidget(prev_btn)
 
         next_btn = QPushButton("▶")
         next_btn.setFixedWidth(35)
-        next_btn.setStyleSheet(btn_style + f"background-color: {self.palette['info']}; color: white; min-width: 25px;")
+        next_btn.setStyleSheet(btn_style + f"background-color: #A5D8FF; color: black; min-width: 25px;")
         next_btn.clicked.connect(self.next_file)
         control_layout.addWidget(next_btn)
 
         # Fit Peaks button
         fit_btn = QPushButton("Fit Peaks")
-        fit_btn.setStyleSheet(btn_style + f"background-color: {self.palette['purple']}; color: white;")
+        fit_btn.setStyleSheet(btn_style + f"background-color: #D0BFFF; color: black;")
         fit_btn.clicked.connect(self.fit_all_peaks)
         control_layout.addWidget(fit_btn)
 
         # Reset button
         reset_btn = QPushButton("Reset")
-        reset_btn.setStyleSheet(btn_style + f"background-color: {self.palette['warning']}; color: #212529;")
+        reset_btn.setStyleSheet(btn_style + f"background-color: #FFC9A8; color: black;")
         reset_btn.clicked.connect(self.clear_peaks)
         control_layout.addWidget(reset_btn)
 
         # Save Results button
-        save_btn = QPushButton("Save")
-        save_btn.setStyleSheet(btn_style + f"background-color: {self.palette['success']}; color: white;")
+        save_btn = QPushButton("Save Results")
+        save_btn.setStyleSheet(btn_style + f"background-color: #A8E6CF; color: black;")
         save_btn.clicked.connect(self.export_results)
         control_layout.addWidget(save_btn)
 
         # Clear Fit button
-        clear_btn = QPushButton("Clear")
-        clear_btn.setStyleSheet(btn_style + f"background-color: {self.palette['danger']}; color: white;")
+        clear_btn = QPushButton("Clear Fit")
+        clear_btn.setStyleSheet(btn_style + f"background-color: #FFB3BA; color: black;")
         clear_btn.clicked.connect(self.clear_peaks)
         control_layout.addWidget(clear_btn)
 
         # Undo button
         undo_btn = QPushButton("Undo")
-        undo_btn.setStyleSheet(btn_style + f"background-color: #CED4DA; color: #212529;")
+        undo_btn.setStyleSheet(btn_style + f"background-color: #E8D5F5; color: black;")
         undo_btn.clicked.connect(self.undo_action)
         control_layout.addWidget(undo_btn)
 
         # Auto Find button
         auto_btn = QPushButton("Auto Find")
-        auto_btn.setStyleSheet(btn_style + f"background-color: {self.palette['primary']}; color: white;")
+        auto_btn.setStyleSheet(btn_style + f"background-color: #B9DEFF; color: black;")
         auto_btn.clicked.connect(self.auto_detect_peaks)
         control_layout.addWidget(auto_btn)
 
         # Overlap button
         overlap_btn = QPushButton("Overlap")
-        overlap_btn.setStyleSheet(btn_style + f"background-color: {self.palette['info']}; color: white;")
+        overlap_btn.setStyleSheet(btn_style + f"background-color: #B9F2FF; color: black;")
         overlap_btn.clicked.connect(self.toggle_overlap_mode)
         control_layout.addWidget(overlap_btn)
 
-        # Batch button
-        batch_btn = QPushButton("Batch")
-        batch_btn.setStyleSheet(btn_style + f"background-color: #868E96; color: white;")
+        # Batch Auto Fit button
+        batch_btn = QPushButton("Batch Auto Fit")
+        batch_btn.setStyleSheet(btn_style + f"background-color: #D5D5FF; color: black;")
         control_layout.addWidget(batch_btn)
+
+        # Settings button (gear icon)
+        settings_btn = QPushButton("⚙")
+        settings_btn.setFixedWidth(35)
+        settings_btn.setStyleSheet(btn_style + f"background-color: #F5F5F5; color: black; min-width: 25px; font-size: 14pt;")
+        control_layout.addWidget(settings_btn)
 
         control_layout.addStretch()
 
         # Status label - more space for display
         self.status_label = QLabel("Please load a file to start")
-        self.status_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        self.status_label.setStyleSheet(f"color: #212529; background: transparent; padding: 5px;")
+        self.status_label.setFont(QFont('Arial', 11, QFont.Weight.Bold))
+        self.status_label.setStyleSheet(f"color: #4A148C; background: transparent; padding: 5px;")
         self.status_label.setMinimumWidth(400)
-        self.status_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
+        self.status_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         control_layout.addWidget(self.status_label)
 
         parent_layout.addWidget(control_widget)
 
     def setup_background_panel(self, parent_layout):
-        """Setup background panel - compact and modern"""
+        """Setup background panel - colorful and vibrant"""
         bg_widget = QWidget()
         bg_widget.setFixedHeight(50)
         bg_widget.setAutoFillBackground(True)
-        bg_widget.setStyleSheet("QWidget { background-color: #E7F5FF; }")  # Light blue tint
+        bg_widget.setStyleSheet("QWidget { background-color: #E3F2FF; }")  # Light blue tint
         bg_layout = QHBoxLayout(bg_widget)
         bg_layout.setContentsMargins(8, 5, 8, 5)
         bg_layout.setSpacing(4)
 
-        # Background label
+        # Background label - colorful
         bg_label = QLabel("Background:")
         bg_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        bg_label.setStyleSheet(f"color: #212529; background: transparent;")
+        bg_label.setStyleSheet(f"color: #00BCD4; background: transparent;")  # Cyan
         bg_layout.addWidget(bg_label)
 
-        # Compact button style with explicit text color
+        # Colorful button style
         bg_btn_style = """
             QPushButton {
                 font-family: Arial;
                 font-size: 9pt;
                 font-weight: bold;
-                border: none;
-                border-radius: 3px;
+                border: 2px solid #7CB9E8;
+                border-radius: 4px;
                 padding: 5px 10px;
                 min-width: 60px;
             }
             QPushButton:hover {
-                opacity: 0.9;
+                opacity: 0.85;
             }
         """
 
         # Select BG Points
-        select_bg_btn = QPushButton("Select")
-        select_bg_btn.setStyleSheet(bg_btn_style + f"background-color: {self.palette['info']}; color: white;")
+        select_bg_btn = QPushButton("Select BG Points")
+        select_bg_btn.setStyleSheet(bg_btn_style + f"background-color: #A5D8FF; color: black;")
         select_bg_btn.clicked.connect(self.toggle_bg_selection)
         bg_layout.addWidget(select_bg_btn)
 
         # Subtract BG
-        subtract_bg_btn = QPushButton("Subtract")
-        subtract_bg_btn.setStyleSheet(bg_btn_style + f"background-color: {self.palette['success']}; color: white;")
+        subtract_bg_btn = QPushButton("Subtract BG")
+        subtract_bg_btn.setStyleSheet(bg_btn_style + f"background-color: #A8E6CF; color: black;")
         subtract_bg_btn.clicked.connect(self.subtract_background)
         self.background_cb = QCheckBox()  # Hidden for compatibility
         self.background_cb.setChecked(True)
@@ -801,23 +811,23 @@ class InteractiveFittingGUI(QWidget):
         bg_layout.addWidget(subtract_bg_btn)
 
         # Clear BG
-        clear_bg_btn = QPushButton("Clear")
-        clear_bg_btn.setStyleSheet(bg_btn_style + f"background-color: {self.palette['danger']}; color: white;")
+        clear_bg_btn = QPushButton("Clear BG")
+        clear_bg_btn.setStyleSheet(bg_btn_style + f"background-color: #FFB3BA; color: black;")
         clear_bg_btn.clicked.connect(self.clear_background)
         bg_layout.addWidget(clear_bg_btn)
 
         # Auto Select BG
-        auto_bg_btn = QPushButton("Auto")
-        auto_bg_btn.setStyleSheet(bg_btn_style + f"background-color: {self.palette['primary']}; color: white;")
+        auto_bg_btn = QPushButton("Auto Select BG")
+        auto_bg_btn.setStyleSheet(bg_btn_style + f"background-color: #B9E5FF; color: black;")
         auto_bg_btn.clicked.connect(self.auto_select_background)
         bg_layout.addWidget(auto_bg_btn)
 
         bg_layout.addSpacing(10)
 
-        # Fit Method
-        fit_label = QLabel("Method:")
+        # Fit Method - colorful
+        fit_label = QLabel("Fit Method:")
         fit_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        fit_label.setStyleSheet(f"color: #212529; background: transparent;")
+        fit_label.setStyleSheet(f"color: #FF4081; background: transparent;")  # Pink
         bg_layout.addWidget(fit_label)
 
         self.method_combo = QComboBox()
@@ -827,12 +837,13 @@ class InteractiveFittingGUI(QWidget):
         self.method_combo.setStyleSheet(f"""
             QComboBox {{ 
                 padding: 3px; 
-                color: #212529;
+                color: black;
                 background-color: white;
-                border: 1px solid #CED4DA;
+                border: 2px solid #B794F6;
+                border-radius: 3px;
             }}
             QComboBox QAbstractItemView {{
-                color: #212529;
+                color: black;
                 background-color: white;
             }}
         """)
@@ -841,10 +852,10 @@ class InteractiveFittingGUI(QWidget):
 
         bg_layout.addSpacing(10)
 
-        # Overlap FWHM×
-        overlap_label = QLabel("FWHM×:")
+        # Overlap FWHM× - colorful
+        overlap_label = QLabel("Overlap FWHM×:")
         overlap_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        overlap_label.setStyleSheet(f"color: #212529; background: transparent;")
+        overlap_label.setStyleSheet(f"color: #7B1FA2; background: transparent;")  # Purple
         bg_layout.addWidget(overlap_label)
 
         self.overlap_entry = QLineEdit("5.0")
@@ -853,19 +864,20 @@ class InteractiveFittingGUI(QWidget):
         self.overlap_entry.setStyleSheet(f"""
             QLineEdit {{ 
                 padding: 3px; 
-                color: #212529;
+                color: black;
                 background-color: white;
-                border: 1px solid #CED4DA;
+                border: 2px solid #B794F6;
+                border-radius: 3px;
             }}
         """)
         bg_layout.addWidget(self.overlap_entry)
 
         bg_layout.addSpacing(10)
 
-        # Fit Window×
-        window_label = QLabel("Window×:")
+        # Fit Window× - colorful
+        window_label = QLabel("Fit Window×:")
         window_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        window_label.setStyleSheet(f"color: #212529; background: transparent;")
+        window_label.setStyleSheet(f"color: #4A148C; background: transparent;")  # Dark purple
         bg_layout.addWidget(window_label)
 
         self.fit_window_entry = QLineEdit("3.0")
@@ -874,19 +886,20 @@ class InteractiveFittingGUI(QWidget):
         self.fit_window_entry.setStyleSheet(f"""
             QLineEdit {{ 
                 padding: 3px; 
-                color: #212529;
+                color: black;
                 background-color: white;
-                border: 1px solid #CED4DA;
+                border: 2px solid #B794F6;
+                border-radius: 3px;
             }}
         """)
         bg_layout.addWidget(self.fit_window_entry)
 
         bg_layout.addStretch()
 
-        # Coordinate label (right side) - more space
+        # Coordinate label (right side) - colorful
         self.coord_label = QLabel("")
         self.coord_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        self.coord_label.setStyleSheet(f"color: #212529; background: transparent;")
+        self.coord_label.setStyleSheet(f"color: #00BCD4; background: transparent;")  # Cyan
         self.coord_label.setMinimumWidth(300)
         self.coord_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         bg_layout.addWidget(self.coord_label)
@@ -894,33 +907,33 @@ class InteractiveFittingGUI(QWidget):
         parent_layout.addWidget(bg_widget)
 
     def setup_smoothing_panel(self, parent_layout):
-        """Setup smoothing panel - compact and modern"""
+        """Setup smoothing panel - colorful and vibrant"""
         smooth_widget = QWidget()
         smooth_widget.setFixedHeight(50)
         smooth_widget.setAutoFillBackground(True)
-        smooth_widget.setStyleSheet("QWidget { background-color: #F3F0FF; }")  # Light purple tint
+        smooth_widget.setStyleSheet("QWidget { background-color: #F3E5FF; }")  # Light purple tint
         smooth_layout = QHBoxLayout(smooth_widget)
         smooth_layout.setContentsMargins(8, 5, 8, 5)
         smooth_layout.setSpacing(4)
 
-        # Smoothing label
+        # Smoothing label - colorful
         smooth_label = QLabel("Smoothing:")
         smooth_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        smooth_label.setStyleSheet(f"color: #212529; background: transparent;")
+        smooth_label.setStyleSheet(f"color: #F44336; background: transparent;")  # Red
         smooth_layout.addWidget(smooth_label)
 
         # Enable checkbox
         self.smoothing_enable_cb = QCheckBox("Enable")
         self.smoothing_enable_cb.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        self.smoothing_enable_cb.setStyleSheet(f"color: #212529; background: transparent;")
+        self.smoothing_enable_cb.setStyleSheet(f"color: #4A148C; background: transparent;")
         smooth_layout.addWidget(self.smoothing_enable_cb)
 
         smooth_layout.addSpacing(10)
 
-        # Method
+        # Method - colorful
         method_label = QLabel("Method:")
         method_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        method_label.setStyleSheet(f"color: #212529; background: transparent;")
+        method_label.setStyleSheet(f"color: #7B1FA2; background: transparent;")  # Purple
         smooth_layout.addWidget(method_label)
 
         self.smooth_method_combo = QComboBox()
@@ -930,12 +943,13 @@ class InteractiveFittingGUI(QWidget):
         self.smooth_method_combo.setStyleSheet(f"""
             QComboBox {{ 
                 padding: 3px; 
-                color: #212529;
+                color: black;
                 background-color: white;
-                border: 1px solid #CED4DA;
+                border: 2px solid #B794F6;
+                border-radius: 3px;
             }}
             QComboBox QAbstractItemView {{
-                color: #212529;
+                color: black;
                 background-color: white;
             }}
         """)
@@ -943,10 +957,10 @@ class InteractiveFittingGUI(QWidget):
 
         smooth_layout.addSpacing(10)
 
-        # Sigma
+        # Sigma - colorful
         sigma_label = QLabel("Sigma:")
         sigma_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        sigma_label.setStyleSheet(f"color: #212529; background: transparent;")
+        sigma_label.setStyleSheet(f"color: #4A148C; background: transparent;")
         smooth_layout.addWidget(sigma_label)
 
         self.sigma_entry = QLineEdit("2.0")
@@ -955,19 +969,20 @@ class InteractiveFittingGUI(QWidget):
         self.sigma_entry.setStyleSheet(f"""
             QLineEdit {{ 
                 padding: 3px; 
-                color: #212529;
+                color: black;
                 background-color: white;
-                border: 1px solid #CED4DA;
+                border: 2px solid #B794F6;
+                border-radius: 3px;
             }}
         """)
         smooth_layout.addWidget(self.sigma_entry)
 
         smooth_layout.addSpacing(10)
 
-        # Window
+        # Window - colorful
         window_label = QLabel("Window:")
         window_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        window_label.setStyleSheet(f"color: #212529; background: transparent;")
+        window_label.setStyleSheet(f"color: #FF4081; background: transparent;")  # Pink
         smooth_layout.addWidget(window_label)
 
         self.smooth_window_entry = QLineEdit("11")
@@ -976,9 +991,10 @@ class InteractiveFittingGUI(QWidget):
         self.smooth_window_entry.setStyleSheet(f"""
             QLineEdit {{ 
                 padding: 3px; 
-                color: #212529;
+                color: black;
                 background-color: white;
-                border: 1px solid #CED4DA;
+                border: 2px solid #B794F6;
+                border-radius: 3px;
             }}
         """)
         smooth_layout.addWidget(self.smooth_window_entry)
@@ -992,36 +1008,36 @@ class InteractiveFittingGUI(QWidget):
                 font-family: Arial;
                 font-size: 9pt;
                 font-weight: bold;
-                background-color: {self.palette['success']};
-                color: white;
-                border: none;
-                border-radius: 3px;
+                background-color: #A8E6CF;
+                color: black;
+                border: 2px solid #7CB9A8;
+                border-radius: 4px;
                 padding: 5px 14px;
                 min-width: 55px;
             }}
             QPushButton:hover {{
-                opacity: 0.9;
+                opacity: 0.85;
             }}
         """)
         apply_btn.clicked.connect(self.apply_smoothing_to_data)
         smooth_layout.addWidget(apply_btn)
 
         # Reset Data button
-        reset_data_btn = QPushButton("Reset")
+        reset_data_btn = QPushButton("Reset Data")
         reset_data_btn.setStyleSheet(f"""
             QPushButton {{
                 font-family: Arial;
                 font-size: 9pt;
                 font-weight: bold;
-                background-color: {self.palette['danger']};
-                color: white;
-                border: none;
-                border-radius: 3px;
+                background-color: #FFB3BA;
+                color: black;
+                border: 2px solid #FF8A80;
+                border-radius: 4px;
                 padding: 5px 14px;
                 min-width: 55px;
             }}
             QPushButton:hover {{
-                opacity: 0.9;
+                opacity: 0.85;
             }}
         """)
         reset_data_btn.clicked.connect(self.reset_to_original_data)
@@ -1032,7 +1048,7 @@ class InteractiveFittingGUI(QWidget):
         parent_layout.addWidget(smooth_widget)
 
     def setup_results_panel(self, parent_layout):
-        """Setup results panel - compact and modern"""
+        """Setup results panel - colorful and vibrant"""
         results_widget = QWidget()
         results_widget.setFixedHeight(120)
         results_widget.setAutoFillBackground(True)
@@ -1041,10 +1057,10 @@ class InteractiveFittingGUI(QWidget):
         results_layout.setContentsMargins(8, 4, 8, 4)
         results_layout.setSpacing(3)
 
-        # Results label
+        # Results label - colorful
         results_label = QLabel("Fitting Results:")
         results_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        results_label.setStyleSheet(f"color: #212529; background: transparent;")
+        results_label.setStyleSheet(f"color: #FF6B00; background: transparent;")  # Orange
         results_layout.addWidget(results_label)
 
         # Results table
@@ -1063,17 +1079,20 @@ class InteractiveFittingGUI(QWidget):
         self.peak_table.setStyleSheet(f"""
             QTableWidget {{
                 background-color: white;
-                gridline-color: {self.palette['border']};
-                border: 1px solid {self.palette['border']};
+                gridline-color: #FFD88D;
+                border: 2px solid #FFD88D;
             }}
             QHeaderView::section {{
-                background-color: #F8F9FA;
-                color: {self.palette['text_dark']};
+                background-color: #FFF4CC;
+                color: #4A148C;
                 font-weight: bold;
                 font-family: Arial;
                 font-size: 8pt;
-                border: 1px solid {self.palette['border']};
+                border: 1px solid #FFD88D;
                 padding: 3px;
+            }}
+            QTableWidget::item {{
+                color: black;
             }}
         """)
         results_layout.addWidget(self.peak_table)
@@ -1081,25 +1100,25 @@ class InteractiveFittingGUI(QWidget):
         parent_layout.addWidget(results_widget)
 
     def setup_plot_area(self, parent_layout):
-        """Setup plot area - matches tkinter exactly"""
+        """Setup plot area - colorful background"""
         plot_widget = QWidget()
         plot_widget.setAutoFillBackground(True)
-        plot_widget.setStyleSheet("QWidget { background-color: white; }")
+        plot_widget.setStyleSheet("QWidget { background-color: #E8E4FF; }")
         plot_layout = QVBoxLayout(plot_widget)
         plot_layout.setContentsMargins(5, 5, 5, 5)
         plot_layout.setSpacing(2)
 
         # Create matplotlib figure
-        self.fig = Figure(figsize=(12, 6), facecolor='white')
-        # Increase left margin to 0.12 to prevent label cutoff (从0.08增加到0.12)
+        self.fig = Figure(figsize=(12, 6), facecolor='#E8E4FF')
+        # Increase left margin to 0.12 to prevent label cutoff
         self.fig.subplots_adjust(left=0.12, right=0.98, top=0.92, bottom=0.15)
         self.ax = self.fig.add_subplot(111)
-        self.ax.set_facecolor('#F8F9FA')  # Light gray
-        self.ax.grid(True, alpha=0.3, linestyle='--', color='#ADB5BD')
-        self.ax.set_xlabel('2θ (degree)', fontsize=12, color=self.palette['text_dark'], fontweight='bold')
-        self.ax.set_ylabel('Intensity', fontsize=12, color=self.palette['text_dark'], fontweight='bold')
+        self.ax.set_facecolor('#FFFFFF')  # White plot area
+        self.ax.grid(True, alpha=0.3, linestyle='--', color='#9575CD')
+        self.ax.set_xlabel('2θ (degree)', fontsize=12, color='#4A148C', fontweight='bold')
+        self.ax.set_ylabel('Intensity', fontsize=12, color='#4A148C', fontweight='bold')
         self.ax.set_title('Click on peaks to select | Use toolbar or scroll to zoom/pan',
-                         fontsize=10, color=self.palette['primary'])
+                         fontsize=10, color='#7B1FA2')
 
         # Canvas
         self.canvas = FigureCanvasQTAgg(self.fig)
@@ -1107,24 +1126,24 @@ class InteractiveFittingGUI(QWidget):
         self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
         plot_layout.addWidget(self.canvas)
 
-        # Toolbar - fix text visibility
+        # Toolbar - colorful
         toolbar_frame = QWidget()
-        toolbar_frame.setStyleSheet("background-color: #F5E6FA;")
+        toolbar_frame.setStyleSheet("background-color: #E8D5FF;")
         toolbar_layout = QVBoxLayout(toolbar_frame)
         toolbar_layout.setContentsMargins(0, 0, 0, 0)
         toolbar = NavigationToolbar2QT(self.canvas, toolbar_frame)
-        # Fix toolbar text color to be visible (修复导航栏文字颜色)
+        # Colorful toolbar
         toolbar.setStyleSheet(f"""
             QToolBar {{
-                background-color: #F5E6FA;
-                color: {self.palette['text_dark']};
+                background-color: #E8D5FF;
+                color: #4A148C;
             }}
             QToolButton {{
-                color: {self.palette['text_dark']};
+                color: #4A148C;
                 background-color: transparent;
             }}
             QLabel {{
-                color: {self.palette['text_dark']};
+                color: #4A148C;
             }}
         """)
         toolbar_layout.addWidget(toolbar)
@@ -1133,11 +1152,11 @@ class InteractiveFittingGUI(QWidget):
         parent_layout.addWidget(plot_widget)
 
     def setup_info_panel(self, parent_layout):
-        """Setup info panel at bottom - compact and modern"""
+        """Setup info panel at bottom - colorful and vibrant"""
         info_widget = QWidget()
         info_widget.setFixedHeight(75)
         info_widget.setAutoFillBackground(True)
-        info_widget.setStyleSheet("QWidget { background-color: #E7F5FF; }")  # Light blue tint
+        info_widget.setStyleSheet("QWidget { background-color: #E3F2FF; }")  # Light blue tint
         info_layout = QVBoxLayout(info_widget)
         info_layout.setContentsMargins(8, 4, 8, 4)
 
@@ -1148,8 +1167,8 @@ class InteractiveFittingGUI(QWidget):
         self.info_text.setStyleSheet(f"""
             QTextEdit {{
                 background-color: white;
-                color: {self.palette['text_dark']};
-                border: 1px solid {self.palette['border']};
+                color: #4A148C;
+                border: 2px solid #B794F6;
                 border-radius: 3px;
             }}
         """)
@@ -1452,11 +1471,18 @@ class InteractiveFittingGUI(QWidget):
                 self.ax.plot(x_smooth, y_full, '--', linewidth=2, 
                            label=f'Peak {i+1} fit', alpha=0.8)
 
-        self.ax.set_xlabel('2θ (degree)', fontsize=12, fontweight='bold')
-        self.ax.set_ylabel('Intensity', fontsize=12, fontweight='bold')
-        self.ax.set_title(f'XRD Data: {self.current_file}', fontsize=13, fontweight='bold')
-        self.ax.legend(loc='best', fontsize=9)
-        self.ax.grid(True, alpha=0.3, linestyle='--')
+        # Apply colorful styling to axes
+        self.ax.set_facecolor('#FFFFFF')  # White plot area
+        self.ax.set_xlabel('2θ (degree)', fontsize=12, color='#4A148C', fontweight='bold')
+        self.ax.set_ylabel('Intensity', fontsize=12, color='#4A148C', fontweight='bold')
+        self.ax.set_title(f'XRD Data: {self.current_file}', fontsize=13, color='#7B1FA2', fontweight='bold')
+        self.ax.legend(loc='best', fontsize=9, framealpha=0.9)
+        self.ax.grid(True, alpha=0.3, linestyle='--', color='#9575CD')
+        
+        # Colorful tick labels
+        self.ax.tick_params(colors='#4A148C', which='both')
+        for label in self.ax.get_xticklabels() + self.ax.get_yticklabels():
+            label.set_color('#4A148C')
 
         self.fig.tight_layout()
         self.canvas.draw()
