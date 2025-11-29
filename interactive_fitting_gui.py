@@ -1116,18 +1116,18 @@ class InteractiveFittingGUI(QWidget):
         parent_layout.addWidget(results_widget)
 
     def setup_plot_area(self, parent_layout):
-        """Setup plot area - colorful background"""
+        """Setup plot area - white background"""
         plot_widget = QWidget()
         plot_widget.setAutoFillBackground(True)
-        plot_widget.setStyleSheet("QWidget { background-color: #E8E4FF; }")
+        plot_widget.setStyleSheet("QWidget { background-color: #FFFFFF; }")  # Changed to white
         plot_layout = QVBoxLayout(plot_widget)
         plot_layout.setContentsMargins(5, 5, 5, 5)
         plot_layout.setSpacing(2)
 
         # Create matplotlib figure
-        self.fig = Figure(figsize=(12, 6), facecolor='#E8E4FF')
-        # Set consistent margins matching loaded data display
-        self.fig.subplots_adjust(left=0.10, right=0.98, top=0.95, bottom=0.10)
+        self.fig = Figure(figsize=(12, 6), facecolor='#FFFFFF')  # Changed to white
+        # Fixed margins with more space for title at top
+        self.fig.subplots_adjust(left=0.10, right=0.98, top=0.93, bottom=0.12)
         self.ax = self.fig.add_subplot(111)
         self.ax.set_facecolor('#FFFFFF')  # White plot area
         self.ax.grid(True, alpha=0.3, linestyle='--', color='#9575CD')
@@ -1560,7 +1560,7 @@ class InteractiveFittingGUI(QWidget):
             self.ax.set_xlim(xlim)
             self.ax.set_ylim(ylim)
 
-        self.fig.tight_layout()
+        # Don't use tight_layout - keep fixed margins for consistent axis label positions
         self.canvas.draw()
 
     def update_peak_table(self):
