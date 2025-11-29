@@ -260,16 +260,53 @@ class PowderXRDModule(GUIBase):
         self.create_folder_input(left_layout, "Output Directory:", "output_dir")
         self.create_text_input(left_layout, "Dataset Directory:", "dataset_path", placeholder="entry/data/data", with_browse=True)
 
-        params_row = QWidget()
-        params_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        params_row_layout = QHBoxLayout(params_row)
-        params_row_layout.setContentsMargins(0, 6, 0, 6)
-        params_row_layout.setSpacing(0)
+        # Add Run Integration button centered
+        run_int_btn_row = QWidget()
+        run_int_btn_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
+        run_int_btn_layout = QHBoxLayout(run_int_btn_row)
+        run_int_btn_layout.setContentsMargins(0, 15, 0, 0)
+        run_int_btn_layout.setSpacing(0)
+        
+        run_int_btn_layout.addStretch()
+        run_int_btn = ModernButton(
+            "Run Integration",
+            self.run_integration,
+            bg_color=self.colors['secondary'],
+            hover_color=self.colors['primary_hover'],
+            width=170, height=36,
+            parent=run_int_btn_row
+        )
+        run_int_btn.setFont(QFont('Arial', 9))
+        run_int_btn_layout.addWidget(run_int_btn)
+        run_int_btn_layout.addStretch()
 
+        left_layout.addWidget(run_int_btn_row)
+        left_layout.addStretch()
+
+        # Right: output options and quick actions stacked vertically
+        right_panel = QWidget()
+        right_panel.setStyleSheet(f"background-color: {self.colors['card_bg']};")
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 4, 0, 4)
+        right_layout.setSpacing(12)
+
+        output_card = self.create_card_frame(None)
+        output_card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {self.colors['card_bg']};
+                border: 2px solid #888888;
+                border-radius: 8px;
+            }}
+        """)
+        output_layout = QVBoxLayout(output_card)
+        output_layout.setContentsMargins(15, 12, 15, 12)
+        output_layout.setSpacing(8)
+
+        # Number of Points
         npt_container = QWidget()
         npt_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         npt_layout = QVBoxLayout(npt_container)
-        npt_layout.setContentsMargins(0, 0, 0, 0)
+        npt_layout.setContentsMargins(0, 0, 0, 8)
 
         npt_label = QLabel("Number of Points")
         npt_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
@@ -280,26 +317,13 @@ class PowderXRDModule(GUIBase):
                                          increment=500, width=110, parent=npt_container)
         self.npt_spinbox.valueChanged.connect(lambda v: setattr(self, 'npt', int(v)))
         npt_layout.addWidget(self.npt_spinbox, alignment=Qt.AlignmentFlag.AlignCenter)
-        params_row_layout.addWidget(npt_container)
-        params_row_layout.addStretch()
-        
-        # Add Run Integration button in the same row
-        run_int_btn = ModernButton(
-            "Run Integration",
-            self.run_integration,
-            bg_color=self.colors['secondary'],
-            hover_color=self.colors['primary_hover'],
-            width=170, height=36,
-            parent=params_row
-        )
-        run_int_btn.setFont(QFont('Arial', 9))
-        params_row_layout.addWidget(run_int_btn)
-        params_row_layout.addStretch()
+        output_layout.addWidget(npt_container)
 
+        # Unit
         unit_container = QWidget()
         unit_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         unit_layout = QVBoxLayout(unit_container)
-        unit_layout.setContentsMargins(0, 0, 0, 0)
+        unit_layout.setContentsMargins(0, 0, 0, 8)
         unit_layout.setSpacing(4)
 
         unit_label = QLabel("Unit")
@@ -343,29 +367,7 @@ class PowderXRDModule(GUIBase):
             unit_radios_layout.addWidget(radio)
 
         unit_layout.addWidget(unit_radios)
-        params_row_layout.addWidget(unit_container)
-
-        left_layout.addWidget(params_row)
-        left_layout.addStretch()
-
-        # Right: output options and quick actions stacked vertically
-        right_panel = QWidget()
-        right_panel.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        right_layout = QVBoxLayout(right_panel)
-        right_layout.setContentsMargins(0, 4, 0, 4)
-        right_layout.setSpacing(12)
-
-        output_card = self.create_card_frame(None)
-        output_card.setStyleSheet(f"""
-            QFrame {{
-                background-color: {self.colors['card_bg']};
-                border: 2px solid #888888;
-                border-radius: 8px;
-            }}
-        """)
-        output_layout = QVBoxLayout(output_card)
-        output_layout.setContentsMargins(15, 12, 15, 12)
-        output_layout.setSpacing(8)
+        output_layout.addWidget(unit_container)
 
         formats_label = QLabel("Select Output Formats:")
         formats_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
@@ -495,19 +497,19 @@ class PowderXRDModule(GUIBase):
         offset_row_layout.setSpacing(10)
 
         offset_label = QLabel("Offset:")
-        offset_label.setFont(QFont('Arial', 9))
-        offset_label.setStyleSheet(f"color: #666666; background-color: {self.colors['card_bg']};")
+        offset_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        offset_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
         offset_row_layout.addWidget(offset_label)
 
         self.offset_entry = QLineEdit("auto")
         self.offset_entry.setFixedWidth(70)
         self.offset_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.offset_entry.setFont(QFont('Arial', 9))
+        self.offset_entry.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         self.offset_entry.setStyleSheet(f"""
             QLineEdit {{
-                background-color: white;
+                background-color: transparent;
                 color: {self.colors['text_dark']};
-                border: 2px solid #AAAAAA;
+                border: none;
                 padding: 3px;
             }}
         """)
