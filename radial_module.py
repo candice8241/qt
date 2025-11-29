@@ -36,7 +36,7 @@ try:
     PYFAI_AVAILABLE = True
 except ImportError:
     PYFAI_AVAILABLE = False
-    print("⚠ Warning: pyFAI not available. Integration功能将被禁用。")
+    print("⚠ Warning: pyFAI not available. Integration features will be disabled.")
 
 # Import matplotlib for plotting (non-interactive backend)
 try:
@@ -47,7 +47,7 @@ try:
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
-    print("⚠ Warning: matplotlib not available. Plotting功能将被禁用。")
+    print("⚠ Warning: matplotlib not available. Plotting features will be disabled.")
 
 
 class WorkerThread(QThread):
@@ -166,7 +166,7 @@ class AzimuthalIntegrationModule(GUIBase):
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.setStyleSheet(f"background-color: {self.colors['bg']}; border: none;")
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)  # 禁用垂直滚动条
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)  # Disable vertical scrollbar
         
         # Content widget
         content_widget = QWidget()
@@ -399,76 +399,36 @@ class AzimuthalIntegrationModule(GUIBase):
         right_panel = QWidget()
         right_panel.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         right_layout = QVBoxLayout(right_panel)
-        right_layout.setContentsMargins(0, 4, 0, 4)
-        right_layout.setSpacing(12)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(0)
 
-        # Right panel centered card
-        right_layout.addStretch()
+        # Calculate left Browse area alignment:
+        # - Left title (Integration Settings): ~25px
+        # - 5 file input boxes, each ~50px = 250px
+        # - Browse area center: 25 + 250/2 = 150px
+        # Align right container center with left Browse area center
+        # Adjusted to 25px for better alignment
+        from PyQt6.QtWidgets import QSpacerItem, QSizePolicy
+        top_spacer = QSpacerItem(20, 25, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        right_layout.addItem(top_spacer)
 
         settings_card = self.create_card_frame(None)
+        # Darken the border of right container
+        settings_card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {self.colors['card_bg']};
+                border: 2px solid rgba(0, 0, 0, 0.4);
+                border-radius: 8px;
+            }}
+        """)
         settings_layout = QVBoxLayout(settings_card)
         settings_layout.setContentsMargins(15, 12, 15, 12)
         settings_layout.setSpacing(8)
 
         settings_title = QLabel("Azimuthal Sector Settings")
         settings_title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        settings_title.setStyleSheet(f"color: {self.colors['primary']}; background-color: {self.colors['card_bg']};")
+        settings_title.setStyleSheet(f"color: black; background-color: {self.colors['card_bg']};")
         settings_layout.addWidget(settings_title)
-
-        # Angular range
-        range_label = QLabel("Angular Range (degrees):")
-        range_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        range_label.setStyleSheet(f"color: #666666; background-color: {self.colors['card_bg']};")
-        settings_layout.addWidget(range_label)
-
-        range_row = QWidget()
-        range_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        range_layout = QHBoxLayout(range_row)
-        range_layout.setContentsMargins(0, 0, 0, 0)
-        range_layout.setSpacing(8)
-
-        min_label = QLabel("Min:")
-        min_label.setFont(QFont('Arial', 9))
-        min_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
-        range_layout.addWidget(min_label)
-
-        self.azim_min_entry = QLineEdit("0")
-        self.azim_min_entry.setFixedWidth(70)
-        self.azim_min_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.azim_min_entry.setFont(QFont('Arial', 9))
-        self.azim_min_entry.setStyleSheet(f"""
-            QLineEdit {{
-                background-color: white;
-                color: {self.colors['text_dark']};
-                border: 1px solid {self.colors['border']};
-                padding: 3px;
-            }}
-        """)
-        self.azim_min_entry.textChanged.connect(lambda text: setattr(self, 'azim_range_min', float(text) if text else 0.0))
-        range_layout.addWidget(self.azim_min_entry)
-
-        max_label = QLabel("Max:")
-        max_label.setFont(QFont('Arial', 9))
-        max_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
-        range_layout.addWidget(max_label)
-
-        self.azim_max_entry = QLineEdit("360")
-        self.azim_max_entry.setFixedWidth(70)
-        self.azim_max_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.azim_max_entry.setFont(QFont('Arial', 9))
-        self.azim_max_entry.setStyleSheet(f"""
-            QLineEdit {{
-                background-color: white;
-                color: {self.colors['text_dark']};
-                border: 1px solid {self.colors['border']};
-                padding: 3px;
-            }}
-        """)
-        self.azim_max_entry.textChanged.connect(lambda text: setattr(self, 'azim_range_max', float(text) if text else 360.0))
-        range_layout.addWidget(self.azim_max_entry)
-        range_layout.addStretch()
-
-        settings_layout.addWidget(range_row)
 
         # Bin Mode Configuration Button
         bin_btn_row = QWidget()
@@ -478,11 +438,11 @@ class AzimuthalIntegrationModule(GUIBase):
         bin_btn_layout.setSpacing(10)
         
         self.bin_config_btn = QPushButton("⚙ Configure Bins")
-        self.bin_config_btn.setFont(QFont('Arial', 9))
+        self.bin_config_btn.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         self.bin_config_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['primary']};
-                color: white;
+                color: black;
                 border: none;
                 padding: 6px 12px;
                 border-radius: 4px;
@@ -498,8 +458,8 @@ class AzimuthalIntegrationModule(GUIBase):
         self.bin_status_label = QLabel("No bins configured")
         self.bin_status_label.setFont(QFont('Arial', 9))
         self.bin_status_label.setStyleSheet("color: #999999;")
-        self.bin_status_label.setMinimumWidth(150)  # 固定最小宽度，防止容器变化
-        self.bin_status_label.setWordWrap(True)  # 允许换行
+        self.bin_status_label.setMinimumWidth(150)  # Fixed minimum width to prevent container changes
+        self.bin_status_label.setWordWrap(True)  # Allow word wrap
         bin_btn_layout.addWidget(self.bin_status_label)
         bin_btn_layout.addStretch()
         
@@ -513,11 +473,11 @@ class AzimuthalIntegrationModule(GUIBase):
         sector_btn_layout.setSpacing(10)
         
         self.sector_config_btn = QPushButton("⚙ Configure Sectors")
-        self.sector_config_btn.setFont(QFont('Arial', 9))
+        self.sector_config_btn.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         self.sector_config_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['primary']};
-                color: white;
+                color: black;
                 border: none;
                 padding: 6px 12px;
                 border-radius: 4px;
@@ -533,8 +493,8 @@ class AzimuthalIntegrationModule(GUIBase):
         self.sector_status_label = QLabel("No sectors configured")
         self.sector_status_label.setFont(QFont('Arial', 9))
         self.sector_status_label.setStyleSheet("color: #999999;")
-        self.sector_status_label.setMinimumWidth(150)  # 固定最小宽度，防止容器变化
-        self.sector_status_label.setWordWrap(True)  # 允许换行
+        self.sector_status_label.setMinimumWidth(150)  # Fixed minimum width to prevent container changes
+        self.sector_status_label.setWordWrap(True)  # Allow word wrap
         sector_btn_layout.addWidget(self.sector_status_label)
         sector_btn_layout.addStretch()
         
@@ -562,7 +522,7 @@ class AzimuthalIntegrationModule(GUIBase):
             ('png', 'format_png', False)
         ]
 
-        # Create 2-column layout
+        # Create 2-row layout with 3 formats per row
         for i in range(0, len(format_options), 3):
             row_widget = QWidget()
             row_widget.setStyleSheet(f"background-color: {self.colors['card_bg']};")
@@ -575,7 +535,7 @@ class AzimuthalIntegrationModule(GUIBase):
             cb1 = QCheckBox(label1)
             cb1.setChecked(default1)
             cb1.setFont(QFont('Arial', 9))
-            cb1.setFixedWidth(45)  # 固定宽度以对齐
+            cb1.setFixedWidth(45)  # Fixed width for alignment
             cb1.setStyleSheet(f"""
                 QCheckBox {{
                     color: #666666;
@@ -605,7 +565,7 @@ class AzimuthalIntegrationModule(GUIBase):
                 cb2 = QCheckBox(label2)
                 cb2.setChecked(default2)
                 cb2.setFont(QFont('Arial', 9))
-                cb2.setFixedWidth(45)  # 固定宽度以对齐
+                cb2.setFixedWidth(45)  # Fixed width for alignment
                 cb2.setStyleSheet(f"""
                     QCheckBox {{
                         color: #666666;
@@ -628,6 +588,35 @@ class AzimuthalIntegrationModule(GUIBase):
                 cb2.stateChanged.connect(lambda state, v=var2: setattr(self, v, state == Qt.CheckState.Checked.value))
                 row_layout.addWidget(cb2)
             
+            # Third checkbox in row (if exists)
+            if i + 2 < len(format_options):
+                label3, var3, default3 = format_options[i + 2]
+                cb3 = QCheckBox(label3)
+                cb3.setChecked(default3)
+                cb3.setFont(QFont('Arial', 9))
+                cb3.setFixedWidth(45)  # Fixed width for alignment
+                cb3.setStyleSheet(f"""
+                    QCheckBox {{
+                        color: #666666;
+                        background-color: {self.colors['card_bg']};
+                    }}
+                    QCheckBox::indicator {{
+                        width: 10px;
+                        height: 10px;
+                        border: 1.5px solid #999999;
+                        border-radius: 2px;
+                        background-color: {self.colors['primary']};
+                    }}
+                    QCheckBox::indicator:checked {{
+                        border: 1.5px solid #999999;
+                        border-radius: 2px;
+                        background-color: {self.colors['primary']};
+                        image:  url(check.png);
+                    }}
+                """)
+                cb3.stateChanged.connect(lambda state, v=var3: setattr(self, v, state == Qt.CheckState.Checked.value))
+                row_layout.addWidget(cb3)
+            
             row_layout.addStretch()
             formats_grid_layout.addWidget(row_widget)
 
@@ -647,7 +636,7 @@ class AzimuthalIntegrationModule(GUIBase):
         
         # Stacked Plot checkbox
         stacked_cb = QCheckBox("Create Stacked Plot")
-        stacked_cb.setChecked(True)  # Default: enabled
+        stacked_cb.setChecked(True)  # Default enabled
         stacked_cb.setFont(QFont('Arial', 9))
         stacked_cb.setStyleSheet(f"""
             QCheckBox {{
@@ -676,12 +665,12 @@ class AzimuthalIntegrationModule(GUIBase):
         offset_row = QWidget()
         offset_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         offset_layout = QHBoxLayout(offset_row)
-        offset_layout.setContentsMargins(20, 0, 0, 0)  # Indent to show it's related to stacked plot
+        offset_layout.setContentsMargins(0, 0, 0, 0)  # Align left, remove indent
         offset_layout.setSpacing(8)
         
         offset_label = QLabel("Offset:")
-        offset_label.setFont(QFont('Arial', 9))
-        offset_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
+        offset_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        offset_label.setStyleSheet(f"color: black; background-color: {self.colors['card_bg']};")
         offset_layout.addWidget(offset_label)
         
         self.stacked_offset_entry = QLineEdit("auto")
@@ -709,7 +698,9 @@ class AzimuthalIntegrationModule(GUIBase):
         
         settings_layout.addWidget(viz_grid)
 
-        right_layout.addWidget(settings_card, alignment=Qt.AlignmentFlag.AlignCenter)
+        right_layout.addWidget(settings_card, alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
+        
+        # Bottom stretch space
         right_layout.addStretch()
 
         # Add both panels to columns with stretch ratios
@@ -792,7 +783,7 @@ class AzimuthalIntegrationModule(GUIBase):
             QLineEdit {{
                 background-color: white;
                 color: {self.colors['text_dark']};
-                border: 1px solid {self.colors['border']};
+                border: 1.5px solid rgba(0, 0, 0, 0.3);
                 padding: 3px;
             }}
         """)
@@ -807,7 +798,7 @@ class AzimuthalIntegrationModule(GUIBase):
             width=70, height=26,
             parent=container
         )
-        browse_btn.setFont(QFont('Arial', 8))  # 更小的字体
+        browse_btn.setFont(QFont('Arial', 9))  # Increase font size
         input_layout.addWidget(browse_btn)
         
         layout.addLayout(input_layout)
@@ -836,7 +827,7 @@ class AzimuthalIntegrationModule(GUIBase):
             QLineEdit {{
                 background-color: white;
                 color: {self.colors['text_dark']};
-                border: 1px solid {self.colors['border']};
+                border: 1.5px solid rgba(0, 0, 0, 0.3);
                 padding: 3px;
             }}
         """)
@@ -851,7 +842,7 @@ class AzimuthalIntegrationModule(GUIBase):
             width=70, height=26,
             parent=container
         )
-        browse_btn.setFont(QFont('Arial', 8))  # 更小的字体
+        browse_btn.setFont(QFont('Arial', 9))  # Increase font size
         input_layout.addWidget(browse_btn)
         
         layout.addLayout(input_layout)
@@ -882,7 +873,7 @@ class AzimuthalIntegrationModule(GUIBase):
             QLineEdit {{
                 background-color: white;
                 color: {self.colors['text_dark']};
-                border: 1px solid {self.colors['border']};
+                border: 1.5px solid rgba(0, 0, 0, 0.3);
                 padding: 3px;
             }}
         """)
@@ -890,7 +881,7 @@ class AzimuthalIntegrationModule(GUIBase):
         
         input_layout.addWidget(entry)
         
-        # 添加Browse按钮（用于浏览HDF5文件选择dataset）
+        # Add Browse button for browsing HDF5 file to select dataset
         browse_btn = ModernButton(
             "Browse",
             lambda: self.browse_dataset(entry),
@@ -899,7 +890,7 @@ class AzimuthalIntegrationModule(GUIBase):
             width=70, height=26,
             parent=container
         )
-        browse_btn.setFont(QFont('Arial', 8))  # 更小的字体
+        browse_btn.setFont(QFont('Arial', 9))  # Increase font size
         input_layout.addWidget(browse_btn)
         
         layout.addLayout(input_layout)
@@ -926,7 +917,7 @@ class AzimuthalIntegrationModule(GUIBase):
     
     def browse_dataset(self, entry):
         """Browse for HDF5 dataset path"""
-        # 简单的dataset path输入对话框
+        # Simple dataset path input dialog
         from PyQt6.QtWidgets import QInputDialog
         text, ok = QInputDialog.getText(
             self.root, 
@@ -990,7 +981,7 @@ class AzimuthalIntegrationModule(GUIBase):
         try:
             # Check if pyFAI is available
             if not PYFAI_AVAILABLE:
-                self.show_error("Error", "pyFAI is not installed.\n请安装pyFAI: pip install pyFAI")
+                self.show_error("Error", "pyFAI is not installed.\nPlease install pyFAI: pip install pyFAI")
                 return
             
             # Validate inputs
@@ -1244,9 +1235,9 @@ class AzimuthalIntegrationModule(GUIBase):
         self.show_error("Error", error_msg)
 
 
-# Batch Integration功能类
+# Batch Integration class
 class BatchIntegrator:
-    """Batch integration processor - 从batch_integration.py迁移"""
+    """Batch integration processor - migrated from batch_integration.py"""
     
     def __init__(self, poni_file, mask_file=None):
         """

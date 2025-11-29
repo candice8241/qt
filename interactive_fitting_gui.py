@@ -656,11 +656,11 @@ class InteractiveFittingGUI(QWidget):
         control_layout.setContentsMargins(8, 5, 8, 5)
         control_layout.setSpacing(4)
 
-        # Compact button style
+        # Compact button style with explicit text color
         btn_style = """
             QPushButton {
                 font-family: Arial;
-                font-size: 9pt;
+                font-size: 10pt;
                 font-weight: bold;
                 border: none;
                 border-radius: 4px;
@@ -676,7 +676,7 @@ class InteractiveFittingGUI(QWidget):
         """
 
         # Load File button
-        load_btn = QPushButton("📁 Load")
+        load_btn = QPushButton("Load")
         load_btn.setStyleSheet(btn_style + f"background-color: {self.palette['primary']}; color: white;")
         load_btn.clicked.connect(self.load_data_file)
         control_layout.addWidget(load_btn)
@@ -695,49 +695,49 @@ class InteractiveFittingGUI(QWidget):
         control_layout.addWidget(next_btn)
 
         # Fit Peaks button
-        fit_btn = QPushButton("⚡ Fit")
+        fit_btn = QPushButton("Fit Peaks")
         fit_btn.setStyleSheet(btn_style + f"background-color: {self.palette['purple']}; color: white;")
         fit_btn.clicked.connect(self.fit_all_peaks)
         control_layout.addWidget(fit_btn)
 
         # Reset button
-        reset_btn = QPushButton("↺ Reset")
-        reset_btn.setStyleSheet(btn_style + f"background-color: {self.palette['warning']}; color: {self.palette['text_dark']};")
+        reset_btn = QPushButton("Reset")
+        reset_btn.setStyleSheet(btn_style + f"background-color: {self.palette['warning']}; color: #212529;")
         reset_btn.clicked.connect(self.clear_peaks)
         control_layout.addWidget(reset_btn)
 
         # Save Results button
-        save_btn = QPushButton("💾 Save")
+        save_btn = QPushButton("Save")
         save_btn.setStyleSheet(btn_style + f"background-color: {self.palette['success']}; color: white;")
         save_btn.clicked.connect(self.export_results)
         control_layout.addWidget(save_btn)
 
         # Clear Fit button
-        clear_btn = QPushButton("✕ Clear")
+        clear_btn = QPushButton("Clear")
         clear_btn.setStyleSheet(btn_style + f"background-color: {self.palette['danger']}; color: white;")
         clear_btn.clicked.connect(self.clear_peaks)
         control_layout.addWidget(clear_btn)
 
         # Undo button
-        undo_btn = QPushButton("⟲ Undo")
-        undo_btn.setStyleSheet(btn_style + f"background-color: #CED4DA; color: {self.palette['text_dark']};")
+        undo_btn = QPushButton("Undo")
+        undo_btn.setStyleSheet(btn_style + f"background-color: #CED4DA; color: #212529;")
         undo_btn.clicked.connect(self.undo_action)
         control_layout.addWidget(undo_btn)
 
         # Auto Find button
-        auto_btn = QPushButton("🔍 Auto")
+        auto_btn = QPushButton("Auto Find")
         auto_btn.setStyleSheet(btn_style + f"background-color: {self.palette['primary']}; color: white;")
         auto_btn.clicked.connect(self.auto_detect_peaks)
         control_layout.addWidget(auto_btn)
 
         # Overlap button
-        overlap_btn = QPushButton("⊕ Overlap")
+        overlap_btn = QPushButton("Overlap")
         overlap_btn.setStyleSheet(btn_style + f"background-color: {self.palette['info']}; color: white;")
         overlap_btn.clicked.connect(self.toggle_overlap_mode)
         control_layout.addWidget(overlap_btn)
 
         # Batch button
-        batch_btn = QPushButton("⚙ Batch")
+        batch_btn = QPushButton("Batch")
         batch_btn.setStyleSheet(btn_style + f"background-color: #868E96; color: white;")
         control_layout.addWidget(batch_btn)
 
@@ -746,7 +746,7 @@ class InteractiveFittingGUI(QWidget):
         # Status label - more space for display
         self.status_label = QLabel("Please load a file to start")
         self.status_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        self.status_label.setStyleSheet(f"color: {self.palette['primary']}; background: transparent; padding: 5px;")
+        self.status_label.setStyleSheet(f"color: #212529; background: transparent; padding: 5px;")
         self.status_label.setMinimumWidth(400)
         self.status_label.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)
         control_layout.addWidget(self.status_label)
@@ -765,19 +765,19 @@ class InteractiveFittingGUI(QWidget):
 
         # Background label
         bg_label = QLabel("Background:")
-        bg_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        bg_label.setStyleSheet(f"color: {self.palette['text_dark']}; background: transparent;")
+        bg_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
+        bg_label.setStyleSheet(f"color: #212529; background: transparent;")
         bg_layout.addWidget(bg_label)
 
-        # Compact button style
+        # Compact button style with explicit text color
         bg_btn_style = """
             QPushButton {
                 font-family: Arial;
-                font-size: 8pt;
+                font-size: 9pt;
                 font-weight: bold;
                 border: none;
                 border-radius: 3px;
-                padding: 4px 8px;
+                padding: 5px 10px;
                 min-width: 60px;
             }
             QPushButton:hover {
@@ -816,23 +816,23 @@ class InteractiveFittingGUI(QWidget):
 
         # Fit Method
         fit_label = QLabel("Method:")
-        fit_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))
-        fit_label.setStyleSheet(f"color: {self.palette['text_dark']}; background: transparent;")
+        fit_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        fit_label.setStyleSheet(f"color: #212529; background: transparent;")
         bg_layout.addWidget(fit_label)
 
         self.method_combo = QComboBox()
         self.method_combo.addItems(['pseudo_voigt', 'voigt'])
-        self.method_combo.setFont(QFont('Arial', 8))
-        self.method_combo.setFixedWidth(100)
-        # Fix combo box text color (修复下拉框文字颜色)
+        self.method_combo.setFont(QFont('Arial', 9))
+        self.method_combo.setFixedWidth(110)
         self.method_combo.setStyleSheet(f"""
             QComboBox {{ 
-                padding: 2px; 
-                color: {self.palette['text_dark']};
+                padding: 3px; 
+                color: #212529;
                 background-color: white;
+                border: 1px solid #CED4DA;
             }}
             QComboBox QAbstractItemView {{
-                color: {self.palette['text_dark']};
+                color: #212529;
                 background-color: white;
             }}
         """)
@@ -843,19 +843,19 @@ class InteractiveFittingGUI(QWidget):
 
         # Overlap FWHM×
         overlap_label = QLabel("FWHM×:")
-        overlap_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))
-        overlap_label.setStyleSheet(f"color: {self.palette['text_dark']}; background: transparent;")
+        overlap_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        overlap_label.setStyleSheet(f"color: #212529; background: transparent;")
         bg_layout.addWidget(overlap_label)
 
         self.overlap_entry = QLineEdit("5.0")
-        self.overlap_entry.setFixedWidth(40)
-        self.overlap_entry.setFont(QFont('Arial', 8))
-        # Fix input text color (修复输入框文字颜色)
+        self.overlap_entry.setFixedWidth(50)
+        self.overlap_entry.setFont(QFont('Arial', 9))
         self.overlap_entry.setStyleSheet(f"""
             QLineEdit {{ 
-                padding: 2px; 
-                color: {self.palette['text_dark']};
+                padding: 3px; 
+                color: #212529;
                 background-color: white;
+                border: 1px solid #CED4DA;
             }}
         """)
         bg_layout.addWidget(self.overlap_entry)
@@ -864,19 +864,19 @@ class InteractiveFittingGUI(QWidget):
 
         # Fit Window×
         window_label = QLabel("Window×:")
-        window_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))
-        window_label.setStyleSheet(f"color: {self.palette['text_dark']}; background: transparent;")
+        window_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        window_label.setStyleSheet(f"color: #212529; background: transparent;")
         bg_layout.addWidget(window_label)
 
         self.fit_window_entry = QLineEdit("3.0")
-        self.fit_window_entry.setFixedWidth(40)
-        self.fit_window_entry.setFont(QFont('Arial', 8))
-        # Fix input text color (修复输入框文字颜色)
+        self.fit_window_entry.setFixedWidth(50)
+        self.fit_window_entry.setFont(QFont('Arial', 9))
         self.fit_window_entry.setStyleSheet(f"""
             QLineEdit {{ 
-                padding: 2px; 
-                color: {self.palette['text_dark']};
+                padding: 3px; 
+                color: #212529;
                 background-color: white;
+                border: 1px solid #CED4DA;
             }}
         """)
         bg_layout.addWidget(self.fit_window_entry)
@@ -886,7 +886,7 @@ class InteractiveFittingGUI(QWidget):
         # Coordinate label (right side) - more space
         self.coord_label = QLabel("")
         self.coord_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        self.coord_label.setStyleSheet(f"color: {self.palette['primary']}; background: transparent;")
+        self.coord_label.setStyleSheet(f"color: #212529; background: transparent;")
         self.coord_label.setMinimumWidth(300)
         self.coord_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
         bg_layout.addWidget(self.coord_label)
@@ -905,37 +905,37 @@ class InteractiveFittingGUI(QWidget):
 
         # Smoothing label
         smooth_label = QLabel("Smoothing:")
-        smooth_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        smooth_label.setStyleSheet(f"color: {self.palette['text_dark']}; background: transparent;")
+        smooth_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
+        smooth_label.setStyleSheet(f"color: #212529; background: transparent;")
         smooth_layout.addWidget(smooth_label)
 
         # Enable checkbox
         self.smoothing_enable_cb = QCheckBox("Enable")
-        self.smoothing_enable_cb.setFont(QFont('Arial', 8, QFont.Weight.Bold))
-        self.smoothing_enable_cb.setStyleSheet(f"color: {self.palette['text_dark']}; background: transparent;")
+        self.smoothing_enable_cb.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        self.smoothing_enable_cb.setStyleSheet(f"color: #212529; background: transparent;")
         smooth_layout.addWidget(self.smoothing_enable_cb)
 
         smooth_layout.addSpacing(10)
 
         # Method
         method_label = QLabel("Method:")
-        method_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))
-        method_label.setStyleSheet(f"color: {self.palette['text_dark']}; background: transparent;")
+        method_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        method_label.setStyleSheet(f"color: #212529; background: transparent;")
         smooth_layout.addWidget(method_label)
 
         self.smooth_method_combo = QComboBox()
         self.smooth_method_combo.addItems(['gaussian', 'savgol'])
-        self.smooth_method_combo.setFont(QFont('Arial', 8))
-        self.smooth_method_combo.setFixedWidth(90)
-        # Fix combo box text color
+        self.smooth_method_combo.setFont(QFont('Arial', 9))
+        self.smooth_method_combo.setFixedWidth(100)
         self.smooth_method_combo.setStyleSheet(f"""
             QComboBox {{ 
-                padding: 2px; 
-                color: {self.palette['text_dark']};
+                padding: 3px; 
+                color: #212529;
                 background-color: white;
+                border: 1px solid #CED4DA;
             }}
             QComboBox QAbstractItemView {{
-                color: {self.palette['text_dark']};
+                color: #212529;
                 background-color: white;
             }}
         """)
@@ -945,19 +945,19 @@ class InteractiveFittingGUI(QWidget):
 
         # Sigma
         sigma_label = QLabel("Sigma:")
-        sigma_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))
-        sigma_label.setStyleSheet(f"color: {self.palette['text_dark']}; background: transparent;")
+        sigma_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        sigma_label.setStyleSheet(f"color: #212529; background: transparent;")
         smooth_layout.addWidget(sigma_label)
 
         self.sigma_entry = QLineEdit("2.0")
-        self.sigma_entry.setFixedWidth(40)
-        self.sigma_entry.setFont(QFont('Arial', 8))
-        # Fix input text color
+        self.sigma_entry.setFixedWidth(50)
+        self.sigma_entry.setFont(QFont('Arial', 9))
         self.sigma_entry.setStyleSheet(f"""
             QLineEdit {{ 
-                padding: 2px; 
-                color: {self.palette['text_dark']};
+                padding: 3px; 
+                color: #212529;
                 background-color: white;
+                border: 1px solid #CED4DA;
             }}
         """)
         smooth_layout.addWidget(self.sigma_entry)
@@ -966,19 +966,19 @@ class InteractiveFittingGUI(QWidget):
 
         # Window
         window_label = QLabel("Window:")
-        window_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))
-        window_label.setStyleSheet(f"color: {self.palette['text_dark']}; background: transparent;")
+        window_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        window_label.setStyleSheet(f"color: #212529; background: transparent;")
         smooth_layout.addWidget(window_label)
 
         self.smooth_window_entry = QLineEdit("11")
-        self.smooth_window_entry.setFixedWidth(40)
-        self.smooth_window_entry.setFont(QFont('Arial', 8))
-        # Fix input text color
+        self.smooth_window_entry.setFixedWidth(50)
+        self.smooth_window_entry.setFont(QFont('Arial', 9))
         self.smooth_window_entry.setStyleSheet(f"""
             QLineEdit {{ 
-                padding: 2px; 
-                color: {self.palette['text_dark']};
+                padding: 3px; 
+                color: #212529;
                 background-color: white;
+                border: 1px solid #CED4DA;
             }}
         """)
         smooth_layout.addWidget(self.smooth_window_entry)
@@ -990,14 +990,14 @@ class InteractiveFittingGUI(QWidget):
         apply_btn.setStyleSheet(f"""
             QPushButton {{
                 font-family: Arial;
-                font-size: 8pt;
+                font-size: 9pt;
                 font-weight: bold;
                 background-color: {self.palette['success']};
                 color: white;
                 border: none;
                 border-radius: 3px;
-                padding: 4px 12px;
-                min-width: 50px;
+                padding: 5px 14px;
+                min-width: 55px;
             }}
             QPushButton:hover {{
                 opacity: 0.9;
@@ -1011,14 +1011,14 @@ class InteractiveFittingGUI(QWidget):
         reset_data_btn.setStyleSheet(f"""
             QPushButton {{
                 font-family: Arial;
-                font-size: 8pt;
+                font-size: 9pt;
                 font-weight: bold;
                 background-color: {self.palette['danger']};
                 color: white;
                 border: none;
                 border-radius: 3px;
-                padding: 4px 12px;
-                min-width: 50px;
+                padding: 5px 14px;
+                min-width: 55px;
             }}
             QPushButton:hover {{
                 opacity: 0.9;
@@ -1042,9 +1042,9 @@ class InteractiveFittingGUI(QWidget):
         results_layout.setSpacing(3)
 
         # Results label
-        results_label = QLabel("📊 Fitting Results:")
-        results_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        results_label.setStyleSheet(f"color: {self.palette['text_dark']}; background: transparent;")
+        results_label = QLabel("Fitting Results:")
+        results_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
+        results_label.setStyleSheet(f"color: #212529; background: transparent;")
         results_layout.addWidget(results_label)
 
         # Results table
