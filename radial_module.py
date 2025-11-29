@@ -562,7 +562,7 @@ class AzimuthalIntegrationModule(GUIBase):
             ('png', 'format_png', False)
         ]
 
-        # Create 2-column layout
+        # Create 2-row layout with 3 formats per row
         for i in range(0, len(format_options), 3):
             row_widget = QWidget()
             row_widget.setStyleSheet(f"background-color: {self.colors['card_bg']};")
@@ -627,6 +627,35 @@ class AzimuthalIntegrationModule(GUIBase):
                 """)
                 cb2.stateChanged.connect(lambda state, v=var2: setattr(self, v, state == Qt.CheckState.Checked.value))
                 row_layout.addWidget(cb2)
+            
+            # Third checkbox in row (if exists)
+            if i + 2 < len(format_options):
+                label3, var3, default3 = format_options[i + 2]
+                cb3 = QCheckBox(label3)
+                cb3.setChecked(default3)
+                cb3.setFont(QFont('Arial', 9))
+                cb3.setFixedWidth(45)  # 固定宽度以对齐
+                cb3.setStyleSheet(f"""
+                    QCheckBox {{
+                        color: #666666;
+                        background-color: {self.colors['card_bg']};
+                    }}
+                    QCheckBox::indicator {{
+                        width: 10px;
+                        height: 10px;
+                        border: 1.5px solid #999999;
+                        border-radius: 2px;
+                        background-color: {self.colors['primary']};
+                    }}
+                    QCheckBox::indicator:checked {{
+                        border: 1.5px solid #999999;
+                        border-radius: 2px;
+                        background-color: {self.colors['primary']};
+                        image:  url(check.png);
+                    }}
+                """)
+                cb3.stateChanged.connect(lambda state, v=var3: setattr(self, v, state == Qt.CheckState.Checked.value))
+                row_layout.addWidget(cb3)
             
             row_layout.addStretch()
             formats_grid_layout.addWidget(row_widget)
@@ -790,8 +819,8 @@ class AzimuthalIntegrationModule(GUIBase):
         entry.setFont(QFont('Arial', 9))
         entry.setStyleSheet(f"""
             QLineEdit {{
-                background-color: white;
-                color: {self.colors['text_dark']};
+                background-color: rgba(0, 0, 0, 0.7);
+                color: black;
                 border: 1px solid {self.colors['border']};
                 padding: 3px;
             }}
@@ -834,8 +863,8 @@ class AzimuthalIntegrationModule(GUIBase):
         entry.setFont(QFont('Arial', 9))
         entry.setStyleSheet(f"""
             QLineEdit {{
-                background-color: white;
-                color: {self.colors['text_dark']};
+                background-color: rgba(0, 0, 0, 0.7);
+                color: black;
                 border: 1px solid {self.colors['border']};
                 padding: 3px;
             }}
@@ -880,8 +909,8 @@ class AzimuthalIntegrationModule(GUIBase):
         entry.setText(getattr(self, var_name, ""))
         entry.setStyleSheet(f"""
             QLineEdit {{
-                background-color: white;
-                color: {self.colors['text_dark']};
+                background-color: rgba(0, 0, 0, 0.7);
+                color: black;
                 border: 1px solid {self.colors['border']};
                 padding: 3px;
             }}
