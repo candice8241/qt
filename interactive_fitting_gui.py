@@ -1126,8 +1126,8 @@ class InteractiveFittingGUI(QWidget):
 
         # Create matplotlib figure
         self.fig = Figure(figsize=(12, 6), facecolor='#E8E4FF')
-        # Increase left margin to 0.12 to prevent label cutoff
-        self.fig.subplots_adjust(left=0.12, right=0.98, top=0.92, bottom=0.15)
+        # Set consistent margins matching loaded data display
+        self.fig.subplots_adjust(left=0.10, right=0.98, top=0.95, bottom=0.10)
         self.ax = self.fig.add_subplot(111)
         self.ax.set_facecolor('#FFFFFF')  # White plot area
         self.ax.grid(True, alpha=0.3, linestyle='--', color='#9575CD')
@@ -1479,6 +1479,11 @@ class InteractiveFittingGUI(QWidget):
         if self.x_data is None or self.y_data is None:
             return
 
+        # Save current view limits before clearing
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+        has_limits = xlim != (0, 1) and ylim != (0, 1)  # Check if limits have been set
+
         self.ax.clear()
 
         # Plot raw data
@@ -1496,12 +1501,13 @@ class InteractiveFittingGUI(QWidget):
                 bg_line = np.interp(self.x_data, bg_x, bg_y)
                 self.ax.plot(self.x_data, bg_line, '--', color='#4682B4', linewidth=1.5, label='BG Fit', alpha=0.5)
 
-        # Plot detected peaks - smaller five-pointed star
+        # Plot detected peaks - sharp five-pointed star
         if self.peaks:
             peak_x = self.x_data[self.peaks]
             peak_y = self.y_data[self.peaks]
-            # Changed to star marker, much smaller size
-            self.ax.plot(peak_x, peak_y, '*', color='red', markersize=6, label=f'Detected Peaks ({len(self.peaks)})')
+            # Using custom star marker for sharper appearance
+            self.ax.plot(peak_x, peak_y, marker=(5, 1, 0), color='red', markersize=8, 
+                        linestyle='', label=f'Detected Peaks ({len(self.peaks)})')
 
         # Plot fitted curves
         if self.peak_params:
@@ -1548,6 +1554,11 @@ class InteractiveFittingGUI(QWidget):
         self.ax.tick_params(colors='#4A148C', which='both')
         for label in self.ax.get_xticklabels() + self.ax.get_yticklabels():
             label.set_color('#4A148C')
+
+        # Restore previous view limits if they existed (don't reset zoom/pan)
+        if has_limits:
+            self.ax.set_xlim(xlim)
+            self.ax.set_ylim(ylim)
 
         self.fig.tight_layout()
         self.canvas.draw()
