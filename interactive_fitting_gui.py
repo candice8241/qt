@@ -1131,11 +1131,16 @@ class InteractiveFittingGUI(QWidget):
         self.ax = self.fig.add_subplot(111)
         self.ax.set_facecolor('#FFFFFF')  # White plot area
         self.ax.grid(True, alpha=0.3, linestyle='--', color='#9575CD')
-        # Initial labels - smaller font (10 - 2 = 8pt), not bold
-        self.ax.set_xlabel('2θ (degree)', fontsize=8, color='#4A148C', fontweight='normal')
-        self.ax.set_ylabel('Intensity', fontsize=8, color='#4A148C', fontweight='normal')
+        # Set initial axis ranges to avoid flashing when loading data
+        self.ax.set_xlim(0, 100)
+        self.ax.set_ylim(0, 1000)
+        # Initial labels - consistent with loaded data
+        self.ax.set_xlabel('2θ (degree)', fontsize=10, color='#4A148C', fontweight='normal')
+        self.ax.set_ylabel('Intensity', fontsize=10, color='#4A148C', fontweight='normal')
         self.ax.set_title('Left click: add | Right click: remove | Scroll: zoom',
-                         fontsize=8, color='#7B1FA2')
+                         fontsize=9, color='#7B1FA2', fontweight='normal')
+        # Set tick label colors
+        self.ax.tick_params(colors='#4A148C', which='both')
 
         # Canvas
         self.canvas = FigureCanvasQTAgg(self.fig)
@@ -1377,9 +1382,9 @@ class InteractiveFittingGUI(QWidget):
         self.peaks = []
         self.peak_params = []
         self.update_peak_table()
-        # Reset view by setting limits to invalid values so plot_data won't restore them
-        self.ax.set_xlim(0, 1)
-        self.ax.set_ylim(0, 1)
+        # Reset view to default initial state
+        self.ax.set_xlim(0, 100)
+        self.ax.set_ylim(0, 1000)
         self.plot_data()
 
     def on_method_changed(self):
@@ -1485,7 +1490,9 @@ class InteractiveFittingGUI(QWidget):
         # Save current view limits before clearing
         xlim = self.ax.get_xlim()
         ylim = self.ax.get_ylim()
-        has_limits = xlim != (0, 1) and ylim != (0, 1)  # Check if limits have been set
+        # Check if this is first load (default limits) or user has zoomed/panned
+        is_default_view = (xlim == (0, 100) and ylim == (0, 1000))
+        has_custom_limits = xlim != (0, 1) and ylim != (0, 1) and not is_default_view
 
         self.ax.clear()
 
@@ -1543,14 +1550,14 @@ class InteractiveFittingGUI(QWidget):
                 self.ax.plot(x_smooth, y_full, '--', linewidth=2, 
                            label=f'Peak {i+1} fit', alpha=0.8)
 
-        # Apply colorful styling to axes
+        # Apply consistent styling to axes (same for loaded and unloaded state)
         self.ax.set_facecolor('#FFFFFF')  # White plot area
-        # Not bold, fontweight='normal'
         self.ax.set_xlabel('2θ (degree)', fontsize=10, color='#4A148C', fontweight='normal')
         self.ax.set_ylabel('Intensity', fontsize=10, color='#4A148C', fontweight='normal')
-        # Title: only show filename, not bold, smaller (11 - 2 = 9)
-        self.ax.set_title(f'{self.current_file}', fontsize=9, color='#7B1FA2', fontweight='normal')
-        self.ax.legend(loc='best', fontsize=7, framealpha=0.9)  # Smaller legend: 9 → 7
+        # Title: show filename if loaded, otherwise show instructions
+        title_text = self.current_file if self.current_file else 'Left click: add | Right click: remove | Scroll: zoom'
+        self.ax.set_title(title_text, fontsize=9, color='#7B1FA2', fontweight='normal')
+        self.ax.legend(loc='best', fontsize=7, framealpha=0.9)
         self.ax.grid(True, alpha=0.3, linestyle='--', color='#9575CD')
         
         # Colorful tick labels
@@ -1559,9 +1566,13 @@ class InteractiveFittingGUI(QWidget):
             label.set_color('#4A148C')
 
         # Restore previous view limits if they existed (don't reset zoom/pan)
-        if has_limits:
+        # Or auto-fit to data if this is default view
+        if has_custom_limits:
             self.ax.set_xlim(xlim)
             self.ax.set_ylim(ylim)
+        elif is_default_view:
+            # First time loading data - auto-fit
+            self.ax.autoscale(enable=True, axis='both')
 
         # Don't use tight_layout - keep fixed margins for consistent axis label positions
         self.canvas.draw()
