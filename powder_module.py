@@ -274,12 +274,12 @@ class PowderXRDModule(GUIBase):
         npt_label = QLabel("Number of Points")
         npt_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         npt_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
-        npt_layout.addWidget(npt_label)
+        npt_layout.addWidget(npt_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
         self.npt_spinbox = CustomSpinbox(from_=500, to=10000, value=4000,
                                          increment=500, width=110, parent=npt_container)
         self.npt_spinbox.valueChanged.connect(lambda v: setattr(self, 'npt', int(v)))
-        npt_layout.addWidget(self.npt_spinbox)
+        npt_layout.addWidget(self.npt_spinbox, alignment=Qt.AlignmentFlag.AlignCenter)
         params_row_layout.addWidget(npt_container)
 
         unit_container = QWidget()
@@ -331,30 +331,21 @@ class PowderXRDModule(GUIBase):
         unit_layout.addWidget(unit_radios)
         params_row_layout.addWidget(unit_container)
         params_row_layout.addStretch()
-
-        left_layout.addWidget(params_row)
-
-        # Add Run Integration button centered in left panel
-        run_int_btn_row = QWidget()
-        run_int_btn_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        run_int_btn_layout = QHBoxLayout(run_int_btn_row)
-        run_int_btn_layout.setContentsMargins(0, 15, 0, 0)
-        run_int_btn_layout.setSpacing(0)
-
-        run_int_btn_layout.addStretch()
+        
+        # Add Run Integration button in the same row
         run_int_btn = ModernButton(
             "Run Integration",
             self.run_integration,
             bg_color=self.colors['secondary'],
             hover_color=self.colors['primary_hover'],
             width=170, height=36,
-            parent=run_int_btn_row
+            parent=params_row
         )
         run_int_btn.setFont(QFont('Arial', 9))
-        run_int_btn_layout.addWidget(run_int_btn)
-        run_int_btn_layout.addStretch()
+        params_row_layout.addWidget(run_int_btn)
+        params_row_layout.addStretch()
 
-        left_layout.addWidget(run_int_btn_row)
+        left_layout.addWidget(params_row)
         left_layout.addStretch()
 
         # Right: output options and quick actions stacked vertically
@@ -571,10 +562,10 @@ class PowderXRDModule(GUIBase):
         output_card_container_layout.addWidget(output_card)
         output_card_container_layout.addStretch()
 
-        # Add vertical centering for output card
-        right_layout.addStretch()
+        # Add vertical centering for output card to align with left panel file inputs
+        right_layout.addStretch(1)
         right_layout.addWidget(output_card_container)
-        right_layout.addStretch()
+        right_layout.addStretch(2)
 
         columns.addWidget(left_panel, stretch=2)
         columns.addWidget(right_panel, stretch=1)
@@ -741,8 +732,17 @@ class PowderXRDModule(GUIBase):
         wl_label = QLabel("Wavelength (Å)")
         wl_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         wl_label.setStyleSheet(f"color: {self.colors['text_dark']}; border: none;background-color: transparent;")
+        wl_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         combined_frame_layout.addWidget(wl_label)
 
+        # Create container for wavelength input to center it
+        wl_input_container = QWidget()
+        wl_input_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
+        wl_input_container_layout = QHBoxLayout(wl_input_container)
+        wl_input_container_layout.setContentsMargins(0, 0, 0, 0)
+        wl_input_container_layout.setSpacing(0)
+        
+        wl_input_container_layout.addStretch()
         self.phase_wavelength_entry = QLineEdit(str(self.phase_wavelength))
         self.phase_wavelength_entry.setFixedWidth(80)
         self.phase_wavelength_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -756,7 +756,10 @@ class PowderXRDModule(GUIBase):
             }}
         """)
         self.phase_wavelength_entry.textChanged.connect(self._on_phase_wavelength_changed)
-        combined_frame_layout.addWidget(self.phase_wavelength_entry, alignment=Qt.AlignmentFlag.AlignLeft)
+        wl_input_container_layout.addWidget(self.phase_wavelength_entry)
+        wl_input_container_layout.addStretch()
+        
+        combined_frame_layout.addWidget(wl_input_container)
 
         # Add frame to container with stretch on both sides to center it
         frame_container_layout.addStretch()
