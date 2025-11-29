@@ -1127,7 +1127,7 @@ class InteractiveFittingGUI(QWidget):
         # Create matplotlib figure
         self.fig = Figure(figsize=(12, 6), facecolor='#FFFFFF')  # Changed to white
         # Fixed margins with more space for Intensity label on left
-        self.fig.subplots_adjust(left=0.14, right=0.98, top=0.93, bottom=0.12)
+        self.fig.subplots_adjust(left=0.18, right=0.98, top=0.93, bottom=0.12)
         self.ax = self.fig.add_subplot(111)
         self.ax.set_facecolor('#FFFFFF')  # White plot area
         self.ax.grid(True, alpha=0.3, linestyle='--', color='#9575CD')
@@ -1511,12 +1511,12 @@ class InteractiveFittingGUI(QWidget):
                 bg_line = np.interp(self.x_data, bg_x, bg_y)
                 self.ax.plot(self.x_data, bg_line, '--', color='#4682B4', linewidth=1.5, label='BG Fit', alpha=0.5)
 
-        # Plot detected peaks - sharp five-pointed star
+        # Plot detected peaks - red upward triangle
         if self.peaks:
             peak_x = self.x_data[self.peaks]
             peak_y = self.y_data[self.peaks]
-            # Using standard star marker with crimson color
-            self.ax.plot(peak_x, peak_y, '*', color='#C41E3A', markersize=10, 
+            # Using upward triangle marker with red color
+            self.ax.plot(peak_x, peak_y, '^', color='red', markersize=8, 
                         linestyle='', label=f'Detected Peaks ({len(self.peaks)})')
 
         # Plot fitted curves
