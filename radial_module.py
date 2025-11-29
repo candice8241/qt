@@ -402,12 +402,14 @@ class AzimuthalIntegrationModule(GUIBase):
         right_layout.setContentsMargins(0, 0, 0, 0)
         right_layout.setSpacing(0)
 
-        # 添加顶部间距，使右边容器相对于左边Browse区域垂直居中
-        # 左边标题约20px，5个输入框约250px，Browse区域中心约145px
-        # 右边容器高度约350px，所以需要向下偏移：145 - 350/2 + 20(标题) ≈ -30，但至少从标题后开始
-        # 实际调整：让右边从左边第2-3个输入框的位置开始，约80px
+        # 计算左边Browse区域：
+        # - 左边标题(Integration Settings): 约25px
+        # - 5个文件输入框，每个约50px = 250px
+        # - Browse区域中点：25 + 250/2 = 150px
+        # 右边容器从这里开始，需要向上偏移右边容器高度的一半，让中心对齐
+        # 先从左边第2-3个输入框位置开始（约100px处）
         from PyQt6.QtWidgets import QSpacerItem, QSizePolicy
-        top_spacer = QSpacerItem(20, 80, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        top_spacer = QSpacerItem(20, 100, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
         right_layout.addItem(top_spacer)
 
         settings_card = self.create_card_frame(None)
@@ -698,7 +700,7 @@ class AzimuthalIntegrationModule(GUIBase):
 
         right_layout.addWidget(settings_card, alignment=Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignHCenter)
         
-        # 底部弹性空间，让整体布局更好
+        # 底部弹性空间
         right_layout.addStretch()
 
         # Add both panels to columns with stretch ratios
