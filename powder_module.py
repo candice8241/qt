@@ -303,15 +303,15 @@ class PowderXRDModule(GUIBase):
         output_layout.setSpacing(8)
 
         # Number of Points - horizontal layout
-        npt_container = QWidget()
-        npt_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        npt_layout = QHBoxLayout(npt_container)
+        npt_row = QWidget()
+        npt_row.setStyleSheet(f"background-color: transparent; border: none;")
+        npt_layout = QHBoxLayout(npt_row)
         npt_layout.setContentsMargins(0, 0, 0, 8)
         npt_layout.setSpacing(10)
 
         npt_label = QLabel("Number of Points")
         npt_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        npt_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
+        npt_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: transparent; border: none;")
         npt_layout.addWidget(npt_label)
 
         from PyQt6.QtWidgets import QSpinBox
@@ -337,19 +337,26 @@ class PowderXRDModule(GUIBase):
         self.npt_spinbox.valueChanged.connect(lambda v: setattr(self, 'npt', int(v)))
         npt_layout.addWidget(self.npt_spinbox)
         npt_layout.addStretch()
-        output_layout.addWidget(npt_container)
+        output_layout.addWidget(npt_row)
 
-        # Unit - horizontal layout, left aligned
+        # Unit - vertical layout, label on top, options below
         unit_container = QWidget()
-        unit_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        unit_layout = QHBoxLayout(unit_container)
+        unit_container.setStyleSheet(f"background-color: transparent; border: none;")
+        unit_layout = QVBoxLayout(unit_container)
         unit_layout.setContentsMargins(0, 0, 0, 8)
-        unit_layout.setSpacing(10)
+        unit_layout.setSpacing(4)
 
         unit_label = QLabel("Unit")
         unit_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        unit_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
+        unit_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: transparent; border: none;")
         unit_layout.addWidget(unit_label)
+
+        # Radio buttons in horizontal layout
+        unit_radios_row = QWidget()
+        unit_radios_row.setStyleSheet(f"background-color: transparent; border: none;")
+        unit_radios_layout = QHBoxLayout(unit_radios_row)
+        unit_radios_layout.setContentsMargins(0, 0, 0, 0)
+        unit_radios_layout.setSpacing(10)
 
         self.unit_group = QButtonGroup(unit_container)
         unit_options = ['2θ (°)', 'q (A⁻¹)', 'r (mm)']
@@ -360,7 +367,8 @@ class PowderXRDModule(GUIBase):
             radio.setStyleSheet(f"""
                 QRadioButton {{
                     color: {self.colors['text_dark']};
-                    background-color: {self.colors['card_bg']};
+                    background-color: transparent;
+                    border: none;
                 }}
                 QRadioButton::indicator {{
                     width: 10px;
@@ -378,9 +386,10 @@ class PowderXRDModule(GUIBase):
             """)
             radio.toggled.connect(lambda checked, text=option: setattr(self, 'unit', text) if checked else None)
             self.unit_group.addButton(radio)
-            unit_layout.addWidget(radio)
+            unit_radios_layout.addWidget(radio)
 
-        unit_layout.addStretch()
+        unit_radios_layout.addStretch()
+        unit_layout.addWidget(unit_radios_row)
         output_layout.addWidget(unit_container)
 
         formats_label = QLabel("Select Output Formats:")
@@ -505,14 +514,14 @@ class PowderXRDModule(GUIBase):
         stacked_layout.addWidget(self.stacked_plot_cb)
 
         offset_row = QWidget()
-        offset_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
+        offset_row.setStyleSheet(f"background-color: transparent; border: none;")
         offset_row_layout = QHBoxLayout(offset_row)
         offset_row_layout.setContentsMargins(0, 0, 0, 0)
         offset_row_layout.setSpacing(10)
 
         offset_label = QLabel("Offset:")
         offset_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        offset_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
+        offset_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: transparent; border: none;")
         offset_row_layout.addWidget(offset_label)
 
         self.offset_entry = QLineEdit("auto")
@@ -531,6 +540,12 @@ class PowderXRDModule(GUIBase):
         offset_row_layout.addWidget(self.offset_entry)
         offset_row_layout.addStretch()
         stacked_layout.addWidget(offset_row)
+
+        # Add help text below offset
+        offset_help = QLabel("(use 'auto' or number for offset)")
+        offset_help.setFont(QFont('Arial', 8))
+        offset_help.setStyleSheet(f"color: #999999; background-color: transparent; border: none;")
+        stacked_layout.addWidget(offset_help)
 
         output_layout.addWidget(stacked_box)
 
