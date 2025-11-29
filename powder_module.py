@@ -316,7 +316,7 @@ class PowderXRDModule(GUIBase):
 
         from PyQt6.QtWidgets import QSpinBox
         self.npt_spinbox = QSpinBox()
-        self.npt_spinbox.setRange(500, 10000)
+        self.npt_spinbox.setRange(500, 1000000)
         self.npt_spinbox.setValue(4000)
         self.npt_spinbox.setSingleStep(500)
         self.npt_spinbox.setFixedWidth(80)
@@ -344,7 +344,7 @@ class PowderXRDModule(GUIBase):
         unit_container.setStyleSheet(f"background-color: transparent; border: none;")
         unit_layout = QVBoxLayout(unit_container)
         unit_layout.setContentsMargins(0, 0, 0, 16)
-        unit_layout.setSpacing(4)
+        unit_layout.setSpacing(10)
 
         unit_label = QLabel("Unit")
         unit_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
@@ -356,7 +356,7 @@ class PowderXRDModule(GUIBase):
         unit_radios_row.setStyleSheet(f"background-color: transparent; border: none;")
         unit_radios_layout = QHBoxLayout(unit_radios_row)
         unit_radios_layout.setContentsMargins(0, 0, 0, 0)
-        unit_radios_layout.setSpacing(10)
+        unit_radios_layout.setSpacing(20)
 
         self.unit_group = QButtonGroup(unit_container)
         unit_options = ['2θ (°)', 'q (A⁻¹)', 'r (mm)']
@@ -394,7 +394,7 @@ class PowderXRDModule(GUIBase):
 
         formats_label = QLabel("Select Output Formats:")
         formats_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        formats_label.setStyleSheet(f"color: #666666; background-color: {self.colors['card_bg']}; margin-bottom: 0px;")
+        formats_label.setStyleSheet(f"color: #666666; background-color: {self.colors['card_bg']}; margin-bottom: 0px;border:none;")
         output_layout.addWidget(formats_label, alignment=Qt.AlignmentFlag.AlignLeft)
 
         # Format checkboxes without frame
@@ -491,7 +491,7 @@ class PowderXRDModule(GUIBase):
         # Add "Stacked Plot Options:" label
         stacked_options_label = QLabel("Stacked Plot Options:")
         stacked_options_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        stacked_options_label.setStyleSheet(f"color: #666666; background-color: {self.colors['card_bg']};")
+        stacked_options_label.setStyleSheet(f"color: #666666; background-color: {self.colors['card_bg']};border:none;")
         stacked_layout.addWidget(stacked_options_label)
 
         self.stacked_plot_cb = QCheckBox("Create Stacked Plot")
@@ -512,7 +512,7 @@ class PowderXRDModule(GUIBase):
                 background-color: {self.colors['primary']};
                 border: 1.5px solid #999999;
                 border-radius: 2px;
-                image:url(check.png);
+                image:url(point.png);
             }}
         """)
         self.stacked_plot_cb.stateChanged.connect(
@@ -716,7 +716,7 @@ class PowderXRDModule(GUIBase):
                     
                     border: 1.5px solid #999999;
                     border-radius: 2px;
-                    image:url(point.png);
+                    image:url(check.png);
                 }}
             """)
             radio.toggled.connect(lambda checked, text=value: setattr(self, 'phase_volume_system', text) if checked else None)
