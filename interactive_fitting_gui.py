@@ -665,7 +665,7 @@ class InteractiveFittingGUI(QWidget):
                 font-family: Arial;
                 font-size: 10pt;
                 font-weight: bold;
-                border: none;
+                border: 2px solid #495057;
                 border-radius: 4px;
                 padding: 6px 10px;
                 min-width: 70px;
@@ -775,7 +775,7 @@ class InteractiveFittingGUI(QWidget):
         # Background label
         bg_label = QLabel("Background:")
         bg_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        bg_label.setStyleSheet(f"color: #212529; background: transparent;")
+        bg_label.setStyleSheet(f"color: #9775FA; background: transparent;")
         bg_layout.addWidget(bg_label)
 
         # Compact button style with explicit text color
@@ -784,7 +784,7 @@ class InteractiveFittingGUI(QWidget):
                 font-family: Arial;
                 font-size: 9pt;
                 font-weight: bold;
-                border: none;
+                border: 2px solid #495057;
                 border-radius: 3px;
                 padding: 5px 10px;
                 min-width: 60px;
@@ -826,7 +826,7 @@ class InteractiveFittingGUI(QWidget):
         # Fit Method
         fit_label = QLabel("Fit Method:")
         fit_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        fit_label.setStyleSheet(f"color: #212529; background: transparent;")
+        fit_label.setStyleSheet(f"color: #9775FA; background: transparent;")
         bg_layout.addWidget(fit_label)
 
         self.method_combo = QComboBox()
@@ -853,7 +853,7 @@ class InteractiveFittingGUI(QWidget):
         # Overlap FWHM×
         overlap_label = QLabel("Overlap FWHM×:")
         overlap_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        overlap_label.setStyleSheet(f"color: #212529; background: transparent;")
+        overlap_label.setStyleSheet(f"color: #9775FA; background: transparent;")
         bg_layout.addWidget(overlap_label)
 
         self.overlap_entry = QLineEdit("5.0")
@@ -874,7 +874,7 @@ class InteractiveFittingGUI(QWidget):
         # Fit Window
         window_label = QLabel("Fit Window:")
         window_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        window_label.setStyleSheet(f"color: #212529; background: transparent;")
+        window_label.setStyleSheet(f"color: #9775FA; background: transparent;")
         bg_layout.addWidget(window_label)
 
         self.fit_window_entry = QLineEdit("3.0")
@@ -915,13 +915,13 @@ class InteractiveFittingGUI(QWidget):
         # Smoothing label
         smooth_label = QLabel("Smoothing:")
         smooth_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        smooth_label.setStyleSheet(f"color: #212529; background: transparent;")
+        smooth_label.setStyleSheet(f"color: #228BE6; background: transparent;")
         smooth_layout.addWidget(smooth_label)
 
         # Enable checkbox
         self.smoothing_enable_cb = QCheckBox("Enable")
         self.smoothing_enable_cb.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        self.smoothing_enable_cb.setStyleSheet(f"color: #212529; background: transparent;")
+        self.smoothing_enable_cb.setStyleSheet(f"color: #228BE6; background: transparent;")
         smooth_layout.addWidget(self.smoothing_enable_cb)
 
         smooth_layout.addSpacing(10)
@@ -929,7 +929,7 @@ class InteractiveFittingGUI(QWidget):
         # Method
         method_label = QLabel("Method:")
         method_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        method_label.setStyleSheet(f"color: #212529; background: transparent;")
+        method_label.setStyleSheet(f"color: #228BE6; background: transparent;")
         smooth_layout.addWidget(method_label)
 
         self.smooth_method_combo = QComboBox()
@@ -955,7 +955,7 @@ class InteractiveFittingGUI(QWidget):
         # Sigma
         sigma_label = QLabel("Sigma:")
         sigma_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        sigma_label.setStyleSheet(f"color: #212529; background: transparent;")
+        sigma_label.setStyleSheet(f"color: #228BE6; background: transparent;")
         smooth_layout.addWidget(sigma_label)
 
         self.sigma_entry = QLineEdit("2.0")
@@ -976,7 +976,7 @@ class InteractiveFittingGUI(QWidget):
         # Window
         window_label = QLabel("Window:")
         window_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        window_label.setStyleSheet(f"color: #212529; background: transparent;")
+        window_label.setStyleSheet(f"color: #228BE6; background: transparent;")
         smooth_layout.addWidget(window_label)
 
         self.smooth_window_entry = QLineEdit("11")
@@ -1003,7 +1003,7 @@ class InteractiveFittingGUI(QWidget):
                 font-weight: bold;
                 background-color: {self.palette['success']};
                 color: white;
-                border: none;
+                border: 2px solid #495057;
                 border-radius: 3px;
                 padding: 5px 14px;
                 min-width: 55px;
@@ -1024,7 +1024,7 @@ class InteractiveFittingGUI(QWidget):
                 font-weight: bold;
                 background-color: {self.palette['danger']};
                 color: white;
-                border: none;
+                border: 2px solid #495057;
                 border-radius: 3px;
                 padding: 5px 14px;
                 min-width: 55px;
@@ -1053,7 +1053,7 @@ class InteractiveFittingGUI(QWidget):
         # Results label
         results_label = QLabel("Fitting Results:")
         results_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        results_label.setStyleSheet(f"color: #212529; background: transparent;")
+        results_label.setStyleSheet(f"color: #FF6B9D; background: transparent;")
         results_layout.addWidget(results_label)
 
         # Results table
