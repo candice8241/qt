@@ -1130,15 +1130,16 @@ class InteractiveFittingGUI(QWidget):
         self.ax = self.fig.add_subplot(111)
         self.ax.set_facecolor('#FFFFFF')  # White plot area
         self.ax.grid(True, alpha=0.3, linestyle='--', color='#9575CD')
-        # Initial labels - smaller font (10 - 2 = 8pt)
-        self.ax.set_xlabel('2θ (degree)', fontsize=8, color='#4A148C', fontweight='bold')
-        self.ax.set_ylabel('Intensity', fontsize=8, color='#4A148C', fontweight='bold')
-        self.ax.set_title('Click on peaks to select | Use toolbar or scroll to zoom/pan',
+        # Initial labels - smaller font (10 - 2 = 8pt), not bold
+        self.ax.set_xlabel('2θ (degree)', fontsize=8, color='#4A148C', fontweight='normal')
+        self.ax.set_ylabel('Intensity', fontsize=8, color='#4A148C', fontweight='normal')
+        self.ax.set_title('Left click: add | Right click: remove | Scroll: zoom',
                          fontsize=8, color='#7B1FA2')
 
         # Canvas
         self.canvas = FigureCanvasQTAgg(self.fig)
         self.canvas.mpl_connect('button_press_event', self.on_plot_click)
+        self.canvas.mpl_connect('scroll_event', self.on_scroll)  # Add scroll zoom
         # Removed mouse move event - no real-time coordinate display
         # self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
         plot_layout.addWidget(self.canvas)
@@ -1189,10 +1190,8 @@ class InteractiveFittingGUI(QWidget):
                 border-radius: 3px;
             }}
         """)
-        self.info_text.setText(
-            '💡 Welcome! Load your XRD data file to begin peak fitting.\n'
-            '🖱️ Click on peaks to select | Use toolbar to zoom/pan'
-        )
+        # Remove welcome text - leave empty
+        self.info_text.setText("")
         info_layout.addWidget(self.info_text)
 
         parent_layout.addWidget(info_widget)
@@ -1204,6 +1203,74 @@ class InteractiveFittingGUI(QWidget):
             self.coord_label.setText(f"2θ:{event.xdata:.3f} I:{event.ydata:.1f}")
         else:
             self.coord_label.setText("")
+
+    def on_scroll(self, event):
+        """Handle mouse scroll for zooming"""
+        if event.inaxes != self.ax:
+            return
+        
+        # Get current axis limits
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+        
+        # Calculate zoom factor
+        zoom_factor = 0.9 if event.button == 'up' else 1.1
+        
+        # Get click position
+        xdata = event.xdata
+        ydata = event.ydata
+        
+        # Calculate new limits centered on cursor
+        x_range = xlim[1] - xlim[0]
+        y_range = ylim[1] - ylim[0]
+        
+        new_x_range = x_range * zoom_factor
+        new_y_range = y_range * zoom_factor
+        
+        # Keep cursor position fixed
+        x_ratio = (xdata - xlim[0]) / x_range if x_range > 0 else 0.5
+        y_ratio = (ydata - ylim[0]) / y_range if y_range > 0 else 0.5
+        
+        new_xlim = [xdata - new_x_range * x_ratio, xdata + new_x_range * (1 - x_ratio)]
+        new_ylim = [ydata - new_y_range * y_ratio, ydata + new_y_range * (1 - y_ratio)]
+        
+        self.ax.set_xlim(new_xlim)
+        self.ax.set_ylim(new_ylim)
+        self.canvas.draw()
+
+    def find_nearest_peak(self, idx, search_window=20):
+        """Find nearest peak position within search window"""
+        if self.y_data is None:
+            return idx
+        
+        # Define search window
+        left = max(0, idx - search_window)
+        right = min(len(self.y_data), idx + search_window)
+        
+        # Find local maximum
+        local_y = self.y_data[left:right]
+        if len(local_y) > 0:
+            local_max_idx = np.argmax(local_y)
+            return left + local_max_idx
+        
+        return idx
+
+    def find_nearest_minimum(self, idx, search_window=15):
+        """Find nearest minimum position within search window"""
+        if self.y_data is None:
+            return idx
+        
+        # Define search window
+        left = max(0, idx - search_window)
+        right = min(len(self.y_data), idx + search_window)
+        
+        # Find local minimum
+        local_y = self.y_data[left:right]
+        if len(local_y) > 0:
+            local_min_idx = np.argmin(local_y)
+            return left + local_min_idx
+        
+        return idx
 
     def load_data_file(self):
         """Load XRD data file"""
@@ -1271,7 +1338,9 @@ class InteractiveFittingGUI(QWidget):
             self.update_peak_table()
             self.plot_data()
 
-            QMessageBox.information(self, "Success", f"Detected {len(self.peaks)} peaks")
+            # Remove the success dialog - no popup after auto detection
+            # Update status label instead
+            self.status_label.setText(f"Detected {len(self.peaks)} peaks")
 
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Peak detection failed:\n{str(e)}")
@@ -1285,7 +1354,7 @@ class InteractiveFittingGUI(QWidget):
 
     def on_plot_click(self, event):
         """Handle plot click for manual peak or background selection
-        Left click: Add peak/BG point
+        Left click: Add peak/BG point (with auto-correction)
         Right click: Remove peak/BG point
         """
         if event.inaxes != self.ax:
@@ -1303,8 +1372,7 @@ class InteractiveFittingGUI(QWidget):
         self.save_state_to_undo()
 
         if self.bg_selection_mode:
-            # Background point mode
-            point = (self.x_data[idx], self.y_data[idx])
+            # Background point mode - auto-correct to local minimum
             remove_threshold = 0.02 * (self.x_data.max() - self.x_data.min())
             
             if event.button == 3:  # Right click - remove
@@ -1314,11 +1382,15 @@ class InteractiveFittingGUI(QWidget):
                         self.bg_points.pop(i)
                         removed = True
                         break
-            elif event.button == 1:  # Left click - add
+            elif event.button == 1:  # Left click - add with auto-correction
+                # Auto-correct to local minimum for background
+                corrected_idx = self.find_nearest_minimum(idx, search_window=15)
+                point = (self.x_data[corrected_idx], self.y_data[corrected_idx])
+                
                 # Check if not too close to existing point
                 too_close = False
                 for px, py in self.bg_points:
-                    if abs(px - self.x_data[idx]) < remove_threshold:
+                    if abs(px - self.x_data[corrected_idx]) < remove_threshold:
                         too_close = True
                         break
                 if not too_close:
@@ -1327,13 +1399,19 @@ class InteractiveFittingGUI(QWidget):
             
             self.plot_data()
         else:
-            # Peak mode
+            # Peak mode - auto-correct to local maximum
             if event.button == 3:  # Right click - remove peak
-                if idx in self.peaks:
-                    self.peaks.remove(idx)
-            elif event.button == 1:  # Left click - add peak
-                if idx not in self.peaks:
-                    self.peaks.append(idx)
+                # Find nearest peak to remove
+                remove_threshold = 0.02 * (self.x_data.max() - self.x_data.min())
+                for peak_idx in self.peaks[:]:
+                    if abs(self.x_data[peak_idx] - x_click) < remove_threshold:
+                        self.peaks.remove(peak_idx)
+                        break
+            elif event.button == 1:  # Left click - add peak with auto-correction
+                # Auto-correct to local maximum for peak
+                corrected_idx = self.find_nearest_peak(idx, search_window=20)
+                if corrected_idx not in self.peaks:
+                    self.peaks.append(corrected_idx)
                     self.peaks.sort()
 
             self.update_peak_table()
@@ -1452,17 +1530,17 @@ class InteractiveFittingGUI(QWidget):
         # Plot raw data
         self.ax.plot(self.x_data, self.y_data, 'k-', linewidth=1, label='Raw Data', alpha=0.7)
 
-        # Plot background points if any - smaller size, light blue color
+        # Plot background points if any - small square, darker blue
         if self.bg_points:
             bg_x = [p[0] for p in self.bg_points]
             bg_y = [p[1] for p in self.bg_points]
-            # Changed to light blue color, smaller size
-            self.ax.plot(bg_x, bg_y, 'o', color='#87CEEB', markersize=4, label=f'BG Points ({len(self.bg_points)})', alpha=0.8)
+            # Changed to darker blue square, smaller size
+            self.ax.plot(bg_x, bg_y, 's', color='#4682B4', markersize=4, label=f'BG Points ({len(self.bg_points)})', alpha=0.8)
             
             # Plot background line if we have points
             if len(bg_x) > 1:
                 bg_line = np.interp(self.x_data, bg_x, bg_y)
-                self.ax.plot(self.x_data, bg_line, '--', color='#87CEEB', linewidth=1.5, label='BG Fit', alpha=0.5)
+                self.ax.plot(self.x_data, bg_line, '--', color='#4682B4', linewidth=1.5, label='BG Fit', alpha=0.5)
 
         # Plot detected peaks - smaller five-pointed star
         if self.peaks:
@@ -1504,10 +1582,11 @@ class InteractiveFittingGUI(QWidget):
 
         # Apply colorful styling to axes
         self.ax.set_facecolor('#FFFFFF')  # White plot area
-        self.ax.set_xlabel('2θ (degree)', fontsize=10, color='#4A148C', fontweight='bold')  # Reduced from 12 to 10
-        self.ax.set_ylabel('Intensity', fontsize=10, color='#4A148C', fontweight='bold')  # Reduced from 12 to 10
-        # Title: only show filename, not bold, smaller (13 - 2 = 11)
-        self.ax.set_title(f'{self.current_file}', fontsize=11, color='#7B1FA2', fontweight='normal')
+        # Not bold, fontweight='normal'
+        self.ax.set_xlabel('2θ (degree)', fontsize=10, color='#4A148C', fontweight='normal')
+        self.ax.set_ylabel('Intensity', fontsize=10, color='#4A148C', fontweight='normal')
+        # Title: only show filename, not bold, smaller (11 - 2 = 9)
+        self.ax.set_title(f'{self.current_file}', fontsize=9, color='#7B1FA2', fontweight='normal')
         self.ax.legend(loc='best', fontsize=9, framealpha=0.9)
         self.ax.grid(True, alpha=0.3, linestyle='--', color='#9575CD')
         
