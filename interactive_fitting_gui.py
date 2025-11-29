@@ -628,10 +628,10 @@ class InteractiveFittingGUI(QWidget):
         self.setup_ui()
 
     def setup_ui(self):
-        """Setup the user interface matching tkinter layout exactly"""
+        """Setup the user interface - compact layout"""
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(5, 5, 5, 5)
-        main_layout.setSpacing(3)  # Small spacing between panels
+        main_layout.setContentsMargins(3, 3, 3, 3)  # More compact: 5 → 3
+        main_layout.setSpacing(2)  # More compact: 3 → 2
 
         # 1. Top control panel - all main buttons
         self.setup_control_panel(main_layout)
@@ -652,15 +652,15 @@ class InteractiveFittingGUI(QWidget):
         self.setup_info_panel(main_layout)
 
     def setup_control_panel(self, parent_layout):
-        """Setup top control panel - colorful and vibrant with compact sizing"""
+        """Setup top control panel - compact and uniform"""
         control_widget = QWidget()
-        control_widget.setFixedHeight(50)  # Reduced from 55
+        control_widget.setFixedHeight(45)  # More compact: 50 → 45
         control_widget.setAutoFillBackground(True)
         # Lighter color for control panel
         control_widget.setStyleSheet("QWidget { background-color: #E0D9FF; border-bottom: 2px solid #B794F6; }")
         control_layout = QHBoxLayout(control_widget)
-        control_layout.setContentsMargins(6, 4, 6, 4)  # Reduced margins
-        control_layout.setSpacing(3)  # Reduced spacing
+        control_layout.setContentsMargins(6, 3, 6, 3)  # More compact: 6,4 → 6,3
+        control_layout.setSpacing(2)  # More compact: 3 → 2
 
         # Compact button style with smaller fonts and widths
         btn_style = """
@@ -775,14 +775,14 @@ class InteractiveFittingGUI(QWidget):
         parent_layout.addWidget(control_widget)
 
     def setup_background_panel(self, parent_layout):
-        """Setup background panel - colorful and vibrant"""
+        """Setup background panel - compact and uniform"""
         bg_widget = QWidget()
-        bg_widget.setFixedHeight(50)
+        bg_widget.setFixedHeight(45)  # More compact: 50 → 45
         bg_widget.setAutoFillBackground(True)
         bg_widget.setStyleSheet("QWidget { background-color: #E3F2FF; }")  # Light blue tint
         bg_layout = QHBoxLayout(bg_widget)
-        bg_layout.setContentsMargins(8, 5, 8, 5)
-        bg_layout.setSpacing(4)
+        bg_layout.setContentsMargins(6, 3, 6, 3)  # More compact: 8,5 → 6,3
+        bg_layout.setSpacing(3)  # More compact: 4 → 3
 
         # Background label - compact font like control panel
         bg_label = QLabel("Background:")
@@ -790,16 +790,16 @@ class InteractiveFittingGUI(QWidget):
         bg_label.setStyleSheet(f"color: #00BCD4; background: transparent;")  # Cyan
         bg_layout.addWidget(bg_label)
 
-        # Colorful button style
+        # Compact button style - match load row
         bg_btn_style = """
             QPushButton {
                 font-family: Arial;
-                font-size: 9pt;
+                font-size: 8pt;
                 font-weight: bold;
                 border: 2px solid #7CB9E8;
                 border-radius: 4px;
-                padding: 5px 10px;
-                min-width: 60px;
+                padding: 3px 6px;
+                min-width: 50px;
             }
             QPushButton:hover {
                 opacity: 0.85;
@@ -861,20 +861,20 @@ class InteractiveFittingGUI(QWidget):
         self.method_combo.currentTextChanged.connect(self.on_method_changed)
         bg_layout.addWidget(self.method_combo)
 
-        bg_layout.addSpacing(10)
+        bg_layout.addSpacing(6)  # More compact: 10 → 6
 
         # Overlap FWHM× - compact font
-        overlap_label = QLabel("Overlap FWHM×:")
+        overlap_label = QLabel("FWHM×:")  # Shortened label
         overlap_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Match load row font
         overlap_label.setStyleSheet(f"color: #7B1FA2; background: transparent;")  # Purple
         bg_layout.addWidget(overlap_label)
 
         self.overlap_entry = QLineEdit("5.0")
-        self.overlap_entry.setFixedWidth(50)
+        self.overlap_entry.setFixedWidth(45)  # Smaller: 50 → 45
         self.overlap_entry.setFont(QFont('Arial', 8))  # Smaller font
         self.overlap_entry.setStyleSheet(f"""
             QLineEdit {{ 
-                padding: 3px; 
+                padding: 2px; 
                 color: black;
                 background-color: white;
                 border: 2px solid #B794F6;
@@ -883,20 +883,20 @@ class InteractiveFittingGUI(QWidget):
         """)
         bg_layout.addWidget(self.overlap_entry)
 
-        bg_layout.addSpacing(10)
+        bg_layout.addSpacing(6)  # More compact: 10 → 6
 
         # Fit Window× - black text, compact font
-        window_label = QLabel("Fit Window×:")
+        window_label = QLabel("Window×:")  # Shortened label
         window_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))  # Match load row font
         window_label.setStyleSheet(f"color: black; background: transparent;")  # Black text
         bg_layout.addWidget(window_label)
 
         self.fit_window_entry = QLineEdit("3.0")
-        self.fit_window_entry.setFixedWidth(50)
+        self.fit_window_entry.setFixedWidth(45)  # Smaller: 50 → 45
         self.fit_window_entry.setFont(QFont('Arial', 8))  # Smaller font
         self.fit_window_entry.setStyleSheet(f"""
             QLineEdit {{ 
-                padding: 3px; 
+                padding: 2px; 
                 color: black;
                 background-color: white;
                 border: 2px solid #B794F6;
@@ -905,8 +905,7 @@ class InteractiveFittingGUI(QWidget):
         """)
         bg_layout.addWidget(self.fit_window_entry)
 
-        # More spacing to push coordinate label left
-        bg_layout.addSpacing(20)  # Add spacing to move label left
+        bg_layout.addStretch()  # Use stretch instead of fixed spacing
 
         # Coordinate label (right side) - hidden by default, moved left
         self.coord_label = QLabel("")
@@ -923,14 +922,14 @@ class InteractiveFittingGUI(QWidget):
         parent_layout.addWidget(bg_widget)
 
     def setup_smoothing_panel(self, parent_layout):
-        """Setup smoothing panel - colorful and vibrant"""
+        """Setup smoothing panel - compact and uniform"""
         smooth_widget = QWidget()
-        smooth_widget.setFixedHeight(50)
+        smooth_widget.setFixedHeight(45)  # More compact: 50 → 45
         smooth_widget.setAutoFillBackground(True)
         smooth_widget.setStyleSheet("QWidget { background-color: #F3E5FF; }")  # Light purple tint
         smooth_layout = QHBoxLayout(smooth_widget)
-        smooth_layout.setContentsMargins(8, 5, 8, 5)
-        smooth_layout.setSpacing(4)
+        smooth_layout.setContentsMargins(6, 3, 6, 3)  # More compact: 8,5 → 6,3
+        smooth_layout.setSpacing(3)  # More compact: 4 → 3
 
         # Smoothing label - black text, compact font
         smooth_label = QLabel("Smoothing:")
@@ -944,7 +943,7 @@ class InteractiveFittingGUI(QWidget):
         self.smoothing_enable_cb.setStyleSheet(f"color: #4A148C; background: transparent;")
         smooth_layout.addWidget(self.smoothing_enable_cb)
 
-        smooth_layout.addSpacing(10)
+        smooth_layout.addSpacing(6)  # More compact: 10 → 6
 
         # Method - compact font
         method_label = QLabel("Method:")
@@ -955,10 +954,10 @@ class InteractiveFittingGUI(QWidget):
         self.smooth_method_combo = QComboBox()
         self.smooth_method_combo.addItems(['gaussian', 'savgol'])
         self.smooth_method_combo.setFont(QFont('Arial', 8))  # Smaller font
-        self.smooth_method_combo.setFixedWidth(100)
+        self.smooth_method_combo.setFixedWidth(90)  # More compact: 100 → 90
         self.smooth_method_combo.setStyleSheet(f"""
             QComboBox {{ 
-                padding: 3px; 
+                padding: 2px; 
                 color: black;
                 background-color: white;
                 border: 2px solid #B794F6;
@@ -971,7 +970,7 @@ class InteractiveFittingGUI(QWidget):
         """)
         smooth_layout.addWidget(self.smooth_method_combo)
 
-        smooth_layout.addSpacing(10)
+        smooth_layout.addSpacing(6)  # More compact: 10 → 6
 
         # Sigma - compact font
         sigma_label = QLabel("Sigma:")
@@ -980,11 +979,11 @@ class InteractiveFittingGUI(QWidget):
         smooth_layout.addWidget(sigma_label)
 
         self.sigma_entry = QLineEdit("2.0")
-        self.sigma_entry.setFixedWidth(50)
+        self.sigma_entry.setFixedWidth(45)  # More compact: 50 → 45
         self.sigma_entry.setFont(QFont('Arial', 8))  # Smaller font
         self.sigma_entry.setStyleSheet(f"""
             QLineEdit {{ 
-                padding: 3px; 
+                padding: 2px; 
                 color: black;
                 background-color: white;
                 border: 2px solid #B794F6;
@@ -993,7 +992,7 @@ class InteractiveFittingGUI(QWidget):
         """)
         smooth_layout.addWidget(self.sigma_entry)
 
-        smooth_layout.addSpacing(10)
+        smooth_layout.addSpacing(6)  # More compact: 10 → 6
 
         # Window - black text, compact font
         window_label = QLabel("Window:")
@@ -1002,11 +1001,11 @@ class InteractiveFittingGUI(QWidget):
         smooth_layout.addWidget(window_label)
 
         self.smooth_window_entry = QLineEdit("11")
-        self.smooth_window_entry.setFixedWidth(50)
+        self.smooth_window_entry.setFixedWidth(45)  # More compact: 50 → 45
         self.smooth_window_entry.setFont(QFont('Arial', 8))  # Smaller font
         self.smooth_window_entry.setStyleSheet(f"""
             QLineEdit {{ 
-                padding: 3px; 
+                padding: 2px; 
                 color: black;
                 background-color: white;
                 border: 2px solid #B794F6;
@@ -1015,21 +1014,21 @@ class InteractiveFittingGUI(QWidget):
         """)
         smooth_layout.addWidget(self.smooth_window_entry)
 
-        smooth_layout.addSpacing(10)
+        smooth_layout.addSpacing(6)  # More compact: 10 → 6
 
-        # Apply button
+        # Apply button - match load row style
         apply_btn = QPushButton("Apply")
         apply_btn.setStyleSheet(f"""
             QPushButton {{
                 font-family: Arial;
-                font-size: 9pt;
+                font-size: 8pt;
                 font-weight: bold;
                 background-color: #A8E6CF;
                 color: black;
                 border: 2px solid #7CB9A8;
                 border-radius: 4px;
-                padding: 5px 14px;
-                min-width: 55px;
+                padding: 3px 8px;
+                min-width: 50px;
             }}
             QPushButton:hover {{
                 opacity: 0.85;
@@ -1038,19 +1037,19 @@ class InteractiveFittingGUI(QWidget):
         apply_btn.clicked.connect(self.apply_smoothing_to_data)
         smooth_layout.addWidget(apply_btn)
 
-        # Reset Data button
-        reset_data_btn = QPushButton("Reset Data")
+        # Reset Data button - match load row style
+        reset_data_btn = QPushButton("Reset")
         reset_data_btn.setStyleSheet(f"""
             QPushButton {{
                 font-family: Arial;
-                font-size: 9pt;
+                font-size: 8pt;
                 font-weight: bold;
                 background-color: #FFB3BA;
                 color: black;
                 border: 2px solid #FF8A80;
                 border-radius: 4px;
-                padding: 5px 14px;
-                min-width: 55px;
+                padding: 3px 8px;
+                min-width: 50px;
             }}
             QPushButton:hover {{
                 opacity: 0.85;
@@ -1064,14 +1063,14 @@ class InteractiveFittingGUI(QWidget):
         parent_layout.addWidget(smooth_widget)
 
     def setup_results_panel(self, parent_layout):
-        """Setup results panel - colorful and vibrant"""
+        """Setup results panel - compact and uniform"""
         results_widget = QWidget()
-        results_widget.setFixedHeight(120)
+        results_widget.setFixedHeight(110)  # More compact: 120 → 110
         results_widget.setAutoFillBackground(True)
         results_widget.setStyleSheet("QWidget { background-color: #FFF9DB; }")  # Light yellow tint
         results_layout = QVBoxLayout(results_widget)
-        results_layout.setContentsMargins(8, 4, 8, 4)
-        results_layout.setSpacing(3)
+        results_layout.setContentsMargins(6, 3, 6, 3)  # More compact: 8,4 → 6,3
+        results_layout.setSpacing(2)  # More compact: 3 → 2
 
         # Results label - compact font like load row
         results_label = QLabel("Fitting Results:")
@@ -1169,18 +1168,18 @@ class InteractiveFittingGUI(QWidget):
         parent_layout.addWidget(plot_widget)
 
     def setup_info_panel(self, parent_layout):
-        """Setup info panel at bottom - colorful and vibrant"""
+        """Setup info panel at bottom - compact and uniform"""
         info_widget = QWidget()
-        info_widget.setFixedHeight(75)
+        info_widget.setFixedHeight(65)  # More compact: 75 → 65
         info_widget.setAutoFillBackground(True)
         info_widget.setStyleSheet("QWidget { background-color: #E3F2FF; }")  # Light blue tint
         info_layout = QVBoxLayout(info_widget)
-        info_layout.setContentsMargins(8, 4, 8, 4)
+        info_layout.setContentsMargins(6, 3, 6, 3)  # More compact: 8,4 → 6,3
 
-        # Info text area
+        # Info text area - match load row font
         self.info_text = QTextEdit()
         self.info_text.setReadOnly(True)
-        self.info_text.setFont(QFont('Arial', 9))
+        self.info_text.setFont(QFont('Arial', 8))  # Match load row: 9 → 8
         self.info_text.setStyleSheet(f"""
             QTextEdit {{
                 background-color: white;
@@ -1191,7 +1190,7 @@ class InteractiveFittingGUI(QWidget):
         """)
         self.info_text.setText(
             '💡 Welcome! Load your XRD data file to begin peak fitting.\n'
-            '🖱️ Click on peaks to select | Use toolbar to zoom/pan | Right labels show coordinates and status.'
+            '🖱️ Click on peaks to select | Use toolbar to zoom/pan'
         )
         info_layout.addWidget(self.info_text)
 
