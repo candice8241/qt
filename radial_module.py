@@ -412,63 +412,8 @@ class AzimuthalIntegrationModule(GUIBase):
 
         settings_title = QLabel("Azimuthal Sector Settings")
         settings_title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        settings_title.setStyleSheet(f"color: {self.colors['primary']}; background-color: {self.colors['card_bg']};")
+        settings_title.setStyleSheet(f"color: black; background-color: {self.colors['card_bg']};")
         settings_layout.addWidget(settings_title)
-
-        # Angular range
-        range_label = QLabel("Angular Range (degrees):")
-        range_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        range_label.setStyleSheet(f"color: #666666; background-color: {self.colors['card_bg']};")
-        settings_layout.addWidget(range_label)
-
-        range_row = QWidget()
-        range_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        range_layout = QHBoxLayout(range_row)
-        range_layout.setContentsMargins(0, 0, 0, 0)
-        range_layout.setSpacing(8)
-
-        min_label = QLabel("Min:")
-        min_label.setFont(QFont('Arial', 9))
-        min_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
-        range_layout.addWidget(min_label)
-
-        self.azim_min_entry = QLineEdit("0")
-        self.azim_min_entry.setFixedWidth(70)
-        self.azim_min_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.azim_min_entry.setFont(QFont('Arial', 9))
-        self.azim_min_entry.setStyleSheet(f"""
-            QLineEdit {{
-                background-color: white;
-                color: {self.colors['text_dark']};
-                border: 1px solid {self.colors['border']};
-                padding: 3px;
-            }}
-        """)
-        self.azim_min_entry.textChanged.connect(lambda text: setattr(self, 'azim_range_min', float(text) if text else 0.0))
-        range_layout.addWidget(self.azim_min_entry)
-
-        max_label = QLabel("Max:")
-        max_label.setFont(QFont('Arial', 9))
-        max_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
-        range_layout.addWidget(max_label)
-
-        self.azim_max_entry = QLineEdit("360")
-        self.azim_max_entry.setFixedWidth(70)
-        self.azim_max_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.azim_max_entry.setFont(QFont('Arial', 9))
-        self.azim_max_entry.setStyleSheet(f"""
-            QLineEdit {{
-                background-color: white;
-                color: {self.colors['text_dark']};
-                border: 1px solid {self.colors['border']};
-                padding: 3px;
-            }}
-        """)
-        self.azim_max_entry.textChanged.connect(lambda text: setattr(self, 'azim_range_max', float(text) if text else 360.0))
-        range_layout.addWidget(self.azim_max_entry)
-        range_layout.addStretch()
-
-        settings_layout.addWidget(range_row)
 
         # Bin Mode Configuration Button
         bin_btn_row = QWidget()
@@ -478,11 +423,11 @@ class AzimuthalIntegrationModule(GUIBase):
         bin_btn_layout.setSpacing(10)
         
         self.bin_config_btn = QPushButton("⚙ Configure Bins")
-        self.bin_config_btn.setFont(QFont('Arial', 9))
+        self.bin_config_btn.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         self.bin_config_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['primary']};
-                color: white;
+                color: black;
                 border: none;
                 padding: 6px 12px;
                 border-radius: 4px;
@@ -513,11 +458,11 @@ class AzimuthalIntegrationModule(GUIBase):
         sector_btn_layout.setSpacing(10)
         
         self.sector_config_btn = QPushButton("⚙ Configure Sectors")
-        self.sector_config_btn.setFont(QFont('Arial', 9))
+        self.sector_config_btn.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         self.sector_config_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['primary']};
-                color: white;
+                color: black;
                 border: none;
                 padding: 6px 12px;
                 border-radius: 4px;
@@ -705,12 +650,12 @@ class AzimuthalIntegrationModule(GUIBase):
         offset_row = QWidget()
         offset_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         offset_layout = QHBoxLayout(offset_row)
-        offset_layout.setContentsMargins(20, 0, 0, 0)  # Indent to show it's related to stacked plot
+        offset_layout.setContentsMargins(0, 0, 0, 0)  # 靠左，移除缩进
         offset_layout.setSpacing(8)
         
         offset_label = QLabel("Offset:")
-        offset_label.setFont(QFont('Arial', 9))
-        offset_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
+        offset_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        offset_label.setStyleSheet(f"color: black; background-color: {self.colors['card_bg']};")
         offset_layout.addWidget(offset_label)
         
         self.stacked_offset_entry = QLineEdit("auto")
@@ -819,9 +764,9 @@ class AzimuthalIntegrationModule(GUIBase):
         entry.setFont(QFont('Arial', 9))
         entry.setStyleSheet(f"""
             QLineEdit {{
-                background-color: rgba(0, 0, 0, 0.7);
-                color: black;
-                border: 1px solid {self.colors['border']};
+                background-color: white;
+                color: {self.colors['text_dark']};
+                border: 1.5px solid rgba(0, 0, 0, 0.6);
                 padding: 3px;
             }}
         """)
@@ -863,9 +808,9 @@ class AzimuthalIntegrationModule(GUIBase):
         entry.setFont(QFont('Arial', 9))
         entry.setStyleSheet(f"""
             QLineEdit {{
-                background-color: rgba(0, 0, 0, 0.7);
-                color: black;
-                border: 1px solid {self.colors['border']};
+                background-color: white;
+                color: {self.colors['text_dark']};
+                border: 1.5px solid rgba(0, 0, 0, 0.6);
                 padding: 3px;
             }}
         """)
@@ -909,9 +854,9 @@ class AzimuthalIntegrationModule(GUIBase):
         entry.setText(getattr(self, var_name, ""))
         entry.setStyleSheet(f"""
             QLineEdit {{
-                background-color: rgba(0, 0, 0, 0.7);
-                color: black;
-                border: 1px solid {self.colors['border']};
+                background-color: white;
+                color: {self.colors['text_dark']};
+                border: 1.5px solid rgba(0, 0, 0, 0.6);
                 padding: 3px;
             }}
         """)
