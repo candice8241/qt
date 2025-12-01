@@ -160,10 +160,12 @@ class BCDICalModule(GUIBase):
         group = self.create_group_box("⚡ Basic Parameters")
         layout = QVBoxLayout()
 
+        # Photon energy and Lattice constant in one row
+        energy_lattice_row = QHBoxLayout()
+        
         # Photon energy
-        energy_row = QHBoxLayout()
         energy_label = QLabel("Photon energy (keV):")
-        energy_label.setFixedWidth(250)
+        energy_label.setFixedWidth(180)
         energy_label.setFont(QFont('Microsoft YaHei', 11))
         energy_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.energy_spin = QDoubleSpinBox()
@@ -172,15 +174,14 @@ class BCDICalModule(GUIBase):
         self.energy_spin.setDecimals(3)
         self.energy_spin.setSingleStep(0.1)
         self.energy_spin.setStyleSheet(self.get_spinbox_style())
-        energy_row.addWidget(energy_label)
-        energy_row.addWidget(self.energy_spin)
-        energy_row.addStretch()
-        layout.addLayout(energy_row)
-
+        energy_lattice_row.addWidget(energy_label)
+        energy_lattice_row.addWidget(self.energy_spin)
+        
+        energy_lattice_row.addSpacing(30)
+        
         # Lattice constant
-        lattice_row = QHBoxLayout()
         lattice_label = QLabel("Lattice constant a (Å):")
-        lattice_label.setFixedWidth(250)
+        lattice_label.setFixedWidth(180)
         lattice_label.setFont(QFont('Microsoft YaHei', 11))
         lattice_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.lattice_spin = QDoubleSpinBox()
@@ -189,10 +190,11 @@ class BCDICalModule(GUIBase):
         self.lattice_spin.setDecimals(4)
         self.lattice_spin.setSingleStep(0.001)
         self.lattice_spin.setStyleSheet(self.get_spinbox_style())
-        lattice_row.addWidget(lattice_label)
-        lattice_row.addWidget(self.lattice_spin)
-        lattice_row.addStretch()
-        layout.addLayout(lattice_row)
+        energy_lattice_row.addWidget(lattice_label)
+        energy_lattice_row.addWidget(self.lattice_spin)
+        
+        energy_lattice_row.addStretch()
+        layout.addLayout(energy_lattice_row)
 
         group.setLayout(layout)
         parent_layout.addWidget(group)
@@ -251,10 +253,12 @@ class BCDICalModule(GUIBase):
         group = self.create_group_box("📷 Detector Parameters")
         layout = QVBoxLayout()
 
+        # Detector pixel size and Oversampling ratio in one row
+        pixel_sigma_row = QHBoxLayout()
+        
         # Detector pixel size
-        pixel_row = QHBoxLayout()
         pixel_label = QLabel("Detector pixel size x_det (m):")
-        pixel_label.setFixedWidth(250)
+        pixel_label.setFixedWidth(230)
         pixel_label.setFont(QFont('Microsoft YaHei', 11))
         pixel_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.pixel_spin = QDoubleSpinBox()
@@ -263,15 +267,14 @@ class BCDICalModule(GUIBase):
         self.pixel_spin.setDecimals(10)
         self.pixel_spin.setSingleStep(1e-6)
         self.pixel_spin.setStyleSheet(self.get_spinbox_style())
-        pixel_row.addWidget(pixel_label)
-        pixel_row.addWidget(self.pixel_spin)
-        pixel_row.addStretch()
-        layout.addLayout(pixel_row)
-
+        pixel_sigma_row.addWidget(pixel_label)
+        pixel_sigma_row.addWidget(self.pixel_spin)
+        
+        pixel_sigma_row.addSpacing(30)
+        
         # Oversampling ratio
-        sigma_row = QHBoxLayout()
         sigma_label = QLabel("Oversampling ratio σ:")
-        sigma_label.setFixedWidth(250)
+        sigma_label.setFixedWidth(180)
         sigma_label.setFont(QFont('Microsoft YaHei', 11))
         sigma_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.sigma_spin = QDoubleSpinBox()
@@ -280,10 +283,11 @@ class BCDICalModule(GUIBase):
         self.sigma_spin.setDecimals(2)
         self.sigma_spin.setSingleStep(0.1)
         self.sigma_spin.setStyleSheet(self.get_spinbox_style())
-        sigma_row.addWidget(sigma_label)
-        sigma_row.addWidget(self.sigma_spin)
-        sigma_row.addStretch()
-        layout.addLayout(sigma_row)
+        pixel_sigma_row.addWidget(sigma_label)
+        pixel_sigma_row.addWidget(self.sigma_spin)
+        
+        pixel_sigma_row.addStretch()
+        layout.addLayout(pixel_sigma_row)
 
         group.setLayout(layout)
         parent_layout.addWidget(group)
@@ -418,10 +422,12 @@ class BCDICalModule(GUIBase):
         group = self.create_group_box("📐 Detector Angles")
         layout = QVBoxLayout()
 
+        # Delta (elevation) and Gamma (azimuth) in one row
+        angles_row = QHBoxLayout()
+        
         # Delta (elevation)
-        delta_row = QHBoxLayout()
         delta_label = QLabel("Detector elevation δ (deg):")
-        delta_label.setFixedWidth(250)
+        delta_label.setFixedWidth(210)
         delta_label.setFont(QFont('Microsoft YaHei', 11))
         delta_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.delta_spin = QDoubleSpinBox()
@@ -430,15 +436,14 @@ class BCDICalModule(GUIBase):
         self.delta_spin.setDecimals(3)
         self.delta_spin.setSingleStep(0.1)
         self.delta_spin.setStyleSheet(self.get_spinbox_style())
-        delta_row.addWidget(delta_label)
-        delta_row.addWidget(self.delta_spin)
-        delta_row.addStretch()
-        layout.addLayout(delta_row)
-
+        angles_row.addWidget(delta_label)
+        angles_row.addWidget(self.delta_spin)
+        
+        angles_row.addSpacing(30)
+        
         # Gamma (azimuth)
-        gamma_row = QHBoxLayout()
         gamma_label = QLabel("Detector azimuth γ (deg):")
-        gamma_label.setFixedWidth(250)
+        gamma_label.setFixedWidth(210)
         gamma_label.setFont(QFont('Microsoft YaHei', 11))
         gamma_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.gamma_spin = QDoubleSpinBox()
@@ -447,10 +452,11 @@ class BCDICalModule(GUIBase):
         self.gamma_spin.setDecimals(3)
         self.gamma_spin.setSingleStep(0.1)
         self.gamma_spin.setStyleSheet(self.get_spinbox_style())
-        gamma_row.addWidget(gamma_label)
-        gamma_row.addWidget(self.gamma_spin)
-        gamma_row.addStretch()
-        layout.addLayout(gamma_row)
+        angles_row.addWidget(gamma_label)
+        angles_row.addWidget(self.gamma_spin)
+        
+        angles_row.addStretch()
+        layout.addLayout(angles_row)
 
         group.setLayout(layout)
         parent_layout.addWidget(group)
