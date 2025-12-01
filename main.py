@@ -15,6 +15,7 @@ from powder_module import PowderXRDModule
 from radial_module import AzimuthalIntegrationModule
 from single_crystal_module import SingleCrystalModule
 from bcdi_cal_module import BCDICalModule
+from dioptas_module import DioptasModule
 
 
 class XRDProcessingGUI(QMainWindow, GUIBase):
@@ -50,13 +51,15 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         self.radial_module = None
         self.single_crystal_module = None
         self.bcdi_cal_module = None
+        self.dioptas_module = None
 
         # Containers for each module (prebuilt and stacked to avoid flicker)
         self.module_frames = {
             "powder": None,
             "single": None,
             "radial": None,
-            "bcdi_cal": None
+            "bcdi_cal": None,
+            "dioptas": None
         }
         
         # Tool windows (embedded in right panel)
@@ -111,7 +114,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
 
         # LEFT SIDEBAR - Navigation
         sidebar_frame = QFrame()
-        sidebar_frame.setFixedWidth(220)
+        sidebar_frame.setFixedWidth(160)
         sidebar_frame.setStyleSheet(f"""
             QFrame {{
                 background-color: {self.colors['card_bg']};
@@ -123,44 +126,28 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         sidebar_layout.setSpacing(10)
         sidebar_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        # Sidebar title
-        sidebar_title = QLabel("Modules")
-        sidebar_title.setFont(QFont('Arial', 12, QFont.Weight.Bold))
-        sidebar_title.setStyleSheet(f"color: {self.colors['primary']}; background-color: {self.colors['card_bg']}; padding: 5px;")
-        sidebar_layout.addWidget(sidebar_title)
-
         # Create navigation buttons (store references for state management)
-        self.powder_btn = self.create_sidebar_button("⚗️  Powder XRD", lambda: self.switch_tab("powder"), is_active=True)
+        self.powder_btn = self.create_sidebar_button("⚗️  Powder Inte.", lambda: self.switch_tab("powder"), is_active=True)
         sidebar_layout.addWidget(self.powder_btn)
 
-        self.radial_btn = self.create_sidebar_button("🔄  Radial XRD", lambda: self.switch_tab("radial"), is_active=False)
+        self.radial_btn = self.create_sidebar_button("🔄  Radial Inte.", lambda: self.switch_tab("radial"), is_active=False)
         sidebar_layout.addWidget(self.radial_btn)
 
-        self.single_btn = self.create_sidebar_button("🔬  Single Crystal", lambda: self.switch_tab("single"), is_active=False)
+        self.single_btn = self.create_sidebar_button("🔬  SC", lambda: self.switch_tab("single"), is_active=False)
         sidebar_layout.addWidget(self.single_btn)
 
-        self.bcdi_cal_btn = self.create_sidebar_button("🔬  BCDI Calibration", lambda: self.switch_tab("bcdi_cal"), is_active=False)
+        self.bcdi_cal_btn = self.create_sidebar_button("🔬  BCDI Cal.", lambda: self.switch_tab("bcdi_cal"), is_active=False)
         sidebar_layout.addWidget(self.bcdi_cal_btn)
 
-        # Add separator line
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.HLine)
-        separator.setStyleSheet(f"background-color: {self.colors['border']};")
-        separator.setFixedHeight(2)
-        sidebar_layout.addWidget(separator)
-
-        # Tools section
-        tools_title = QLabel("Tools")
-        tools_title.setFont(QFont('Arial', 11, QFont.Weight.Bold))
-        tools_title.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']}; padding: 5px; padding-top: 10px;")
-        sidebar_layout.addWidget(tools_title)
+        self.dioptas_btn = self.create_sidebar_button("💎  Dioptas", lambda: self.switch_tab("dioptas"), is_active=False)
+        sidebar_layout.addWidget(self.dioptas_btn)
 
         # Curve Fitting button
-        self.curve_fitting_btn = self.create_sidebar_tool_button("📈  Curve Fitting", self.open_curve_fitting)
+        self.curve_fitting_btn = self.create_sidebar_button("📈  Curve Fitting", self.open_curve_fitting, is_active=False)
         sidebar_layout.addWidget(self.curve_fitting_btn)
 
         # EOS Fitting button
-        self.eos_fitting_btn = self.create_sidebar_tool_button("📊  EOS Fitting", self.open_eos_fitting)
+        self.eos_fitting_btn = self.create_sidebar_button("📊  EOS Fitting", self.open_eos_fitting, is_active=False)
         sidebar_layout.addWidget(self.eos_fitting_btn)
 
         sidebar_layout.addStretch()
@@ -196,7 +183,6 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         
         # Update UI to reflect powder as active
         self.update_sidebar_buttons("powder")
-        self.update_tool_buttons(None)
         self.current_view = "powder"
 
         # Prebuild other modules in background after UI is shown
@@ -268,7 +254,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         else:
             button.setStyleSheet(f"""
                 QPushButton {{
-                    background-color: {self.colors['card_bg']};
+                    background-color: #DBE3F9;
                     color: {self.colors['text_dark']};
                     border: 1px solid {self.colors['border']};
                     border-radius: 8px;
@@ -280,33 +266,6 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
                     border: 1px solid {self.colors['primary']};
                 }}
             """)
-        
-        button.clicked.connect(callback)
-        return button
-
-    def create_sidebar_tool_button(self, text, callback):
-        """Create a sidebar tool button (non-tab button) with active state support"""
-        button = QPushButton(text)
-        button.setFont(QFont('Arial', 9))
-        button.setFixedHeight(40)
-        button.setCursor(Qt.CursorShape.PointingHandCursor)
-        button.is_active = False  # Track active state
-        
-        button.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.colors['bg']};
-                color: {self.colors['text_dark']};
-                border: 1px solid {self.colors['border']};
-                border-radius: 6px;
-                padding: 8px;
-                text-align: left;
-            }}
-            QPushButton:hover {{
-                background-color: {self.colors['accent']};
-                color: white;
-                border: 1px solid {self.colors['accent']};
-            }}
-        """)
         
         button.clicked.connect(callback)
         return button
@@ -334,9 +293,8 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         self.interactive_fitting_window.show()
         self.current_view = "curve_fitting"
         
-        # Update sidebar to show no module is active, but curve fitting tool is active
-        self.update_sidebar_buttons(None)
-        self.update_tool_buttons("curve_fitting")
+        # Update sidebar to show curve fitting is active
+        self.update_sidebar_buttons("curve_fitting")
 
     def open_eos_fitting(self):
         """Open EOS fitting window"""
@@ -368,9 +326,8 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         self.interactive_eos_window.show()
         self.current_view = "eos_fitting"
         
-        # Update sidebar to show no module is active, but EOS fitting tool is active
-        self.update_sidebar_buttons(None)
-        self.update_tool_buttons("eos_fitting")
+        # Update sidebar to show EOS fitting is active
+        self.update_sidebar_buttons("eos_fitting")
 
     def update_sidebar_buttons(self, active_tab):
         """Update sidebar button styles based on active tab (None = no active module)"""
@@ -378,7 +335,10 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             "powder": self.powder_btn,
             "radial": self.radial_btn,
             "single": self.single_btn,
-            "bcdi_cal": self.bcdi_cal_btn
+            "bcdi_cal": self.bcdi_cal_btn,
+            "dioptas": self.dioptas_btn,
+            "curve_fitting": self.curve_fitting_btn,
+            "eos_fitting": self.eos_fitting_btn
         }
         
         for tab_name, button in buttons.items():
@@ -401,7 +361,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             else:
                 button.setStyleSheet(f"""
                     QPushButton {{
-                        background-color: {self.colors['card_bg']};
+                        background-color: #DBE3F9;
                         color: {self.colors['text_dark']};
                         border: 1px solid {self.colors['border']};
                         border-radius: 8px;
@@ -415,48 +375,9 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
                 """)
     
     def update_tool_buttons(self, active_tool):
-        """Update tool button styles based on active tool"""
-        tool_buttons = {
-            "curve_fitting": self.curve_fitting_btn,
-            "eos_fitting": self.eos_fitting_btn
-        }
-        
-        for tool_name, button in tool_buttons.items():
-            is_active = (tool_name == active_tool)
-            if is_active:
-                button.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: {self.colors['accent']};
-                        color: white;
-                        border: 2px solid {self.colors['accent']};
-                        border-radius: 6px;
-                        padding: 8px;
-                        text-align: left;
-                        font-weight: bold;
-                        font-size: 9pt;
-                    }}
-                    QPushButton:hover {{
-                        background-color: {self.colors['primary']};
-                        border: 2px solid {self.colors['primary']};
-                    }}
-                """)
-            else:
-                button.setStyleSheet(f"""
-                    QPushButton {{
-                        background-color: {self.colors['bg']};
-                        color: {self.colors['text_dark']};
-                        border: 1px solid {self.colors['border']};
-                        border-radius: 6px;
-                        padding: 8px;
-                        text-align: left;
-                        font-size: 9pt;
-                    }}
-                    QPushButton:hover {{
-                        background-color: {self.colors['accent']};
-                        color: white;
-                        border: 1px solid {self.colors['accent']};
-                    }}
-                """)
+        """Update tool button styles based on active tool - now handled by update_sidebar_buttons"""
+        # This method is kept for compatibility but functionality moved to update_sidebar_buttons
+        pass
 
     def _warm_interactive_windows(self):
         """Ensure interactive secondary windows are prebuilt after startup."""
@@ -504,6 +425,12 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             self.bcdi_cal_module = BCDICalModule(bcdi_cal_frame, self)
             self.bcdi_cal_module.setup_ui()
         bcdi_cal_frame.hide()  # Ensure hidden after prebuild
+        
+        dioptas_frame = self._ensure_frame("dioptas")
+        if self.dioptas_module is None:
+            self.dioptas_module = DioptasModule(dioptas_frame, self)
+            self.dioptas_module.setup_ui()
+        dioptas_frame.hide()  # Ensure hidden after prebuild
     
     def prebuild_interactive_windows(self):
         """Prebuild interactive tool windows in background to avoid flash on first open"""
@@ -539,8 +466,6 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         
         # Update sidebar button styles
         self.update_sidebar_buttons(tab_name)
-        # Reset tool button styles when switching to modules
-        self.update_tool_buttons(None)
 
         # Hide all module frames
         for frame in self.module_frames.values():
@@ -576,6 +501,12 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             if self.bcdi_cal_module is None:
                 self.bcdi_cal_module = BCDICalModule(target_frame, self)
                 self.bcdi_cal_module.setup_ui()
+
+        elif tab_name == "dioptas":
+            target_frame = self._ensure_frame("dioptas")
+            if self.dioptas_module is None:
+                self.dioptas_module = DioptasModule(target_frame, self)
+                self.dioptas_module.setup_ui()
 
         if target_frame is not None:
             target_frame.show()

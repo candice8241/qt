@@ -1,74 +1,24 @@
 # -*- coding: utf-8 -*-
 """
-BCDI Calibration Module - Qt Version
-X-ray Diffraction Analysis Tool for phase transition identification and lattice parameter fitting
+BCDI Calibration Module - FCC Bragg Calculator
+Detector + Sampling Parameters and Coherence Calculations
 
 Migrated from Streamlit to PyQt6
+Original author: candicewang928@gmail.com
 """
 
 from PyQt6.QtWidgets import (QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton,
-                              QLineEdit, QTextEdit, QCheckBox, QComboBox, QGroupBox,
-                              QFileDialog, QMessageBox, QFrame, QSpinBox, QDoubleSpinBox,
-                              QRadioButton, QButtonGroup)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+                              QLineEdit, QTextEdit, QGroupBox, QScrollArea,
+                              QFrame, QDoubleSpinBox, QSpinBox)
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
-import os
-import sys
+import numpy as np
 from gui_base import GUIBase
-from theme_module import CuteSheepProgressBar, ModernButton
-from custom_widgets import SpinboxStyleButton, CustomSpinbox
-from batch_cal_volume import XRayDiffractionAnalyzer
-
-
-class AnalysisWorkerThread(QThread):
-    """Worker thread for X-ray diffraction analysis"""
-    finished = pyqtSignal(str)
-    error = pyqtSignal(str)
-    progress = pyqtSignal(str)
-
-    def __init__(self, analyzer, csv_path, original_system, new_system, auto_mode=True):
-        super().__init__()
-        self.analyzer = analyzer
-        self.csv_path = csv_path
-        self.original_system = original_system
-        self.new_system = new_system
-        self.auto_mode = auto_mode
-
-    def run(self):
-        """Run the analysis"""
-        try:
-            self.progress.emit("Starting analysis...")
-            results = self.analyzer.analyze(
-                self.csv_path,
-                original_system=self.original_system,
-                new_system=self.new_system,
-                auto_mode=self.auto_mode
-            )
-            
-            if results:
-                self.finished.emit("Analysis completed successfully!")
-            else:
-                self.error.emit("Analysis failed - no results returned")
-        except Exception as e:
-            import traceback
-            error_msg = f"Error during analysis:\n{str(e)}\n{traceback.format_exc()}"
-            self.error.emit(error_msg)
+from theme_module import ModernButton
 
 
 class BCDICalModule(GUIBase):
-    """BCDI Calibration module for X-ray Diffraction Analysis"""
-
-    # Crystal system mapping
-    CRYSTAL_SYSTEM_MAP = {
-        "Face-Centered Cubic (FCC)": "cubic_FCC",
-        "Body-Centered Cubic (BCC)": "cubic_BCC",
-        "Simple Cubic (SC)": "cubic_SC",
-        "Hexagonal Close-Packed (HCP)": "Hexagonal",
-        "Tetragonal": "Tetragonal",
-        "Orthorhombic": "Orthorhombic",
-        "Monoclinic": "Monoclinic",
-        "Triclinic": "Triclinic"
-    }
+    """BCDI Calibration module - FCC Bragg & Coherence Calculator"""
 
     def __init__(self, parent, root):
         """
@@ -81,28 +31,28 @@ class BCDICalModule(GUIBase):
         super().__init__()
         self.parent = parent
         self.root = root
-
-        # Initialize analyzer
-        self.analyzer = None
         
-        # Initialize variables
+        # Initialize input variables with default values
         self._init_variables()
 
-        # Track threads
-        self.running_threads = []
-
     def _init_variables(self):
-        """Initialize all variables"""
-        self.csv_file_path = ""
-        self.wavelength = 0.4133  # Default wavelength in Angstroms
-        self.n_pressure_points = 4  # Default number of pressure points
-        self.original_crystal_system = "cubic_FCC"
-        self.new_crystal_system = "cubic_FCC"
-        
-        # Tolerances (using default values from XRayDiffractionAnalyzer)
-        self.peak_tolerance_1 = 0.3
-        self.peak_tolerance_2 = 0.4
-        self.peak_tolerance_3 = 0.01
+        """Initialize all input variables with default values"""
+        self.E_keV = 9.0
+        self.a_angstrom = 3.608
+        self.h = 1
+        self.k = 1
+        self.l = 1
+        self.x_det = 55e-6
+        self.sigma = 4.0
+        self.sample_size = 1e-6
+        self.D = 100e-6
+        self.energy_resolution = 1e-4
+        self.space_resolution = 50e-9
+        self.N1 = 256
+        self.N2 = 256
+        self.N3 = 100
+        self.delta = 11.104
+        self.gamma = 29.607
 
     def setup_ui(self):
         """Setup the user interface"""
@@ -116,429 +66,559 @@ class BCDICalModule(GUIBase):
         # Clear existing widgets
         self.clear_layout(main_layout)
 
+        # Create scroll area for all content
+        scroll_area = QScrollArea()
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setFrameShape(QFrame.Shape.NoFrame)
+        scroll_area.setStyleSheet(f"background-color: {self.colors['bg']}; border: none;")
+        
+        scroll_widget = QWidget()
+        scroll_layout = QVBoxLayout(scroll_widget)
+        scroll_layout.setContentsMargins(20, 10, 20, 10)
+        scroll_layout.setSpacing(15)
+
         # Title section
-        title_label = QLabel("BCDI Calibration - X-ray Diffraction Analysis")
-        title_label.setFont(QFont('Arial', 16, QFont.Weight.Bold))
+        title_label = QLabel("📐 FCC Bragg & Coherence Calculator")
+        title_label.setFont(QFont('Microsoft YaHei', 19, QFont.Weight.Bold))
         title_label.setStyleSheet(f"color: {self.colors['primary']}; padding: 10px;")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        main_layout.addWidget(title_label)
+        scroll_layout.addWidget(title_label)
 
-        # Description
-        desc_label = QLabel(
-            "Phase transition identification and lattice parameter fitting for X-ray diffraction data"
-        )
-        desc_label.setFont(QFont('Arial', 9))
-        desc_label.setStyleSheet(f"color: {self.colors['text_light']}; padding: 5px;")
-        desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        desc_label.setWordWrap(True)
-        main_layout.addWidget(desc_label)
+        # Subtitle
+        subtitle_label = QLabel("📷 Detector + Sampling Parameters")
+        subtitle_label.setFont(QFont('Microsoft YaHei', 14, QFont.Weight.Bold))
+        subtitle_label.setStyleSheet(f"color: {self.colors['text_dark']}; padding: 5px;")
+        subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        scroll_layout.addWidget(subtitle_label)
 
-        # ===== Input Section =====
-        input_group = self.create_group_box("Input Data")
-        input_layout = QVBoxLayout()
+        # ===== Basic Parameters Section =====
+        self.setup_basic_params(scroll_layout)
 
-        # CSV file input
-        csv_row = QHBoxLayout()
-        csv_label = QLabel("Peak Data CSV:")
-        csv_label.setFixedWidth(150)
-        csv_label.setStyleSheet(f"color: {self.colors['text_dark']};")
-        self.csv_file_entry = QLineEdit()
-        self.csv_file_entry.setPlaceholderText("Select CSV file containing peak data...")
-        self.csv_file_entry.setStyleSheet(self.get_input_style())
-        csv_browse_btn = ModernButton("Browse", self.colors)
-        csv_browse_btn.clicked.connect(self.browse_csv_file)
-        csv_row.addWidget(csv_label)
-        csv_row.addWidget(self.csv_file_entry)
-        csv_row.addWidget(csv_browse_btn)
-        input_layout.addLayout(csv_row)
+        # ===== Miller Indices Section =====
+        self.setup_miller_indices(scroll_layout)
 
-        input_group.setLayout(input_layout)
-        main_layout.addWidget(input_group)
+        # ===== Detector Parameters Section =====
+        self.setup_detector_params(scroll_layout)
 
-        # ===== Parameters Section =====
-        params_group = self.create_group_box("Analysis Parameters")
-        params_layout = QVBoxLayout()
+        # ===== Sample Parameters Section =====
+        self.setup_sample_params(scroll_layout)
 
-        # Wavelength
-        wavelength_row = QHBoxLayout()
-        wavelength_label = QLabel("X-ray Wavelength (Å):")
-        wavelength_label.setFixedWidth(200)
-        wavelength_label.setStyleSheet(f"color: {self.colors['text_dark']};")
-        self.wavelength_spinbox = QDoubleSpinBox()
-        self.wavelength_spinbox.setRange(0.1, 10.0)
-        self.wavelength_spinbox.setValue(self.wavelength)
-        self.wavelength_spinbox.setDecimals(4)
-        self.wavelength_spinbox.setSingleStep(0.001)
-        self.wavelength_spinbox.setStyleSheet(self.get_spinbox_style())
-        self.wavelength_spinbox.valueChanged.connect(
-            lambda v: setattr(self, 'wavelength', v)
-        )
-        wavelength_row.addWidget(wavelength_label)
-        wavelength_row.addWidget(self.wavelength_spinbox)
-        wavelength_row.addStretch()
-        params_layout.addLayout(wavelength_row)
+        # ===== Array Dimensions Section =====
+        self.setup_array_dimensions(scroll_layout)
 
-        # N pressure points
-        n_points_row = QHBoxLayout()
-        n_points_label = QLabel("Min Pressure Points for Stability:")
-        n_points_label.setFixedWidth(200)
-        n_points_label.setStyleSheet(f"color: {self.colors['text_dark']};")
-        self.n_points_spinbox = QSpinBox()
-        self.n_points_spinbox.setRange(1, 100)
-        self.n_points_spinbox.setValue(self.n_pressure_points)
-        self.n_points_spinbox.setStyleSheet(self.get_spinbox_style())
-        self.n_points_spinbox.valueChanged.connect(
-            lambda v: setattr(self, 'n_pressure_points', v)
-        )
-        n_points_row.addWidget(n_points_label)
-        n_points_row.addWidget(self.n_points_spinbox)
-        n_points_row.addStretch()
-        params_layout.addLayout(n_points_row)
+        # ===== Angles Section =====
+        self.setup_angles(scroll_layout)
 
-        # Peak tolerances section
-        tolerances_label = QLabel("Peak Tolerances (degrees):")
-        tolerances_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        tolerances_label.setStyleSheet(f"color: {self.colors['text_dark']}; margin-top: 10px;")
-        params_layout.addWidget(tolerances_label)
-
-        # Tolerance 1
-        tol1_row = QHBoxLayout()
-        tol1_label = QLabel("  Phase Transition Detection:")
-        tol1_label.setFixedWidth(200)
-        tol1_label.setStyleSheet(f"color: {self.colors['text_dark']};")
-        self.tolerance1_spinbox = QDoubleSpinBox()
-        self.tolerance1_spinbox.setRange(0.01, 5.0)
-        self.tolerance1_spinbox.setValue(self.peak_tolerance_1)
-        self.tolerance1_spinbox.setDecimals(2)
-        self.tolerance1_spinbox.setSingleStep(0.1)
-        self.tolerance1_spinbox.setStyleSheet(self.get_spinbox_style())
-        tol1_row.addWidget(tol1_label)
-        tol1_row.addWidget(self.tolerance1_spinbox)
-        tol1_row.addStretch()
-        params_layout.addLayout(tol1_row)
-
-        # Tolerance 2
-        tol2_row = QHBoxLayout()
-        tol2_label = QLabel("  Peak Tracking:")
-        tol2_label.setFixedWidth(200)
-        tol2_label.setStyleSheet(f"color: {self.colors['text_dark']};")
-        self.tolerance2_spinbox = QDoubleSpinBox()
-        self.tolerance2_spinbox.setRange(0.01, 5.0)
-        self.tolerance2_spinbox.setValue(self.peak_tolerance_2)
-        self.tolerance2_spinbox.setDecimals(2)
-        self.tolerance2_spinbox.setSingleStep(0.1)
-        self.tolerance2_spinbox.setStyleSheet(self.get_spinbox_style())
-        tol2_row.addWidget(tol2_label)
-        tol2_row.addWidget(self.tolerance2_spinbox)
-        tol2_row.addStretch()
-        params_layout.addLayout(tol2_row)
-
-        # Tolerance 3
-        tol3_row = QHBoxLayout()
-        tol3_label = QLabel("  Peak Exclusion:")
-        tol3_label.setFixedWidth(200)
-        tol3_label.setStyleSheet(f"color: {self.colors['text_dark']};")
-        self.tolerance3_spinbox = QDoubleSpinBox()
-        self.tolerance3_spinbox.setRange(0.001, 1.0)
-        self.tolerance3_spinbox.setValue(self.peak_tolerance_3)
-        self.tolerance3_spinbox.setDecimals(3)
-        self.tolerance3_spinbox.setSingleStep(0.01)
-        self.tolerance3_spinbox.setStyleSheet(self.get_spinbox_style())
-        tol3_row.addWidget(tol3_label)
-        tol3_row.addWidget(self.tolerance3_spinbox)
-        tol3_row.addStretch()
-        params_layout.addLayout(tol3_row)
-
-        params_group.setLayout(params_layout)
-        main_layout.addWidget(params_group)
-
-        # ===== Crystal System Selection =====
-        crystal_group = self.create_group_box("Crystal System Selection")
-        crystal_layout = QVBoxLayout()
-
-        # Original peaks crystal system
-        original_label = QLabel("Original Phase Crystal System:")
-        original_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        original_label.setStyleSheet(f"color: {self.colors['text_dark']};")
-        crystal_layout.addWidget(original_label)
-
-        self.original_system_combo = QComboBox()
-        self.original_system_combo.addItems(list(self.CRYSTAL_SYSTEM_MAP.keys()))
-        self.original_system_combo.setStyleSheet(self.get_combo_style())
-        self.original_system_combo.currentTextChanged.connect(
-            lambda text: setattr(self, 'original_crystal_system', 
-                               self.CRYSTAL_SYSTEM_MAP[text])
-        )
-        crystal_layout.addWidget(self.original_system_combo)
-
-        # New peaks crystal system
-        new_label = QLabel("New Phase Crystal System:")
-        new_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        new_label.setStyleSheet(f"color: {self.colors['text_dark']}; margin-top: 10px;")
-        crystal_layout.addWidget(new_label)
-
-        self.new_system_combo = QComboBox()
-        self.new_system_combo.addItems(list(self.CRYSTAL_SYSTEM_MAP.keys()))
-        self.new_system_combo.setStyleSheet(self.get_combo_style())
-        self.new_system_combo.currentTextChanged.connect(
-            lambda text: setattr(self, 'new_crystal_system',
-                               self.CRYSTAL_SYSTEM_MAP[text])
-        )
-        crystal_layout.addWidget(self.new_system_combo)
-
-        crystal_group.setLayout(crystal_layout)
-        main_layout.addWidget(crystal_group)
-
-        # ===== Action Buttons =====
-        button_layout = QHBoxLayout()
+        # ===== Calculate Button =====
+        button_container = QWidget()
+        button_layout = QHBoxLayout(button_container)
+        button_layout.setContentsMargins(0, 15, 0, 15)
         button_layout.addStretch()
-
-        self.run_analysis_btn = ModernButton("🚀 Run Analysis", self.colors, primary=True)
-        self.run_analysis_btn.setFixedHeight(50)
-        self.run_analysis_btn.clicked.connect(self.run_analysis)
-        button_layout.addWidget(self.run_analysis_btn)
-
+        
+        calc_btn = ModernButton("🧮 Calculate", self.calculate,
+                               bg_color='#DBE3F9',
+                               hover_color='#C5D3F0',
+                               width=250, height=50,
+                               font_size=12,
+                               parent=button_container)
+        button_layout.addWidget(calc_btn)
         button_layout.addStretch()
-        main_layout.addLayout(button_layout)
+        scroll_layout.addWidget(button_container)
 
-        # ===== Progress Section =====
-        progress_group = self.create_group_box("Progress")
-        progress_layout = QVBoxLayout()
+        # ===== Results Section =====
+        results_group = self.create_group_box("📊 Calculation Results")
+        results_layout = QVBoxLayout()
 
-        # Progress bar
-        self.progress_bar = CuteSheepProgressBar(width=600, height=60)
-        progress_layout.addWidget(self.progress_bar, alignment=Qt.AlignmentFlag.AlignCenter)
-
-        # Log text area
-        self.log_text = QTextEdit()
-        self.log_text.setReadOnly(True)
-        self.log_text.setStyleSheet(f"""
+        self.results_text = QTextEdit()
+        self.results_text.setReadOnly(True)
+        self.results_text.setStyleSheet(f"""
             QTextEdit {{
                 background-color: {self.colors['bg']};
                 color: {self.colors['text_dark']};
                 border: 1px solid {self.colors['border']};
                 border-radius: 5px;
-                padding: 10px;
-                font-family: 'Consolas', 'Courier New', monospace;
-                font-size: 9pt;
+                padding: 15px;
+                font-family: 'Microsoft YaHei', 'Consolas', monospace;
+                font-size: 11pt;
+                line-height: 1.5;
             }}
         """)
-        self.log_text.setMinimumHeight(200)
-        progress_layout.addWidget(self.log_text)
+        self.results_text.setMinimumHeight(250)
+        self.results_text.setMaximumHeight(350)
+        self.results_text.setPlaceholderText("Results will appear here after calculation...")
+        results_layout.addWidget(self.results_text)
 
-        progress_group.setLayout(progress_layout)
-        main_layout.addWidget(progress_group)
+        results_group.setLayout(results_layout)
+        scroll_layout.addWidget(results_group)
 
-        main_layout.addStretch()
+        scroll_layout.addStretch()
+        scroll_area.setWidget(scroll_widget)
+        main_layout.addWidget(scroll_area)
 
-    def browse_csv_file(self):
-        """Browse for CSV file"""
-        file_path, _ = QFileDialog.getOpenFileName(
-            self.parent,
-            "Select Peak Data CSV File",
-            "",
-            "CSV Files (*.csv);;All Files (*)"
-        )
-        if file_path:
-            self.csv_file_path = file_path
-            self.csv_file_entry.setText(file_path)
-            self.log_message(f"Selected CSV file: {file_path}")
+    def setup_basic_params(self, parent_layout):
+        """Setup basic parameters section"""
+        group = self.create_group_box("⚡ Basic Parameters")
+        layout = QVBoxLayout()
 
-    def log_message(self, message):
-        """Add message to log"""
-        self.log_text.append(message)
-        # Scroll to bottom
-        cursor = self.log_text.textCursor()
-        cursor.movePosition(cursor.MoveOperation.End)
-        self.log_text.setTextCursor(cursor)
-
-    def run_analysis(self):
-        """Run the X-ray diffraction analysis"""
-        # Validate inputs
-        if not self.csv_file_path:
-            QMessageBox.warning(
-                self.parent,
-                "Missing Input",
-                "Please select a CSV file containing peak data."
-            )
-            return
-
-        if not os.path.exists(self.csv_file_path):
-            QMessageBox.warning(
-                self.parent,
-                "File Not Found",
-                f"The selected CSV file does not exist:\n{self.csv_file_path}"
-            )
-            return
-
-        # Update tolerances from spinboxes
-        self.peak_tolerance_1 = self.tolerance1_spinbox.value()
-        self.peak_tolerance_2 = self.tolerance2_spinbox.value()
-        self.peak_tolerance_3 = self.tolerance3_spinbox.value()
-
-        # Clear log
-        self.log_text.clear()
-        self.log_message("="*60)
-        self.log_message("X-RAY DIFFRACTION ANALYSIS")
-        self.log_message("="*60)
-        self.log_message(f"CSV File: {self.csv_file_path}")
-        self.log_message(f"Wavelength: {self.wavelength} Å")
-        self.log_message(f"Min Pressure Points: {self.n_pressure_points}")
-        self.log_message(f"Original System: {self.original_crystal_system}")
-        self.log_message(f"New System: {self.new_crystal_system}")
-        self.log_message("="*60)
-        self.log_message("")
-
-        # Disable run button
-        self.run_analysis_btn.setEnabled(False)
-
-        # Start progress animation
-        self.progress_bar.start()
-
-        # Create analyzer with current parameters
-        self.analyzer = XRayDiffractionAnalyzer(
-            wavelength=self.wavelength,
-            n_pressure_points=self.n_pressure_points
-        )
+        # Photon energy and Lattice constant in one row
+        energy_lattice_row = QHBoxLayout()
         
-        # Update tolerances
-        self.analyzer.peak_tolerance_1 = self.peak_tolerance_1
-        self.analyzer.peak_tolerance_2 = self.peak_tolerance_2
-        self.analyzer.peak_tolerance_3 = self.peak_tolerance_3
-
-        # Create and start worker thread
-        self.worker_thread = AnalysisWorkerThread(
-            self.analyzer,
-            self.csv_file_path,
-            self.original_crystal_system,
-            self.new_crystal_system,
-            auto_mode=True
-        )
-
-        # Connect signals
-        self.worker_thread.progress.connect(self.log_message)
-        self.worker_thread.finished.connect(self.on_analysis_finished)
-        self.worker_thread.error.connect(self.on_analysis_error)
-
-        # Start thread
-        self.running_threads.append(self.worker_thread)
-        self.worker_thread.start()
-
-    def on_analysis_finished(self, message):
-        """Handle analysis completion"""
-        self.log_message("")
-        self.log_message("="*60)
-        self.log_message(message)
-        self.log_message("="*60)
+        # Photon energy
+        energy_label = QLabel("Photon energy (keV):")
+        energy_label.setFixedWidth(180)
+        energy_label.setFont(QFont('Microsoft YaHei', 11))
+        energy_label.setStyleSheet(f"color: {self.colors['text_dark']};")
+        self.energy_spin = QDoubleSpinBox()
+        self.energy_spin.setRange(0.1, 100.0)
+        self.energy_spin.setValue(self.E_keV)
+        self.energy_spin.setDecimals(3)
+        self.energy_spin.setSingleStep(0.1)
+        self.energy_spin.setStyleSheet(self.get_spinbox_style())
+        energy_lattice_row.addWidget(energy_label)
+        energy_lattice_row.addWidget(self.energy_spin)
         
-        # Show results summary
-        if self.analyzer:
-            if self.analyzer.transition_pressure:
-                self.log_message(f"\nPhase transition detected at: {self.analyzer.transition_pressure:.2f} GPa")
-            else:
-                self.log_message("\nNo phase transition detected")
-            
-            # Show output files
-            base_filename = self.csv_file_path.replace('.csv', '')
-            self.log_message("\nOutput files:")
-            if self.analyzer.transition_pressure:
-                self.log_message(f"  - {base_filename}_new_peaks_dataset.csv")
-                self.log_message(f"  - {base_filename}_original_peaks_dataset.csv")
-                self.log_message(f"  - {base_filename}_original_peaks_lattice.csv")
-                self.log_message(f"  - {base_filename}_new_peaks_lattice.csv")
-            else:
-                self.log_message(f"  - {base_filename}_lattice_results.csv")
-
-        # Stop progress animation
-        self.progress_bar.stop()
+        energy_lattice_row.addSpacing(30)
         
-        # Re-enable run button
-        self.run_analysis_btn.setEnabled(True)
-
-        # Show completion message
-        QMessageBox.information(
-            self.parent,
-            "Analysis Complete",
-            "X-ray diffraction analysis completed successfully!\nCheck the log for details and output file locations."
-        )
-
-    def on_analysis_error(self, error_message):
-        """Handle analysis error"""
-        self.log_message("")
-        self.log_message("="*60)
-        self.log_message("ERROR")
-        self.log_message("="*60)
-        self.log_message(error_message)
+        # Lattice constant
+        lattice_label = QLabel("Lattice constant a (Å):")
+        lattice_label.setFixedWidth(180)
+        lattice_label.setFont(QFont('Microsoft YaHei', 11))
+        lattice_label.setStyleSheet(f"color: {self.colors['text_dark']};")
+        self.lattice_spin = QDoubleSpinBox()
+        self.lattice_spin.setRange(0.1, 20.0)
+        self.lattice_spin.setValue(self.a_angstrom)
+        self.lattice_spin.setDecimals(4)
+        self.lattice_spin.setSingleStep(0.001)
+        self.lattice_spin.setStyleSheet(self.get_spinbox_style())
+        energy_lattice_row.addWidget(lattice_label)
+        energy_lattice_row.addWidget(self.lattice_spin)
         
-        # Stop progress animation
-        self.progress_bar.stop()
+        energy_lattice_row.addStretch()
+        layout.addLayout(energy_lattice_row)
+
+        group.setLayout(layout)
+        parent_layout.addWidget(group)
+
+    def setup_miller_indices(self, parent_layout):
+        """Setup Miller indices section"""
+        group = self.create_group_box("🔢 Miller Indices (hkl)")
+        layout = QVBoxLayout()
+
+        hkl_row = QHBoxLayout()
         
-        # Re-enable run button
-        self.run_analysis_btn.setEnabled(True)
+        # h
+        h_label = QLabel("h:")
+        h_label.setFixedWidth(30)
+        h_label.setFont(QFont('Microsoft YaHei', 11))
+        h_label.setStyleSheet(f"color: {self.colors['text_dark']};")
+        self.h_spin = QSpinBox()
+        self.h_spin.setRange(-10, 10)
+        self.h_spin.setValue(self.h)
+        self.h_spin.setStyleSheet(self.get_spinbox_style())
+        hkl_row.addWidget(h_label)
+        hkl_row.addWidget(self.h_spin)
 
-        # Show error message
-        QMessageBox.critical(
-            self.parent,
-            "Analysis Error",
-            f"An error occurred during analysis:\n\n{error_message}"
-        )
+        # k
+        k_label = QLabel("k:")
+        k_label.setFixedWidth(30)
+        k_label.setFont(QFont('Microsoft YaHei', 11))
+        k_label.setStyleSheet(f"color: {self.colors['text_dark']};")
+        self.k_spin = QSpinBox()
+        self.k_spin.setRange(-10, 10)
+        self.k_spin.setValue(self.k)
+        self.k_spin.setStyleSheet(self.get_spinbox_style())
+        hkl_row.addWidget(k_label)
+        hkl_row.addWidget(self.k_spin)
 
-    def get_input_style(self):
-        """Get style for input fields"""
-        return f"""
-            QLineEdit {{
-                padding: 8px;
-                border: 2px solid {self.colors['border']};
-                border-radius: 5px;
-                background-color: white;
-                color: {self.colors['text_dark']};
-                font-size: 10pt;
-            }}
-            QLineEdit:focus {{
-                border: 2px solid {self.colors['primary']};
-            }}
-        """
+        # l
+        l_label = QLabel("l:")
+        l_label.setFixedWidth(30)
+        l_label.setFont(QFont('Microsoft YaHei', 11))
+        l_label.setStyleSheet(f"color: {self.colors['text_dark']};")
+        self.l_spin = QSpinBox()
+        self.l_spin.setRange(-10, 10)
+        self.l_spin.setValue(self.l)
+        self.l_spin.setStyleSheet(self.get_spinbox_style())
+        hkl_row.addWidget(l_label)
+        hkl_row.addWidget(self.l_spin)
+
+        hkl_row.addStretch()
+        layout.addLayout(hkl_row)
+
+        group.setLayout(layout)
+        parent_layout.addWidget(group)
+
+    def setup_detector_params(self, parent_layout):
+        """Setup detector parameters section"""
+        group = self.create_group_box("📷 Detector Parameters")
+        layout = QVBoxLayout()
+
+        # Detector pixel size and Oversampling ratio in one row
+        pixel_sigma_row = QHBoxLayout()
+        
+        # Detector pixel size
+        pixel_label = QLabel("Detector pixel size x_det (m):")
+        pixel_label.setFixedWidth(230)
+        pixel_label.setFont(QFont('Microsoft YaHei', 11))
+        pixel_label.setStyleSheet(f"color: {self.colors['text_dark']};")
+        self.pixel_spin = QDoubleSpinBox()
+        self.pixel_spin.setRange(1e-9, 1e-3)
+        self.pixel_spin.setValue(self.x_det)
+        self.pixel_spin.setDecimals(10)
+        self.pixel_spin.setSingleStep(1e-6)
+        self.pixel_spin.setStyleSheet(self.get_spinbox_style())
+        pixel_sigma_row.addWidget(pixel_label)
+        pixel_sigma_row.addWidget(self.pixel_spin)
+        
+        pixel_sigma_row.addSpacing(30)
+        
+        # Oversampling ratio
+        sigma_label = QLabel("Oversampling ratio σ:")
+        sigma_label.setFixedWidth(180)
+        sigma_label.setFont(QFont('Microsoft YaHei', 11))
+        sigma_label.setStyleSheet(f"color: {self.colors['text_dark']};")
+        self.sigma_spin = QDoubleSpinBox()
+        self.sigma_spin.setRange(1.0, 100.0)
+        self.sigma_spin.setValue(self.sigma)
+        self.sigma_spin.setDecimals(2)
+        self.sigma_spin.setSingleStep(0.1)
+        self.sigma_spin.setStyleSheet(self.get_spinbox_style())
+        pixel_sigma_row.addWidget(sigma_label)
+        pixel_sigma_row.addWidget(self.sigma_spin)
+        
+        pixel_sigma_row.addStretch()
+        layout.addLayout(pixel_sigma_row)
+
+        group.setLayout(layout)
+        parent_layout.addWidget(group)
+
+    def setup_sample_params(self, parent_layout):
+        """Setup sample parameters section"""
+        group = self.create_group_box("🔬 Sample Parameters")
+        layout = QVBoxLayout()
+
+        # Sample size
+        sample_row = QHBoxLayout()
+        sample_label = QLabel("Sample size (m):")
+        sample_label.setFixedWidth(250)
+        sample_label.setFont(QFont('Microsoft YaHei', 11))
+        sample_label.setStyleSheet(f"color: {self.colors['text_dark']};")
+        self.sample_spin = QDoubleSpinBox()
+        self.sample_spin.setRange(1e-9, 1e-3)
+        self.sample_spin.setValue(self.sample_size)
+        self.sample_spin.setDecimals(10)
+        self.sample_spin.setSingleStep(1e-7)
+        self.sample_spin.setStyleSheet(self.get_spinbox_style())
+        sample_row.addWidget(sample_label)
+        sample_row.addWidget(self.sample_spin)
+        sample_row.addStretch()
+        layout.addLayout(sample_row)
+
+        # Beam spot size
+        beam_row = QHBoxLayout()
+        beam_label = QLabel("Beam spot size D (m):")
+        beam_label.setFixedWidth(250)
+        beam_label.setFont(QFont('Microsoft YaHei', 11))
+        beam_label.setStyleSheet(f"color: {self.colors['text_dark']};")
+        self.beam_spin = QDoubleSpinBox()
+        self.beam_spin.setRange(1e-9, 1e-3)
+        self.beam_spin.setValue(self.D)
+        self.beam_spin.setDecimals(10)
+        self.beam_spin.setSingleStep(1e-6)
+        self.beam_spin.setStyleSheet(self.get_spinbox_style())
+        beam_row.addWidget(beam_label)
+        beam_row.addWidget(self.beam_spin)
+        beam_row.addStretch()
+        layout.addLayout(beam_row)
+
+        # Energy resolution
+        energy_res_row = QHBoxLayout()
+        energy_res_label = QLabel("Energy resolution Δλ/λ:")
+        energy_res_label.setFixedWidth(250)
+        energy_res_label.setFont(QFont('Microsoft YaHei', 11))
+        energy_res_label.setStyleSheet(f"color: {self.colors['text_dark']};")
+        self.energy_res_spin = QDoubleSpinBox()
+        self.energy_res_spin.setRange(1e-6, 1e-2)
+        self.energy_res_spin.setValue(self.energy_resolution)
+        self.energy_res_spin.setDecimals(10)
+        self.energy_res_spin.setSingleStep(1e-5)
+        self.energy_res_spin.setStyleSheet(self.get_spinbox_style())
+        energy_res_row.addWidget(energy_res_label)
+        energy_res_row.addWidget(self.energy_res_spin)
+        energy_res_row.addStretch()
+        layout.addLayout(energy_res_row)
+
+        # Spatial resolution
+        space_res_row = QHBoxLayout()
+        space_res_label = QLabel("Spatial resolution (m):")
+        space_res_label.setFixedWidth(250)
+        space_res_label.setFont(QFont('Microsoft YaHei', 11))
+        space_res_label.setStyleSheet(f"color: {self.colors['text_dark']};")
+        self.space_res_spin = QDoubleSpinBox()
+        self.space_res_spin.setRange(1e-12, 1e-6)
+        self.space_res_spin.setValue(self.space_resolution)
+        self.space_res_spin.setDecimals(12)
+        self.space_res_spin.setSingleStep(1e-9)
+        self.space_res_spin.setStyleSheet(self.get_spinbox_style())
+        space_res_row.addWidget(space_res_label)
+        space_res_row.addWidget(self.space_res_spin)
+        space_res_row.addStretch()
+        layout.addLayout(space_res_row)
+
+        group.setLayout(layout)
+        parent_layout.addWidget(group)
+
+    def setup_array_dimensions(self, parent_layout):
+        """Setup array dimensions section"""
+        group = self.create_group_box("📐 Array Dimensions")
+        layout = QVBoxLayout()
+
+        dims_row = QHBoxLayout()
+
+        # N1
+        n1_label = QLabel("N1:")
+        n1_label.setFixedWidth(50)
+        n1_label.setFont(QFont('Microsoft YaHei', 11))
+        n1_label.setStyleSheet(f"color: {self.colors['text_dark']};")
+        self.n1_spin = QSpinBox()
+        self.n1_spin.setRange(1, 10000)
+        self.n1_spin.setValue(self.N1)
+        self.n1_spin.setStyleSheet(self.get_spinbox_style())
+        dims_row.addWidget(n1_label)
+        dims_row.addWidget(self.n1_spin)
+
+        # N2
+        n2_label = QLabel("N2:")
+        n2_label.setFixedWidth(50)
+        n2_label.setFont(QFont('Microsoft YaHei', 11))
+        n2_label.setStyleSheet(f"color: {self.colors['text_dark']};")
+        self.n2_spin = QSpinBox()
+        self.n2_spin.setRange(1, 10000)
+        self.n2_spin.setValue(self.N2)
+        self.n2_spin.setStyleSheet(self.get_spinbox_style())
+        dims_row.addWidget(n2_label)
+        dims_row.addWidget(self.n2_spin)
+
+        # N3
+        n3_label = QLabel("N3:")
+        n3_label.setFixedWidth(50)
+        n3_label.setFont(QFont('Microsoft YaHei', 11))
+        n3_label.setStyleSheet(f"color: {self.colors['text_dark']};")
+        self.n3_spin = QSpinBox()
+        self.n3_spin.setRange(1, 10000)
+        self.n3_spin.setValue(self.N3)
+        self.n3_spin.setStyleSheet(self.get_spinbox_style())
+        dims_row.addWidget(n3_label)
+        dims_row.addWidget(self.n3_spin)
+
+        dims_row.addStretch()
+        layout.addLayout(dims_row)
+
+        group.setLayout(layout)
+        parent_layout.addWidget(group)
+
+    def setup_angles(self, parent_layout):
+        """Setup detector angles section"""
+        group = self.create_group_box("📐 Detector Angles")
+        layout = QVBoxLayout()
+
+        # Delta (elevation) and Gamma (azimuth) in one row
+        angles_row = QHBoxLayout()
+        
+        # Delta (elevation)
+        delta_label = QLabel("Detector elevation δ (deg):")
+        delta_label.setFixedWidth(210)
+        delta_label.setFont(QFont('Microsoft YaHei', 11))
+        delta_label.setStyleSheet(f"color: {self.colors['text_dark']};")
+        self.delta_spin = QDoubleSpinBox()
+        self.delta_spin.setRange(-180.0, 180.0)
+        self.delta_spin.setValue(self.delta)
+        self.delta_spin.setDecimals(3)
+        self.delta_spin.setSingleStep(0.1)
+        self.delta_spin.setStyleSheet(self.get_spinbox_style())
+        angles_row.addWidget(delta_label)
+        angles_row.addWidget(self.delta_spin)
+        
+        angles_row.addSpacing(30)
+        
+        # Gamma (azimuth)
+        gamma_label = QLabel("Detector azimuth γ (deg):")
+        gamma_label.setFixedWidth(210)
+        gamma_label.setFont(QFont('Microsoft YaHei', 11))
+        gamma_label.setStyleSheet(f"color: {self.colors['text_dark']};")
+        self.gamma_spin = QDoubleSpinBox()
+        self.gamma_spin.setRange(-180.0, 180.0)
+        self.gamma_spin.setValue(self.gamma)
+        self.gamma_spin.setDecimals(3)
+        self.gamma_spin.setSingleStep(0.1)
+        self.gamma_spin.setStyleSheet(self.get_spinbox_style())
+        angles_row.addWidget(gamma_label)
+        angles_row.addWidget(self.gamma_spin)
+        
+        angles_row.addStretch()
+        layout.addLayout(angles_row)
+
+        group.setLayout(layout)
+        parent_layout.addWidget(group)
+
+    def calculate(self):
+        """Perform calculations and display results"""
+        try:
+            # Get values from spinboxes
+            E_keV = self.energy_spin.value()
+            a_angstrom = self.lattice_spin.value()
+            h = self.h_spin.value()
+            k = self.k_spin.value()
+            l = self.l_spin.value()
+            x_det = self.pixel_spin.value()
+            sigma = self.sigma_spin.value()
+            sample_size = self.sample_spin.value()
+            D = self.beam_spin.value()
+            energy_resolution = self.energy_res_spin.value()
+            space_resolution = self.space_res_spin.value()
+            N1 = self.n1_spin.value()
+            N2 = self.n2_spin.value()
+            N3 = self.n3_spin.value()
+            delta = self.delta_spin.value()
+            gamma = self.gamma_spin.value()
+
+            # Convert keV → λ
+            lambda_ = 1.24e-9 / E_keV
+
+            # d_spacing
+            d_spacing = self.d_fcc(a_angstrom * 1e-10, h, k, l)
+
+            # Bragg angle
+            theta_deg = self.bragg_theta(lambda_, d_spacing, deg=True)
+
+            # Calculations
+            L_min = (x_det * sigma * sample_size) / lambda_
+            delta_omega = lambda_ / (2 * np.sin(np.radians(theta_deg / 2)) * sample_size * sigma) * (180 / np.pi)
+            L_T = (lambda_ / 2) * (L_min / D)
+            L_L = lambda_ / (2 * energy_resolution)
+            delta_q_speckle = (lambda_ * L_min) / sample_size
+            q_max = 1 / (2 * space_resolution)
+            delta_q = (2 * np.pi * x_det) / (L_min * lambda_)
+
+            # Matrix calculations (convert angles to radians)
+            delta_rad = np.radians(delta)
+            gamma_rad = np.radians(gamma)
+            Bdet = self.compute_Bdet(delta_rad, gamma_rad)
+            Brecip = self.compute_Brecip(x_det, D, delta_rad, gamma_rad, np.radians(delta_omega), lambda_)
+            Breal = self.compute_Breal(Brecip, N1, N2, N3)
+
+            # Format results
+            results = []
+            results.append("=" * 70)
+            results.append("CALCULATION RESULTS")
+            results.append("=" * 70)
+            results.append("")
+            results.append("Basic Parameters:")
+            results.append(f"  λ (wavelength) = {lambda_:.3e} m")
+            results.append(f"  d(hkl) = {d_spacing:.3e} m")
+            results.append(f"  θ (Bragg angle) = {theta_deg:.3f}°")
+            results.append("")
+            results.append("Coherence & Resolution:")
+            results.append(f"  L_min = {L_min:.3f} m")
+            results.append(f"  Δω = {delta_omega:.4f}°")
+            results.append(f"  L_T (Transverse coherence length) = {L_T*1e6:.3f} µm")
+            results.append(f"  L_L (Longitudinal coherence length) = {L_L*1e6:.3f} µm")
+            results.append(f"  Δq_speckle = {delta_q_speckle*1e6:.2f} µm")
+            results.append(f"  q_max = {q_max*1e-6:.2f} µm⁻¹")
+            results.append(f"  Δq = {delta_q*1e-9:.6f} nm⁻¹")
+            results.append("")
+            results.append("B_det (Detector matrix):")
+            results.append(self.format_matrix(Bdet))
+            results.append("")
+            results.append("B_recip (Reciprocal space matrix):")
+            results.append(self.format_matrix(Brecip))
+            results.append("")
+            results.append("B_real (Real space matrix):")
+            results.append(self.format_matrix(Breal))
+            results.append("")
+            results.append("=" * 70)
+
+            self.results_text.setPlainText("\n".join(results))
+
+        except Exception as e:
+            import traceback
+            error_msg = f"Error during calculation:\n\n{str(e)}\n\n{traceback.format_exc()}"
+            self.results_text.setPlainText(error_msg)
+
+    # -------------------
+    # Core Physics Functions
+    # -------------------
+    def bragg_theta(self, lambda_, d_spacing, n=1, deg=False):
+        """Calculate Bragg angle"""
+        sin_theta = n * lambda_ / (2 * d_spacing)
+        if sin_theta > 1:
+            raise ValueError("No solution: sin(theta) > 1, check wavelength and plane spacing")
+        theta = np.arcsin(sin_theta)
+        return np.degrees(theta) if deg else theta
+
+    def d_fcc(self, a, h, k, l):
+        """Calculate d-spacing for FCC lattice"""
+        return a / np.sqrt(h**2 + k**2 + l**2)
+
+    def compute_Bdet(self, delta, gamma):
+        """Compute detector matrix"""
+        cosd, sind = np.cos(delta), np.sin(delta)
+        cosg, sing = np.cos(gamma), np.sin(gamma)
+        Bdet = np.array([
+            [cosd, -sing*sind, cosg*sind],
+            [0, cosg, sing],
+            [-sind, -cosd*sing, cosd*cosg]
+        ])
+        return Bdet
+
+    def compute_Brecip(self, P, D, delta, gamma, delta_theta, lambda_):
+        """Compute reciprocal space matrix"""
+        cosd, sind = np.cos(delta), np.sin(delta)
+        cosg, sing = np.cos(gamma), np.sin(gamma)
+        Brecip = np.array([
+            [P/(lambda_*D)*cosd, -P/(lambda_*D)*sing*sind, delta_theta/lambda_*(1 - cosg*cosd)],
+            [0, P/(lambda_*D)*cosg, 0],
+            [-P/(lambda_*D)*sind, -P/(lambda_*D)*cosd*sing, delta_theta/lambda_*cosg*sind]
+        ])
+        return Brecip
+
+    def compute_Breal(self, Brecip, N1, N2, N3):
+        """Compute real space matrix"""
+        D_inv = np.diag([1/N1, 1/N2, 1/N3])
+        Breal = np.linalg.inv(Brecip.T) @ D_inv
+        return Breal
+
+    def format_matrix(self, matrix):
+        """Format numpy matrix for display"""
+        lines = []
+        for row in matrix:
+            formatted_row = "  [" + "  ".join([f"{val:12.6e}" for val in row]) + "]"
+            lines.append(formatted_row)
+        return "\n".join(lines)
 
     def get_spinbox_style(self):
-        """Get style for spinboxes"""
+        """Get style for spinboxes without buttons"""
         return f"""
             QSpinBox, QDoubleSpinBox {{
-                padding: 5px;
+                padding: 6px;
                 border: 2px solid {self.colors['border']};
                 border-radius: 5px;
                 background-color: white;
                 color: {self.colors['text_dark']};
                 min-width: 150px;
+                font-family: 'Microsoft YaHei';
+                font-size: 11pt;
             }}
             QSpinBox:focus, QDoubleSpinBox:focus {{
                 border: 2px solid {self.colors['primary']};
             }}
-        """
-
-    def get_combo_style(self):
-        """Get style for combo boxes"""
-        return f"""
-            QComboBox {{
-                padding: 8px;
-                border: 2px solid {self.colors['border']};
-                border-radius: 5px;
-                background-color: white;
-                color: {self.colors['text_dark']};
-                font-size: 10pt;
-            }}
-            QComboBox:focus {{
-                border: 2px solid {self.colors['primary']};
-            }}
-            QComboBox::drop-down {{
+            QSpinBox::up-button, QDoubleSpinBox::up-button {{
+                width: 0px;
                 border: none;
-                width: 30px;
             }}
-            QComboBox::down-arrow {{
-                image: none;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 5px solid {self.colors['text_dark']};
-                margin-right: 10px;
+            QSpinBox::down-button, QDoubleSpinBox::down-button {{
+                width: 0px;
+                border: none;
             }}
         """
 
