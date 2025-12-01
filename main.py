@@ -15,6 +15,7 @@ from powder_module import PowderXRDModule
 from radial_module import AzimuthalIntegrationModule
 from single_crystal_module import SingleCrystalModule
 from bcdi_cal_module import BCDICalModule
+from dioptas_module import DioptasModule
 
 
 class XRDProcessingGUI(QMainWindow, GUIBase):
@@ -50,13 +51,15 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         self.radial_module = None
         self.single_crystal_module = None
         self.bcdi_cal_module = None
+        self.dioptas_module = None
 
         # Containers for each module (prebuilt and stacked to avoid flicker)
         self.module_frames = {
             "powder": None,
             "single": None,
             "radial": None,
-            "bcdi_cal": None
+            "bcdi_cal": None,
+            "dioptas": None
         }
         
         # Tool windows (embedded in right panel)
@@ -141,6 +144,9 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
 
         self.bcdi_cal_btn = self.create_sidebar_button("🔬  BCDI Calibration", lambda: self.switch_tab("bcdi_cal"), is_active=False)
         sidebar_layout.addWidget(self.bcdi_cal_btn)
+
+        self.dioptas_btn = self.create_sidebar_button("💎  Dioptas", lambda: self.switch_tab("dioptas"), is_active=False)
+        sidebar_layout.addWidget(self.dioptas_btn)
 
         # Add separator line
         separator = QFrame()
@@ -378,7 +384,8 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             "powder": self.powder_btn,
             "radial": self.radial_btn,
             "single": self.single_btn,
-            "bcdi_cal": self.bcdi_cal_btn
+            "bcdi_cal": self.bcdi_cal_btn,
+            "dioptas": self.dioptas_btn
         }
         
         for tab_name, button in buttons.items():
@@ -504,6 +511,12 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             self.bcdi_cal_module = BCDICalModule(bcdi_cal_frame, self)
             self.bcdi_cal_module.setup_ui()
         bcdi_cal_frame.hide()  # Ensure hidden after prebuild
+        
+        dioptas_frame = self._ensure_frame("dioptas")
+        if self.dioptas_module is None:
+            self.dioptas_module = DioptasModule(dioptas_frame, self)
+            self.dioptas_module.setup_ui()
+        dioptas_frame.hide()  # Ensure hidden after prebuild
     
     def prebuild_interactive_windows(self):
         """Prebuild interactive tool windows in background to avoid flash on first open"""
@@ -576,6 +589,12 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             if self.bcdi_cal_module is None:
                 self.bcdi_cal_module = BCDICalModule(target_frame, self)
                 self.bcdi_cal_module.setup_ui()
+
+        elif tab_name == "dioptas":
+            target_frame = self._ensure_frame("dioptas")
+            if self.dioptas_module is None:
+                self.dioptas_module = DioptasModule(target_frame, self)
+                self.dioptas_module.setup_ui()
 
         if target_frame is not None:
             target_frame.show()
