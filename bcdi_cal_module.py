@@ -79,14 +79,14 @@ class BCDICalModule(GUIBase):
 
         # Title section
         title_label = QLabel("📐 FCC Bragg & Coherence Calculator")
-        title_label.setFont(QFont('Arial', 18, QFont.Weight.Bold))
+        title_label.setFont(QFont('Microsoft YaHei', 19, QFont.Weight.Bold))
         title_label.setStyleSheet(f"color: {self.colors['primary']}; padding: 10px;")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         scroll_layout.addWidget(title_label)
 
         # Subtitle
         subtitle_label = QLabel("📷 Detector + Sampling Parameters")
-        subtitle_label.setFont(QFont('Arial', 13, QFont.Weight.Bold))
+        subtitle_label.setFont(QFont('Microsoft YaHei', 14, QFont.Weight.Bold))
         subtitle_label.setStyleSheet(f"color: {self.colors['text_dark']}; padding: 5px;")
         subtitle_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         scroll_layout.addWidget(subtitle_label)
@@ -138,12 +138,13 @@ class BCDICalModule(GUIBase):
                 border: 1px solid {self.colors['border']};
                 border-radius: 5px;
                 padding: 15px;
-                font-family: 'Consolas', 'Courier New', monospace;
-                font-size: 10pt;
+                font-family: 'Microsoft YaHei', 'Consolas', monospace;
+                font-size: 11pt;
                 line-height: 1.5;
             }}
         """)
-        self.results_text.setMinimumHeight(400)
+        self.results_text.setMinimumHeight(250)
+        self.results_text.setMaximumHeight(350)
         self.results_text.setPlaceholderText("Results will appear here after calculation...")
         results_layout.addWidget(self.results_text)
 
@@ -163,6 +164,7 @@ class BCDICalModule(GUIBase):
         energy_row = QHBoxLayout()
         energy_label = QLabel("Photon energy (keV):")
         energy_label.setFixedWidth(250)
+        energy_label.setFont(QFont('Microsoft YaHei', 11))
         energy_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.energy_spin = QDoubleSpinBox()
         self.energy_spin.setRange(0.1, 100.0)
@@ -179,6 +181,7 @@ class BCDICalModule(GUIBase):
         lattice_row = QHBoxLayout()
         lattice_label = QLabel("Lattice constant a (Å):")
         lattice_label.setFixedWidth(250)
+        lattice_label.setFont(QFont('Microsoft YaHei', 11))
         lattice_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.lattice_spin = QDoubleSpinBox()
         self.lattice_spin.setRange(0.1, 20.0)
@@ -204,6 +207,7 @@ class BCDICalModule(GUIBase):
         # h
         h_label = QLabel("h:")
         h_label.setFixedWidth(30)
+        h_label.setFont(QFont('Microsoft YaHei', 11))
         h_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.h_spin = QSpinBox()
         self.h_spin.setRange(-10, 10)
@@ -215,6 +219,7 @@ class BCDICalModule(GUIBase):
         # k
         k_label = QLabel("k:")
         k_label.setFixedWidth(30)
+        k_label.setFont(QFont('Microsoft YaHei', 11))
         k_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.k_spin = QSpinBox()
         self.k_spin.setRange(-10, 10)
@@ -226,6 +231,7 @@ class BCDICalModule(GUIBase):
         # l
         l_label = QLabel("l:")
         l_label.setFixedWidth(30)
+        l_label.setFont(QFont('Microsoft YaHei', 11))
         l_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.l_spin = QSpinBox()
         self.l_spin.setRange(-10, 10)
@@ -249,6 +255,7 @@ class BCDICalModule(GUIBase):
         pixel_row = QHBoxLayout()
         pixel_label = QLabel("Detector pixel size x_det (m):")
         pixel_label.setFixedWidth(250)
+        pixel_label.setFont(QFont('Microsoft YaHei', 11))
         pixel_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.pixel_spin = QDoubleSpinBox()
         self.pixel_spin.setRange(1e-9, 1e-3)
@@ -265,6 +272,7 @@ class BCDICalModule(GUIBase):
         sigma_row = QHBoxLayout()
         sigma_label = QLabel("Oversampling ratio σ:")
         sigma_label.setFixedWidth(250)
+        sigma_label.setFont(QFont('Microsoft YaHei', 11))
         sigma_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.sigma_spin = QDoubleSpinBox()
         self.sigma_spin.setRange(1.0, 100.0)
@@ -289,6 +297,7 @@ class BCDICalModule(GUIBase):
         sample_row = QHBoxLayout()
         sample_label = QLabel("Sample size (m):")
         sample_label.setFixedWidth(250)
+        sample_label.setFont(QFont('Microsoft YaHei', 11))
         sample_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.sample_spin = QDoubleSpinBox()
         self.sample_spin.setRange(1e-9, 1e-3)
@@ -305,6 +314,7 @@ class BCDICalModule(GUIBase):
         beam_row = QHBoxLayout()
         beam_label = QLabel("Beam spot size D (m):")
         beam_label.setFixedWidth(250)
+        beam_label.setFont(QFont('Microsoft YaHei', 11))
         beam_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.beam_spin = QDoubleSpinBox()
         self.beam_spin.setRange(1e-9, 1e-3)
@@ -321,6 +331,7 @@ class BCDICalModule(GUIBase):
         energy_res_row = QHBoxLayout()
         energy_res_label = QLabel("Energy resolution Δλ/λ:")
         energy_res_label.setFixedWidth(250)
+        energy_res_label.setFont(QFont('Microsoft YaHei', 11))
         energy_res_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.energy_res_spin = QDoubleSpinBox()
         self.energy_res_spin.setRange(1e-6, 1e-2)
@@ -337,6 +348,7 @@ class BCDICalModule(GUIBase):
         space_res_row = QHBoxLayout()
         space_res_label = QLabel("Spatial resolution (m):")
         space_res_label.setFixedWidth(250)
+        space_res_label.setFont(QFont('Microsoft YaHei', 11))
         space_res_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.space_res_spin = QDoubleSpinBox()
         self.space_res_spin.setRange(1e-12, 1e-6)
@@ -362,6 +374,7 @@ class BCDICalModule(GUIBase):
         # N1
         n1_label = QLabel("N1:")
         n1_label.setFixedWidth(50)
+        n1_label.setFont(QFont('Microsoft YaHei', 11))
         n1_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.n1_spin = QSpinBox()
         self.n1_spin.setRange(1, 10000)
@@ -373,6 +386,7 @@ class BCDICalModule(GUIBase):
         # N2
         n2_label = QLabel("N2:")
         n2_label.setFixedWidth(50)
+        n2_label.setFont(QFont('Microsoft YaHei', 11))
         n2_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.n2_spin = QSpinBox()
         self.n2_spin.setRange(1, 10000)
@@ -384,6 +398,7 @@ class BCDICalModule(GUIBase):
         # N3
         n3_label = QLabel("N3:")
         n3_label.setFixedWidth(50)
+        n3_label.setFont(QFont('Microsoft YaHei', 11))
         n3_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.n3_spin = QSpinBox()
         self.n3_spin.setRange(1, 10000)
@@ -407,6 +422,7 @@ class BCDICalModule(GUIBase):
         delta_row = QHBoxLayout()
         delta_label = QLabel("Detector elevation δ (deg):")
         delta_label.setFixedWidth(250)
+        delta_label.setFont(QFont('Microsoft YaHei', 11))
         delta_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.delta_spin = QDoubleSpinBox()
         self.delta_spin.setRange(-180.0, 180.0)
@@ -423,6 +439,7 @@ class BCDICalModule(GUIBase):
         gamma_row = QHBoxLayout()
         gamma_label = QLabel("Detector azimuth γ (deg):")
         gamma_label.setFixedWidth(250)
+        gamma_label.setFont(QFont('Microsoft YaHei', 11))
         gamma_label.setStyleSheet(f"color: {self.colors['text_dark']};")
         self.gamma_spin = QDoubleSpinBox()
         self.gamma_spin.setRange(-180.0, 180.0)
@@ -574,7 +591,7 @@ class BCDICalModule(GUIBase):
         return "\n".join(lines)
 
     def get_spinbox_style(self):
-        """Get style for spinboxes"""
+        """Get style for spinboxes with beautiful arrows"""
         return f"""
             QSpinBox, QDoubleSpinBox {{
                 padding: 6px;
@@ -583,10 +600,49 @@ class BCDICalModule(GUIBase):
                 background-color: white;
                 color: {self.colors['text_dark']};
                 min-width: 150px;
-                font-size: 10pt;
+                font-family: 'Microsoft YaHei';
+                font-size: 11pt;
             }}
             QSpinBox:focus, QDoubleSpinBox:focus {{
                 border: 2px solid {self.colors['primary']};
+            }}
+            QSpinBox::up-button, QDoubleSpinBox::up-button {{
+                subcontrol-origin: border;
+                subcontrol-position: top right;
+                width: 20px;
+                border-left: 1px solid {self.colors['border']};
+                border-bottom: 1px solid {self.colors['border']};
+                border-top-right-radius: 4px;
+                background-color: {self.colors['card_bg']};
+            }}
+            QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {{
+                background-color: {self.colors['light_purple']};
+            }}
+            QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
+                width: 0;
+                height: 0;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-bottom: 7px solid {self.colors['text_dark']};
+            }}
+            QSpinBox::down-button, QDoubleSpinBox::down-button {{
+                subcontrol-origin: border;
+                subcontrol-position: bottom right;
+                width: 20px;
+                border-left: 1px solid {self.colors['border']};
+                border-top: 1px solid {self.colors['border']};
+                border-bottom-right-radius: 4px;
+                background-color: {self.colors['card_bg']};
+            }}
+            QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
+                background-color: {self.colors['light_purple']};
+            }}
+            QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
+                width: 0;
+                height: 0;
+                border-left: 5px solid transparent;
+                border-right: 5px solid transparent;
+                border-top: 7px solid {self.colors['text_dark']};
             }}
         """
 
