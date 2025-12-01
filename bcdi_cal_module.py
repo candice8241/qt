@@ -145,8 +145,7 @@ class BCDICalModule(GUIBase):
         self.csv_file_entry = QLineEdit()
         self.csv_file_entry.setPlaceholderText("Select CSV file containing peak data...")
         self.csv_file_entry.setStyleSheet(self.get_input_style())
-        csv_browse_btn = ModernButton("Browse", self.colors)
-        csv_browse_btn.clicked.connect(self.browse_csv_file)
+        csv_browse_btn = ModernButton("Browse", self.browse_csv_file)
         csv_row.addWidget(csv_label)
         csv_row.addWidget(self.csv_file_entry)
         csv_row.addWidget(csv_browse_btn)
@@ -293,9 +292,8 @@ class BCDICalModule(GUIBase):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
-        self.run_analysis_btn = ModernButton("🚀 Run Analysis", self.colors, primary=True)
+        self.run_analysis_btn = ModernButton("🚀 Run Analysis", self.run_analysis)
         self.run_analysis_btn.setFixedHeight(50)
-        self.run_analysis_btn.clicked.connect(self.run_analysis)
         button_layout.addWidget(self.run_analysis_btn)
 
         button_layout.addStretch()
