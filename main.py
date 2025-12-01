@@ -16,7 +16,6 @@ from radial_module import AzimuthalIntegrationModule
 from single_crystal_module import SingleCrystalModule
 from bcdi_cal_module import BCDICalModule
 from dioptas_module import DioptasModule
-from eosfit_module import EoSFitModule
 
 
 class XRDProcessingGUI(QMainWindow, GUIBase):
@@ -53,7 +52,6 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         self.single_crystal_module = None
         self.bcdi_cal_module = None
         self.dioptas_module = None
-        self.eosfit_module = None
 
         # Containers for each module (prebuilt and stacked to avoid flicker)
         self.module_frames = {
@@ -61,8 +59,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             "single": None,
             "radial": None,
             "bcdi_cal": None,
-            "dioptas": None,
-            "eosfit": None
+            "dioptas": None
         }
         
         # Tool windows (embedded in right panel)
@@ -144,9 +141,6 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
 
         self.dioptas_btn = self.create_sidebar_button("💎  Dioptas", lambda: self.switch_tab("dioptas"), is_active=False)
         sidebar_layout.addWidget(self.dioptas_btn)
-        
-        self.eosfit_module_btn = self.create_sidebar_button("📐  EoSFit", lambda: self.switch_tab("eosfit"), is_active=False)
-        sidebar_layout.addWidget(self.eosfit_module_btn)
 
         # Curve Fitting button
         self.curvefit_btn = self.create_sidebar_button("📈  curvefit", self.open_curvefit, is_active=False)
@@ -343,9 +337,8 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             "single": self.single_btn,
             "bcdi_cal": self.bcdi_cal_btn,
             "dioptas": self.dioptas_btn,
-            "eosfit": self.eosfit_module_btn,
             "curvefit": self.curvefit_btn,
-            "EOSfit": self.EOSfit_btn
+            "eosfit": self.EOSfit_btn
         }
         
         for tab_name, button in buttons.items():
@@ -438,12 +431,6 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             self.dioptas_module = DioptasModule(dioptas_frame, self)
             self.dioptas_module.setup_ui()
         dioptas_frame.hide()  # Ensure hidden after prebuild
-        
-        eosfit_frame = self._ensure_frame("eosfit")
-        if self.eosfit_module is None:
-            self.eosfit_module = EoSFitModule(eosfit_frame, self)
-            self.eosfit_module.setup_ui()
-        eosfit_frame.hide()  # Ensure hidden after prebuild
     
     def prebuild_interactive_windows(self):
         """Prebuild interactive tool windows in background to avoid flash on first open"""
@@ -520,12 +507,6 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             if self.dioptas_module is None:
                 self.dioptas_module = DioptasModule(target_frame, self)
                 self.dioptas_module.setup_ui()
-
-        elif tab_name == "eosfit":
-            target_frame = self._ensure_frame("eosfit")
-            if self.eosfit_module is None:
-                self.eosfit_module = EoSFitModule(target_frame, self)
-                self.eosfit_module.setup_ui()
 
         if target_frame is not None:
             target_frame.show()
