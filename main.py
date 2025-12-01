@@ -114,7 +114,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
 
         # LEFT SIDEBAR - Navigation
         sidebar_frame = QFrame()
-        sidebar_frame.setFixedWidth(220)
+        sidebar_frame.setFixedWidth(180)
         sidebar_frame.setStyleSheet(f"""
             QFrame {{
                 background-color: {self.colors['card_bg']};
@@ -126,23 +126,17 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         sidebar_layout.setSpacing(10)
         sidebar_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
-        # Sidebar title
-        sidebar_title = QLabel("Modules")
-        sidebar_title.setFont(QFont('Arial', 12, QFont.Weight.Bold))
-        sidebar_title.setStyleSheet(f"color: {self.colors['primary']}; background-color: {self.colors['card_bg']}; padding: 5px;")
-        sidebar_layout.addWidget(sidebar_title)
-
         # Create navigation buttons (store references for state management)
-        self.powder_btn = self.create_sidebar_button("⚗️  Powder XRD", lambda: self.switch_tab("powder"), is_active=True)
+        self.powder_btn = self.create_sidebar_button("⚗️  Powder Inte.", lambda: self.switch_tab("powder"), is_active=True)
         sidebar_layout.addWidget(self.powder_btn)
 
-        self.radial_btn = self.create_sidebar_button("🔄  Radial XRD", lambda: self.switch_tab("radial"), is_active=False)
+        self.radial_btn = self.create_sidebar_button("🔄  Radial Inte.", lambda: self.switch_tab("radial"), is_active=False)
         sidebar_layout.addWidget(self.radial_btn)
 
-        self.single_btn = self.create_sidebar_button("🔬  Single Crystal", lambda: self.switch_tab("single"), is_active=False)
+        self.single_btn = self.create_sidebar_button("🔬  SC", lambda: self.switch_tab("single"), is_active=False)
         sidebar_layout.addWidget(self.single_btn)
 
-        self.bcdi_cal_btn = self.create_sidebar_button("🔬  BCDI Calibration", lambda: self.switch_tab("bcdi_cal"), is_active=False)
+        self.bcdi_cal_btn = self.create_sidebar_button("🔬  BCDI Cal", lambda: self.switch_tab("bcdi_cal"), is_active=False)
         sidebar_layout.addWidget(self.bcdi_cal_btn)
 
         self.dioptas_btn = self.create_sidebar_button("💎  Dioptas", lambda: self.switch_tab("dioptas"), is_active=False)
@@ -154,12 +148,6 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         separator.setStyleSheet(f"background-color: {self.colors['border']};")
         separator.setFixedHeight(2)
         sidebar_layout.addWidget(separator)
-
-        # Tools section
-        tools_title = QLabel("Tools")
-        tools_title.setFont(QFont('Arial', 11, QFont.Weight.Bold))
-        tools_title.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']}; padding: 5px; padding-top: 10px;")
-        sidebar_layout.addWidget(tools_title)
 
         # Curve Fitting button
         self.curve_fitting_btn = self.create_sidebar_tool_button("📈  Curve Fitting", self.open_curve_fitting)
