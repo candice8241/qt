@@ -116,8 +116,8 @@ class BCDICalModule(GUIBase):
         button_layout.addStretch()
         
         calc_btn = ModernButton("🧮 Calculate", self.calculate,
-                               bg_color='#9D4EDD',
-                               hover_color='#C77DFF',
+                               bg_color='#DBE3F9',
+                               hover_color='#C5D3F0',
                                width=250, height=50,
                                font_size=12,
                                parent=button_container)
@@ -591,7 +591,7 @@ class BCDICalModule(GUIBase):
         return "\n".join(lines)
 
     def get_spinbox_style(self):
-        """Get style for spinboxes with beautiful arrows"""
+        """Get style for spinboxes without buttons"""
         return f"""
             QSpinBox, QDoubleSpinBox {{
                 padding: 6px;
@@ -607,42 +607,12 @@ class BCDICalModule(GUIBase):
                 border: 2px solid {self.colors['primary']};
             }}
             QSpinBox::up-button, QDoubleSpinBox::up-button {{
-                subcontrol-origin: border;
-                subcontrol-position: top right;
-                width: 20px;
-                border-left: 1px solid {self.colors['border']};
-                border-bottom: 1px solid {self.colors['border']};
-                border-top-right-radius: 4px;
-                background-color: {self.colors['card_bg']};
-            }}
-            QSpinBox::up-button:hover, QDoubleSpinBox::up-button:hover {{
-                background-color: {self.colors['light_purple']};
-            }}
-            QSpinBox::up-arrow, QDoubleSpinBox::up-arrow {{
-                width: 0;
-                height: 0;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-bottom: 7px solid {self.colors['text_dark']};
+                width: 0px;
+                border: none;
             }}
             QSpinBox::down-button, QDoubleSpinBox::down-button {{
-                subcontrol-origin: border;
-                subcontrol-position: bottom right;
-                width: 20px;
-                border-left: 1px solid {self.colors['border']};
-                border-top: 1px solid {self.colors['border']};
-                border-bottom-right-radius: 4px;
-                background-color: {self.colors['card_bg']};
-            }}
-            QSpinBox::down-button:hover, QDoubleSpinBox::down-button:hover {{
-                background-color: {self.colors['light_purple']};
-            }}
-            QSpinBox::down-arrow, QDoubleSpinBox::down-arrow {{
-                width: 0;
-                height: 0;
-                border-left: 5px solid transparent;
-                border-right: 5px solid transparent;
-                border-top: 7px solid {self.colors['text_dark']};
+                width: 0px;
+                border: none;
             }}
         """
 
