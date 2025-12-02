@@ -552,9 +552,13 @@ class BatchIntegrator:
                     continue
 
                 print(f"  Generating stacked plot for pressure {pressure:.2f} GPa ({len(file_list)} files)...")
+                # Determine if this is unloading data based on first file
+                first_file = file_list[0][0]
+                _, is_unload = self._extract_pressure(first_file)
+                prefix = 'd' if is_unload else ''
                 self._create_single_pressure_stacked_plot(
                     pressure, file_list, output_dir, offset,
-                    f'stacked_plot_{pressure:.2f}GPa.png'
+                    f'stacked_plot_{prefix}{pressure:.3f}GPa.png'
                 )
         else:
             # Mode 2: Original logic - all pressures in one plot
