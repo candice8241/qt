@@ -55,6 +55,13 @@ class MaskModule(GUIBase):
         self.polygon_points = []
         self.temp_shape = None  # Temporary shape being drawn
         self.preview_artists = []  # Store preview shapes for faster update
+        
+        # Performance optimization - cache computed image
+        self.cached_image = None
+        self.cached_contrast = None
+        self.cached_vmin = None
+        self.cached_vmax = None
+        self.last_preview_update = 0  # Throttle preview updates
 
     def setup_ui(self):
         """Setup UI components"""
@@ -453,11 +460,11 @@ class MaskModule(GUIBase):
         # Canvas and contrast slider layout
         canvas_layout = QHBoxLayout()
         
-        # Matplotlib canvas - Full size
-        self.figure = Figure(figsize=(10, 7))
+        # Matplotlib canvas - Compact size to fit in one page
+        self.figure = Figure(figsize=(8, 5.5))
         self.figure.subplots_adjust(left=0.08, right=0.98, top=0.96, bottom=0.08)
         self.canvas = FigureCanvas(self.figure)
-        self.canvas.setMinimumSize(800, 600)
+        self.canvas.setFixedSize(800, 550)  # Fixed size to ensure fit in one page
         canvas_layout.addWidget(self.canvas)
         
         # Vertical contrast slider
@@ -474,7 +481,7 @@ class MaskModule(GUIBase):
         self.contrast_slider.setMinimum(1)
         self.contrast_slider.setMaximum(100)
         self.contrast_slider.setValue(50)
-        self.contrast_slider.setFixedHeight(400)
+        self.contrast_slider.setFixedHeight(350)
         self.contrast_slider.setFixedWidth(30)
         self.contrast_slider.setStyleSheet("""
             QSlider::groove:vertical {
@@ -734,25 +741,92 @@ class MaskModule(GUIBase):
             QMessageBox.warning(self.root, "Warning", "scipy not available for mask operations")
 
     def on_contrast_changed(self, value):
-        """Handle contrast slider change"""
+        """Handle contrast slider change - with forced recalc"""
         self.contrast_label.setText(f"{value}%")
         if self.image_data is not None:
-            self.update_display()
+            # Force recalculation since contrast changed
+            self.update_display(force_recalc=True)
+    
+    def on_scroll(self, event):
+        """Handle mouse wheel scroll for zooming - Optimized"""
+        if event.inaxes != self.ax or self.image_data is None:
+            return
+        
+        # Get current axis limits
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+        
+        # Get mouse position in data coordinates
+        xdata = event.xdata
+        ydata = event.ydata
+        
+        if xdata is None or ydata is None:
+            return
+        
+        # Zoom factor - smaller for smoother zoom
+        zoom_factor = 1.15 if event.button == 'up' else 0.85
+        
+        # Calculate new limits centered on mouse position
+        x_range = xlim[1] - xlim[0]
+        y_range = ylim[1] - ylim[0]
+        
+        new_x_range = x_range / zoom_factor
+        new_y_range = y_range / zoom_factor
+        
+        # Calculate new limits
+        x_center_ratio = (xdata - xlim[0]) / x_range
+        y_center_ratio = (ydata - ylim[0]) / y_range
+        
+        new_xlim = [
+            xdata - new_x_range * x_center_ratio,
+            xdata + new_x_range * (1 - x_center_ratio)
+        ]
+        new_ylim = [
+            ydata - new_y_range * y_center_ratio,
+            ydata + new_y_range * (1 - y_center_ratio)
+        ]
+        
+        # Constrain to image bounds
+        new_xlim[0] = max(0, new_xlim[0])
+        new_xlim[1] = min(self.image_data.shape[1], new_xlim[1])
+        new_ylim[0] = max(0, new_ylim[0])
+        new_ylim[1] = min(self.image_data.shape[0], new_ylim[1])
+        
+        # Apply new limits - only update view, don't redraw everything
+        self.ax.set_xlim(new_xlim)
+        self.ax.set_ylim(new_ylim)
+        
+        # Fast update
+        self.canvas.draw_idle()
 
-    def update_display(self):
-        """Update image and mask display - Full redraw"""
+    def update_display(self, force_recalc=False):
+        """Update image and mask display - Full redraw with caching"""
         if self.image_data is None:
             return
 
         self.ax.clear()
-
-        # Apply log scale and contrast
-        img_display = np.log10(self.image_data + 1)
-        contrast_factor = self.contrast_slider.value() / 100.0
-        low_percentile = contrast_factor * 20
-        high_percentile = 100 - (1 - contrast_factor) * 5
-        vmin = np.percentile(img_display, low_percentile)
-        vmax = np.percentile(img_display, high_percentile)
+        
+        current_contrast = self.contrast_slider.value()
+        
+        # Use cached image if contrast hasn't changed
+        if (not force_recalc and self.cached_image is not None and 
+            self.cached_contrast == current_contrast):
+            img_display = self.cached_image
+            vmin, vmax = self.cached_vmin, self.cached_vmax
+        else:
+            # Apply log scale and contrast
+            img_display = np.log10(self.image_data + 1)
+            contrast_factor = current_contrast / 100.0
+            low_percentile = contrast_factor * 20
+            high_percentile = 100 - (1 - contrast_factor) * 5
+            vmin = np.percentile(img_display, low_percentile)
+            vmax = np.percentile(img_display, high_percentile)
+            
+            # Cache the result
+            self.cached_image = img_display
+            self.cached_contrast = current_contrast
+            self.cached_vmin = vmin
+            self.cached_vmax = vmax
         
         # Display image
         self.ax.imshow(img_display, cmap='viridis', origin='lower',
@@ -811,10 +885,10 @@ class MaskModule(GUIBase):
         if self.image_data is None:
             return
         
-        # Remove old preview artists
-        for artist in self.preview_artists:
+        # Remove old preview artists efficiently
+        while self.preview_artists:
+            artist = self.preview_artists.pop()
             artist.remove()
-        self.preview_artists = []
         
         # Draw new preview shapes
         if self.drawing and self.draw_start and self.draw_current:
@@ -822,7 +896,7 @@ class MaskModule(GUIBase):
                 radius = np.sqrt((self.draw_current[0] - self.draw_start[0])**2 + 
                                (self.draw_current[1] - self.draw_start[1])**2)
                 circle = Circle(self.draw_start, radius, fill=False, 
-                              edgecolor='yellow', linewidth=2, linestyle='--', animated=True)
+                              edgecolor='yellow', linewidth=1.5, linestyle='--')
                 self.ax.add_patch(circle)
                 self.preview_artists.append(circle)
             
@@ -832,15 +906,15 @@ class MaskModule(GUIBase):
                 width = x2 - x1
                 height = y2 - y1
                 rect = Rectangle((x1, y1), width, height, fill=False,
-                               edgecolor='yellow', linewidth=2, linestyle='--', animated=True)
+                               edgecolor='yellow', linewidth=1.5, linestyle='--')
                 self.ax.add_patch(rect)
                 self.preview_artists.append(rect)
         
-        # Use blit for fast update
+        # Use draw_idle for efficient update
         self.canvas.draw_idle()
 
     def on_mouse_move(self, event):
-        """Handle mouse move event"""
+        """Handle mouse move event - optimized with throttling"""
         if event.inaxes != self.ax or self.image_data is None:
             self.position_label.setText("Position: --")
             return
@@ -848,10 +922,18 @@ class MaskModule(GUIBase):
         x, y = int(event.xdata), int(event.ydata)
         self.position_label.setText(f"Position: ({x}, {y})")
         
-        # Update drawing preview - optimized
+        # Update drawing preview - throttled for better performance
         if self.drawing and self.draw_start is not None:
-            self.draw_current = (x, y)
-            self.update_preview_only()
+            import time
+            current_time = time.time()
+            # Throttle: Only update every 16ms (60 FPS)
+            if current_time - self.last_preview_update > 0.016:
+                self.draw_current = (x, y)
+                self.update_preview_only()
+                self.last_preview_update = current_time
+            else:
+                # Still update position for next draw
+                self.draw_current = (x, y)
 
     def on_mouse_press(self, event):
         """Handle mouse press event for drawing"""
@@ -1052,60 +1134,6 @@ class MaskModule(GUIBase):
                 # Cancel polygon
                 self.polygon_points = []
                 self.update_display()
-    
-    def on_contrast_changed(self, value):
-        """Handle contrast slider change"""
-        self.contrast_label.setText(f"{value}%")
-        if self.image_data is not None:
-            self.update_display()
-    
-    def on_scroll(self, event):
-        """Handle mouse wheel scroll for zooming"""
-        if event.inaxes != self.ax or self.image_data is None:
-            return
-        
-        # Get current axis limits
-        xlim = self.ax.get_xlim()
-        ylim = self.ax.get_ylim()
-        
-        # Get mouse position in data coordinates
-        xdata = event.xdata
-        ydata = event.ydata
-        
-        # Zoom factor
-        zoom_factor = 1.2 if event.button == 'up' else 0.8
-        
-        # Calculate new limits centered on mouse position
-        x_range = xlim[1] - xlim[0]
-        y_range = ylim[1] - ylim[0]
-        
-        new_x_range = x_range / zoom_factor
-        new_y_range = y_range / zoom_factor
-        
-        # Calculate new limits
-        x_center_ratio = (xdata - xlim[0]) / x_range
-        y_center_ratio = (ydata - ylim[0]) / y_range
-        
-        new_xlim = [
-            xdata - new_x_range * x_center_ratio,
-            xdata + new_x_range * (1 - x_center_ratio)
-        ]
-        new_ylim = [
-            ydata - new_y_range * y_center_ratio,
-            ydata + new_y_range * (1 - y_center_ratio)
-        ]
-        
-        # Constrain to image bounds
-        new_xlim[0] = max(0, new_xlim[0])
-        new_xlim[1] = min(self.image_data.shape[1], new_xlim[1])
-        new_ylim[0] = max(0, new_ylim[0])
-        new_ylim[1] = min(self.image_data.shape[0], new_ylim[1])
-        
-        # Apply new limits
-        self.ax.set_xlim(new_xlim)
-        self.ax.set_ylim(new_ylim)
-        
-        self.canvas.draw_idle()
 
 
 # Test code
