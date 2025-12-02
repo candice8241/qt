@@ -406,7 +406,7 @@ class MaskModule(GUIBase):
     def load_image(self):
         """Load diffraction image for mask creation"""
         file_path, _ = QFileDialog.getOpenFileName(
-            self,
+            self.root,
             "Select Diffraction Image",
             "",
             "Image Files (*.tif *.tiff *.edf *.h5 *.hdf5);;All Files (*)"
@@ -444,7 +444,7 @@ class MaskModule(GUIBase):
                     self.image_data = np.array(img)
 
             if self.image_data is None:
-                QMessageBox.warning(self, "Error", "Could not load image data")
+                QMessageBox.warning(self.root, "Error", "Could not load image data")
                 return
 
             # Initialize mask if not exists
@@ -459,12 +459,12 @@ class MaskModule(GUIBase):
             self.update_display()
 
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to load image:\n{str(e)}")
+            QMessageBox.critical(self.root, "Error", f"Failed to load image:\n{str(e)}")
 
     def load_mask(self):
         """Load existing mask file"""
         file_path, _ = QFileDialog.getOpenFileName(
-            self,
+            self.root,
             "Select Mask File",
             "",
             "Mask Files (*.npy *.edf *.tif *.tiff);;All Files (*)"
@@ -489,16 +489,16 @@ class MaskModule(GUIBase):
             self.update_display()
 
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to load mask:\n{str(e)}")
+            QMessageBox.critical(self.root, "Error", f"Failed to load mask:\n{str(e)}")
 
     def save_mask(self):
         """Save current mask"""
         if self.current_mask is None:
-            QMessageBox.warning(self, "Warning", "No mask to save")
+            QMessageBox.warning(self.root, "Warning", "No mask to save")
             return
 
         file_path, _ = QFileDialog.getSaveFileName(
-            self,
+            self.root,
             "Save Mask",
             "",
             "NumPy Array (*.npy);;EDF File (*.edf);;TIFF File (*.tif)"
@@ -518,15 +518,15 @@ class MaskModule(GUIBase):
                 mask_img.write(file_path)
 
             self.mask_file_path = file_path
-            QMessageBox.information(self, "Success", f"Mask saved to:\n{file_path}")
+            QMessageBox.information(self.root, "Success", f"Mask saved to:\n{file_path}")
 
         except Exception as e:
-            QMessageBox.critical(self, "Error", f"Failed to save mask:\n{str(e)}")
+            QMessageBox.critical(self.root, "Error", f"Failed to save mask:\n{str(e)}")
 
     def clear_mask(self):
         """Clear current mask"""
         reply = QMessageBox.question(
-            self, 'Confirm', 'Clear all mask regions?',
+            self.root, 'Confirm', 'Clear all mask regions?',
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
         )
         
@@ -542,7 +542,7 @@ class MaskModule(GUIBase):
 
     def apply_current_tool(self):
         """Apply current drawing tool"""
-        QMessageBox.information(self, "Info", f"Tool '{self.tool_combo.currentText()}' applied")
+        QMessageBox.information(self.root, "Info", f"Tool '{self.tool_combo.currentText()}' applied")
 
     def on_contrast_changed(self, value):
         """Handle contrast slider change"""
