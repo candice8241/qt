@@ -433,11 +433,11 @@ class MaskModule(GUIBase):
         canvas_layout = QHBoxLayout()
         canvas_layout.addStretch(1)  # Left spacer for centering
         
-        # Matplotlib canvas - Very large for h5 images
-        self.figure = Figure(figsize=(14, 8))
+        # Matplotlib canvas - Large for h5 images, no horizontal scroll
+        self.figure = Figure(figsize=(13, 8))
         self.figure.subplots_adjust(left=0.05, right=0.98, top=0.97, bottom=0.06)
         self.canvas = FigureCanvas(self.figure)
-        self.canvas.setFixedSize(1400, 800)  # Very large canvas for better viewing
+        self.canvas.setFixedSize(1300, 800)  # Large canvas without horizontal scroll
         canvas_layout.addWidget(self.canvas)
         
         # Vertical contrast slider
