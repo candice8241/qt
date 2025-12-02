@@ -33,6 +33,8 @@ from PyQt6.QtWidgets import (QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushBut
 from PyQt6.QtCore import Qt, QObject, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
 import threading
+import subprocess
+import sys
 import os
 from gui_base import GUIBase
 from theme_module import CuteSheepProgressBar, ModernButton
@@ -960,7 +962,7 @@ class PowderXRDModule(GUIBase):
 
     # Functionality methods
     def run_integration(self):
-        """Run batch integration"""
+        """Run batch integration using subprocess (isolated process)"""
         try:
             # Validate inputs
             if not self.poni_path:
@@ -978,7 +980,7 @@ class PowderXRDModule(GUIBase):
                 self.show_error("Error", f"PONI file not found: {self.poni_path}")
                 return
             
-            # Collect output formats first
+            # Collect output formats
             formats = []
             if self.format_xy:
                 formats.append('xy')
@@ -1005,9 +1007,9 @@ class PowderXRDModule(GUIBase):
             }
             unit_pyFAI = unit_map.get(self.unit, '2th_deg')
             
-            # Start UI updates
+            # Log start
             self.log("="*60)
-            self.log("Starting Batch Integration...")
+            self.log("Starting Batch Integration in subprocess...")
             self.log(f"PONI: {self.poni_path}")
             self.log(f"Mask: {self.mask_path if self.mask_path else 'None'}")
             self.log(f"Input: {self.input_pattern}")
@@ -1019,41 +1021,117 @@ class PowderXRDModule(GUIBase):
             # Start progress animation
             self.progress.start()
             
-            # Use QTimer to delay thread start - ensure GUI is responsive
-            def start_worker():
-                from batch_integration import run_batch_integration
-                
-                def run_task():
-                    run_batch_integration(
-                        poni_file=self.poni_path,
-                        mask_file=self.mask_path if self.mask_path else None,
-                        input_pattern=self.input_pattern,
-                        output_dir=self.output_dir,
-                        dataset_path=self.dataset_path if self.dataset_path else None,
-                        npt=self.npt,
-                        unit=unit_pyFAI,
-                        formats=formats,
-                        create_stacked_plot=self.create_stacked_plot,
-                        stacked_plot_offset=self.stacked_plot_offset,
-                        disable_progress_bar=True
-                    )
-                
-                signals = WorkerSignals()
-                signals.finished.connect(self._on_integration_finished)
-                signals.error.connect(self._on_integration_error)
-                
-                worker = WorkerThread(run_task, signals)
-                self.running_threads.append(worker)
-                worker.start()
-                self.log("✓ Background thread started successfully")
+            # Create integration script for subprocess
+            script = self._create_integration_script(
+                poni_path=self.poni_path,
+                mask_path=self.mask_path if self.mask_path else "",
+                input_pattern=self.input_pattern,
+                output_dir=self.output_dir,
+                dataset_path=self.dataset_path if self.dataset_path else "",
+                npt=self.npt,
+                unit=unit_pyFAI,
+                formats=formats,
+                create_stacked_plot=self.create_stacked_plot,
+                stacked_plot_offset=self.stacked_plot_offset
+            )
             
-            # Delay worker start by 100ms to ensure GUI is ready
-            QTimer.singleShot(100, start_worker)
+            # Start subprocess
+            self.integration_process = subprocess.Popen(
+                [sys.executable, '-c', script],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                text=True,
+                cwd=os.getcwd()
+            )
+            
+            self.log("✓ Subprocess started successfully")
+            
+            # Start checking subprocess status
+            if hasattr(self, 'check_timer'):
+                self.check_timer.stop()
+            
+            self.check_timer = QTimer()
+            self.check_timer.timeout.connect(self._check_integration_status)
+            self.check_timer.start(500)  # Check every 500ms
             
         except Exception as e:
             self.progress.stop()
             self.log(f"❌ Error: {str(e)}")
             self.show_error("Error", f"Failed to start integration:\n{str(e)}")
+    
+    def _create_integration_script(self, **params):
+        """Create Python script for subprocess execution"""
+        # Escape strings for Python script
+        def escape(s):
+            return s.replace('\\', '\\\\').replace('"', '\\"') if s else ""
+        
+        return f'''
+import sys
+import os
+
+# Add current directory to path
+sys.path.insert(0, "{escape(os.path.dirname(os.path.abspath(__file__)))}")
+
+try:
+    from batch_integration import run_batch_integration
+    
+    print("Starting integration...", flush=True)
+    
+    run_batch_integration(
+        poni_file="{escape(params['poni_path'])}",
+        mask_file="{escape(params['mask_path'])}" if "{escape(params['mask_path'])}" else None,
+        input_pattern="{escape(params['input_pattern'])}",
+        output_dir="{escape(params['output_dir'])}",
+        dataset_path="{escape(params['dataset_path'])}" if "{escape(params['dataset_path'])}" else None,
+        npt={params['npt']},
+        unit="{params['unit']}",
+        formats={params['formats']},
+        create_stacked_plot={params['create_stacked_plot']},
+        stacked_plot_offset="{params['stacked_plot_offset']}",
+        disable_progress_bar=True
+    )
+    
+    print("\\n\\n=== INTEGRATION_SUCCESS ===", flush=True)
+    
+except Exception as e:
+    print(f"\\n\\n=== INTEGRATION_ERROR: {{e}} ===", flush=True)
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+'''
+    
+    def _check_integration_status(self):
+        """Check subprocess status periodically"""
+        if hasattr(self, 'integration_process'):
+            retcode = self.integration_process.poll()
+            
+            if retcode is not None:
+                # Process has finished
+                self.check_timer.stop()
+                self.progress.stop()
+                
+                try:
+                    stdout, stderr = self.integration_process.communicate(timeout=1)
+                except:
+                    stdout, stderr = "", ""
+                
+                if "INTEGRATION_SUCCESS" in stdout:
+                    self.log("✓ Integration completed successfully!")
+                    self.log("="*60)
+                    self.show_success("Success", "Batch integration completed!")
+                else:
+                    self.log("❌ Integration failed or was interrupted")
+                    if stderr:
+                        # Show first 500 chars of error
+                        error_preview = stderr[:500]
+                        self.log(f"Error output:\n{error_preview}")
+                        if len(stderr) > 500:
+                            self.log("... (error message truncated)")
+                    self.log("="*60)
+                    self.show_error("Error", "Integration failed. Check log for details.")
+                
+                # Cleanup
+                del self.integration_process
     
     def _on_integration_finished(self, message):
         """Handle integration completion"""
