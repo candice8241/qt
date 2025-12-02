@@ -588,6 +588,7 @@ class PowderXRDModule(GUIBase):
         stacked_layout.addWidget(stacked_options_label)
 
         self.stacked_plot_cb = QCheckBox("Create Stacked Plot")
+        self.stacked_plot_cb.setChecked(False)  # Default unchecked, will be auto-checked when bins configured
         self.stacked_plot_cb.setFont(QFont('Arial', 9))
         self.stacked_plot_cb.setStyleSheet(f"""
             QCheckBox {{
@@ -1090,11 +1091,11 @@ class PowderXRDModule(GUIBase):
         # Create and show bin config dialog
         dialog = BinConfigDialog(parent=self.root)
         result = dialog.exec()
-        
+
         if result == dialog.DialogCode.Accepted:
             # Get bin configuration
             self.bin_config = dialog.get_bins()
-            
+
             # Update info label
             num_bins = len(self.bin_config)
             if num_bins > 0:
@@ -1106,15 +1107,21 @@ class PowderXRDModule(GUIBase):
                     if num_bins > 3:
                         info_text += f", +{num_bins-3} more"
                     info_text += ")"
-                
+
                 self.bin_info_label.setText(info_text)
                 self.bin_info_label.setStyleSheet(f"color: #FF6F00; background-color: {self.colors['card_bg']}; padding-left: 2px; font-weight: bold;")
-                
+
                 self.log(f"Bin configuration set: {num_bins} bins configured")
                 for bin_data in self.bin_config[:5]:
                     self.log(f"  - {bin_data['name']}: {bin_data['start']:.2f}° - {bin_data['end']:.2f}°")
                 if num_bins > 5:
                     self.log(f"  ... and {num_bins-5} more bins")
+
+                # Auto-enable stacked plot when bins are configured (following radial_module behavior)
+                if not self.stacked_plot_cb.isChecked():
+                    self.stacked_plot_cb.setChecked(True)
+                    self.log("✓ Auto-enabled 'Create Stacked Plot' for bin visualization")
+                    self.log("  (Stacked plots help visualize multiple azimuthal bins together)")
 
     def log(self, message):
         """Add message to log"""
