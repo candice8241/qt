@@ -474,18 +474,21 @@ class BatchIntegrator:
             y_offset = idx * calc_offset
             color_idx = int(range_avg // 90) if range_avg is not None else idx
             color = base_colors[color_idx % len(base_colors)]
-            label = f'{range_avg:.1f}' if range_avg is not None else f'Data {idx+1}'
+            label = f'{range_avg:.1f}°' if range_avg is not None else f'Data {idx+1}'
             plt.plot(data[:, 0], data[:, 1] + y_offset,
                     color=color, linewidth=1.2, label=label)
 
-            # Add label - position relative to the baseline + offset
+            # Add label at the ACTUAL middle of the curve
+            # Curve's actual y range after offset: [min(data)+y_offset, max(data)+y_offset]
+            # So label should be at the middle of this range
             x_pos = data[0, 0] + (data[-1, 0] - data[0, 0]) * 0.02
-            peak_height = np.max(data[:, 1])
-            # Position label at 50% of peak height above the baseline (y_offset)
-            y_pos = y_offset + peak_height * 0.5
+            min_intensity = np.min(data[:, 1])
+            max_intensity = np.max(data[:, 1])
+            # Position label at the actual middle of the curve
+            y_pos = y_offset + (min_intensity + max_intensity) / 2.0
 
             plt.text(x_pos, y_pos, label,
-                    fontsize=9, verticalalignment='center',  # Center alignment for better positioning
+                    fontsize=9, verticalalignment='center',
                     bbox=dict(boxstyle='round,pad=0.3', facecolor=color, alpha=0.3))
 
         plt.xlabel('2θ (degrees)', fontsize=12)
@@ -585,15 +588,17 @@ class BatchIntegrator:
             plt.plot(data[:, 0], data[:, 1] + y_offset,
                     color=colors[color_idx], linewidth=1.2, label=label)
 
-            # Add pressure label - position it at the baseline + some height
-            # This ensures label moves with offset and stays at a consistent relative position
+            # Add pressure label at the ACTUAL middle of the curve
+            # Curve's actual y range after offset: [min(data)+y_offset, max(data)+y_offset]
+            # So label should be at the middle of this range
             x_pos = data[0, 0] + (data[-1, 0] - data[0, 0]) * 0.02
-            # Label position: baseline (y_offset) + a fixed proportion of peak height
-            peak_height = np.max(data[:, 1])
-            y_pos = y_offset + peak_height * 0.5  # Position at 50% of peak height above baseline
+            min_intensity = np.min(data[:, 1])
+            max_intensity = np.max(data[:, 1])
+            # Position label at the actual middle of the curve
+            y_pos = y_offset + (min_intensity + max_intensity) / 2.0
 
             plt.text(x_pos, y_pos, label,
-                    fontsize=9, verticalalignment='center',  # Changed to center for better alignment
+                    fontsize=9, verticalalignment='center',
                     bbox=dict(boxstyle='round,pad=0.3', facecolor=colors[color_idx], alpha=0.3))
 
         plt.xlabel('2θ (degrees)', fontsize=12)
