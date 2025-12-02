@@ -546,6 +546,7 @@ class BatchIntegrator:
             # Mode 1: Generate separate stacked plot for each pressure group with multiple files
             print(f"Detected multiple data files at same pressure, generating separate stacked plot for each pressure point")
 
+            generated_count = 0
             for pressure, file_list in sorted(pressure_groups.items()):
                 if len(file_list) <= 1:
                     print(f"  Pressure {pressure:.2f} GPa has only {len(file_list)} file, skipping")
@@ -560,10 +561,24 @@ class BatchIntegrator:
                     pressure, file_list, output_dir, offset,
                     f'stacked_plot_{prefix}{pressure:.3f}GPa.png'
                 )
+                generated_count += 1
+            
+            # Print completion summary
+            print()
+            print("="*70)
+            print(f"✓ Azimuthal stacked plot generation completed!")
+            print(f"  Total plots generated: {generated_count}")
+            print(f"  Output directory: {output_dir}")
+            print("="*70)
         else:
             # Mode 2: Original logic - all pressures in one plot
             print(f"Using original logic to generate stacked plot for all pressures")
             self._create_all_pressure_stacked_plot(xy_files, output_dir, offset, output_name)
+            print()
+            print("="*70)
+            print(f"✓ Stacked plot generation completed!")
+            print(f"  Output directory: {output_dir}")
+            print("="*70)
 
     def _create_single_pressure_stacked_plot(self, pressure, file_list, output_dir, offset, output_name):
         """
@@ -616,16 +631,20 @@ class BatchIntegrator:
             plt.plot(data[:, 0], data[:, 1] + y_offset,
                     color=color, linewidth=1.2, label=label)
 
-            # Add label between current baseline and next baseline
+            # Add label near the curve baseline (just above the curve start)
+            # Position label at left side of the curve, slightly above the baseline
             x_pos = data[0, 0] + (data[-1, 0] - data[0, 0]) * 0.02
-            # Position at 75% between current and next baseline to avoid overlap
-            # y_offset is current baseline (idx * calc_offset)
-            # Next baseline is (idx + 1) * calc_offset = y_offset + calc_offset
-            y_pos = y_offset + calc_offset * 0.95
-
+            # Get the intensity value at the label position
+            # Find the closest data point to x_pos
+            x_data = data[:, 0]
+            idx_closest = np.argmin(np.abs(x_data - x_pos))
+            y_at_label = data[idx_closest, 1]
+            # Place label just above the actual curve at this position
+            y_pos = y_offset + y_at_label + calc_offset * 0.05  # 5% of offset above the curve
+            
             plt.text(x_pos, y_pos, label,
-                    fontsize=8, verticalalignment='bottom',
-                    color='black', fontname='Arial')
+                    fontsize=9, verticalalignment='bottom',
+                    color='black', fontname='Arial', fontweight='bold')
 
         plt.xlabel('2θ (degrees)', fontsize=12)
         plt.ylabel('Intensity (offset)', fontsize=12)
@@ -641,6 +660,7 @@ class BatchIntegrator:
         print(f"    ✓ Stacked plot saved: {output_path}")
         print(f"      Number of data files: {len(data_list)}")
         print(f"      Offset: {calc_offset:.2f}")
+        print(f"      Azimuthal angles: {', '.join([f'{avg:.1f}°' for avg in range_avgs])}")
 
     def _create_all_pressure_stacked_plot(self, xy_files, output_dir, offset, output_name):
         """
