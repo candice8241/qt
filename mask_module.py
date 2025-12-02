@@ -71,12 +71,22 @@ class MaskModule(GUIBase):
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setStyleSheet(f"background-color: {self.colors['bg']}; border: none;")
 
-        # Content widget
+        # Content widget with center alignment
+        content_container = QWidget()
+        container_layout = QHBoxLayout(content_container)
+        container_layout.setContentsMargins(0, 0, 0, 0)
+        
+        container_layout.addStretch(1)  # Left spacer
+        
         content_widget = QWidget()
+        content_widget.setMaximumWidth(1200)  # Limit width for better centering
         content_widget.setStyleSheet(f"background-color: {self.colors['bg']};")
         content_layout = QVBoxLayout(content_widget)
-        content_layout.setContentsMargins(15, 8, 15, 8)
+        content_layout.setContentsMargins(20, 8, 20, 8)
         content_layout.setSpacing(6)
+        
+        container_layout.addWidget(content_widget)
+        container_layout.addStretch(1)  # Right spacer
 
         # Title
         title = QLabel("🎭 Mask Creation & Management")
@@ -90,53 +100,9 @@ class MaskModule(GUIBase):
         desc.setStyleSheet(f"color: {self.colors['text_dark']}; font-size: 9pt;")
         content_layout.addWidget(desc)
 
-        # Control area
+        # Control area (includes Save/Clear buttons now)
         control_group = self.create_control_group()
         content_layout.addWidget(control_group)
-
-        # Action buttons - Moved up
-        button_layout = QHBoxLayout()
-        button_layout.setSpacing(8)
-
-        save_btn = QPushButton("💾 Save Mask")
-        save_btn.setFixedWidth(110)
-        save_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-                padding: 6px;
-                border-radius: 4px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: #45A049;
-            }}
-        """)
-        save_btn.clicked.connect(self.save_mask)
-        button_layout.addWidget(save_btn)
-
-        clear_btn = QPushButton("🗑️ Clear All")
-        clear_btn.setFixedWidth(110)
-        clear_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: #FF5252;
-                color: white;
-                border: none;
-                padding: 6px;
-                border-radius: 4px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: #FF1744;
-            }}
-        """)
-        clear_btn.clicked.connect(self.clear_mask)
-        button_layout.addWidget(clear_btn)
-        
-        button_layout.addStretch()
-
-        content_layout.addLayout(button_layout)
 
         # Drawing tools
         tools_group = self.create_tools_group()
@@ -147,8 +113,8 @@ class MaskModule(GUIBase):
             preview_group = self.create_preview_group()
             content_layout.addWidget(preview_group)
         
-        # Add content widget to scroll area
-        scroll.setWidget(content_widget)
+        # Add content container to scroll area
+        scroll.setWidget(content_container)
         layout.addWidget(scroll)
 
     def create_control_group(self):
@@ -213,6 +179,47 @@ class MaskModule(GUIBase):
         """)
         load_mask_btn.clicked.connect(self.load_mask)
         layout.addWidget(load_mask_btn)
+        
+        # Separator
+        layout.addWidget(QLabel("|"))
+        
+        # Save Mask button
+        save_btn = QPushButton("💾 Save Mask")
+        save_btn.setFixedWidth(110)
+        save_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 6px;
+                border-radius: 4px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: #45A049;
+            }}
+        """)
+        save_btn.clicked.connect(self.save_mask)
+        layout.addWidget(save_btn)
+        
+        # Clear All button
+        clear_btn = QPushButton("🗑️ Clear All")
+        clear_btn.setFixedWidth(110)
+        clear_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #FF5252;
+                color: white;
+                border: none;
+                padding: 6px;
+                border-radius: 4px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: #FF1744;
+            }}
+        """)
+        clear_btn.clicked.connect(self.clear_mask)
+        layout.addWidget(clear_btn)
 
         layout.addStretch()
         
@@ -290,9 +297,9 @@ class MaskModule(GUIBase):
         tool_row.addStretch()
         layout.addLayout(tool_row)
 
-        # Row 2: Mask/Unmask action
+        # Row 2: Action and Operations (combined)
         action_row = QHBoxLayout()
-        action_row.setSpacing(10)
+        action_row.setSpacing(8)
         
         action_row.addWidget(QLabel("Action:"))
         
@@ -324,94 +331,95 @@ class MaskModule(GUIBase):
         self.action_group = QButtonGroup(group)
         self.action_group.addButton(self.mask_radio)
         self.action_group.addButton(self.unmask_radio)
-
-        action_row.addStretch()
-        layout.addLayout(action_row)
-
-        # Row 3: Mask operations
-        op_row = QHBoxLayout()
-        op_row.setSpacing(8)
         
-        op_row.addWidget(QLabel("Operations:"))
+        # Separator
+        action_row.addWidget(QLabel("|"))
+        
+        # Operations on same row
+        action_row.addWidget(QLabel("Operations:"))
         
         # Invert button
         invert_btn = QPushButton("↕️ Invert")
-        invert_btn.setFixedWidth(80)
+        invert_btn.setFixedWidth(70)
         invert_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['secondary']};
                 color: white;
                 border: none;
-                padding: 5px;
+                padding: 4px;
                 border-radius: 4px;
                 font-weight: bold;
+                font-size: 9pt;
             }}
             QPushButton:hover {{
                 background-color: #7E57C2;
             }}
         """)
         invert_btn.clicked.connect(self.invert_mask)
-        op_row.addWidget(invert_btn)
+        action_row.addWidget(invert_btn)
         
         # Grow button
         grow_btn = QPushButton("➕ Grow")
-        grow_btn.setFixedWidth(75)
+        grow_btn.setFixedWidth(65)
         grow_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['secondary']};
                 color: white;
                 border: none;
-                padding: 5px;
+                padding: 4px;
                 border-radius: 4px;
                 font-weight: bold;
+                font-size: 9pt;
             }}
             QPushButton:hover {{
                 background-color: #7E57C2;
             }}
         """)
         grow_btn.clicked.connect(self.grow_mask)
-        op_row.addWidget(grow_btn)
+        action_row.addWidget(grow_btn)
         
         # Shrink button
         shrink_btn = QPushButton("➖ Shrink")
-        shrink_btn.setFixedWidth(75)
+        shrink_btn.setFixedWidth(65)
         shrink_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['secondary']};
                 color: white;
                 border: none;
-                padding: 5px;
+                padding: 4px;
                 border-radius: 4px;
                 font-weight: bold;
+                font-size: 9pt;
             }}
             QPushButton:hover {{
                 background-color: #7E57C2;
             }}
         """)
         shrink_btn.clicked.connect(self.shrink_mask)
-        op_row.addWidget(shrink_btn)
+        action_row.addWidget(shrink_btn)
         
         # Fill holes button
-        fill_btn = QPushButton("🔧 Fill Holes")
-        fill_btn.setFixedWidth(90)
+        fill_btn = QPushButton("🔧 Fill")
+        fill_btn.setFixedWidth(65)
         fill_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['secondary']};
                 color: white;
                 border: none;
-                padding: 5px;
+                padding: 4px;
                 border-radius: 4px;
                 font-weight: bold;
+                font-size: 9pt;
             }}
             QPushButton:hover {{
                 background-color: #7E57C2;
             }}
         """)
         fill_btn.clicked.connect(self.fill_holes)
-        op_row.addWidget(fill_btn)
+        action_row.addWidget(fill_btn)
 
-        op_row.addStretch()
-        layout.addLayout(op_row)
+        action_row.addStretch()
+        layout.addLayout(action_row)
 
         return group
 
@@ -452,8 +460,9 @@ class MaskModule(GUIBase):
         info_row.addStretch()
         layout.addLayout(info_row)
 
-        # Canvas and contrast slider layout
+        # Canvas layout (no contrast slider)
         canvas_layout = QHBoxLayout()
+        canvas_layout.addStretch()  # Center the canvas
         
         # Matplotlib canvas - Compact size
         self.figure = Figure(figsize=(7, 5))
@@ -462,66 +471,12 @@ class MaskModule(GUIBase):
         self.canvas.setFixedSize(700, 500)  # Compact size to fit in one page
         canvas_layout.addWidget(self.canvas)
         
-        # Vertical contrast slider
-        slider_layout = QVBoxLayout()
-        slider_layout.setSpacing(2)
-        slider_layout.addStretch()
-        
-        max_label = QLabel("High")
-        max_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        max_label.setStyleSheet("color: #666666; font-size: 9px;")
-        slider_layout.addWidget(max_label)
-        
-        self.contrast_slider = QSlider(Qt.Orientation.Vertical)
-        self.contrast_slider.setMinimum(1)
-        self.contrast_slider.setMaximum(100)
-        self.contrast_slider.setValue(50)
-        self.contrast_slider.setFixedHeight(300)
-        self.contrast_slider.setFixedWidth(30)
-        self.contrast_slider.setStyleSheet("""
-            QSlider::groove:vertical {
-                border: 1px solid #BBBBBB;
-                width: 8px;
-                background: #FFFFFF;
-                margin: 0 0;
-            }
-            QSlider::handle:vertical {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #E0E0E0, stop:1 #F5F5F5);
-                border: 1px solid #AAAAAA;
-                height: 18px;
-                width: 20px;
-                margin: 0 -6px;
-            }
-            QSlider::handle:vertical:hover {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
-                    stop:0 #D0D0D0, stop:1 #E5E5E5);
-                border: 1px solid #888888;
-            }
-        """)
-        self.contrast_slider.valueChanged.connect(self.on_contrast_changed)
-        slider_layout.addWidget(self.contrast_slider, alignment=Qt.AlignmentFlag.AlignCenter)
-        
-        min_label = QLabel("Low")
-        min_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        min_label.setStyleSheet("color: #666666; font-size: 9px;")
-        slider_layout.addWidget(min_label)
-        
-        self.contrast_label = QLabel("50%")
-        self.contrast_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.contrast_label.setFixedWidth(50)
-        self.contrast_label.setStyleSheet("color: #333333; font-weight: bold; font-size: 11px;")
-        slider_layout.addWidget(self.contrast_label)
-        
-        contrast_text = QLabel("Contrast")
-        contrast_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        contrast_text.setStyleSheet("color: #666666; font-size: 9px;")
-        slider_layout.addWidget(contrast_text)
-        
-        slider_layout.addStretch()
-        canvas_layout.addLayout(slider_layout)
+        canvas_layout.addStretch()  # Center the canvas
         
         layout.addLayout(canvas_layout)
+        
+        # Contrast value (fixed, no slider)
+        self.contrast_value = 50  # Default contrast
 
         # Connect mouse events
         self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
@@ -749,7 +704,7 @@ class MaskModule(GUIBase):
 
         # Apply log scale and contrast
         img_display = np.log10(self.image_data + 1)
-        contrast_factor = self.contrast_slider.value() / 100.0
+        contrast_factor = self.contrast_value / 100.0
         low_percentile = contrast_factor * 20
         high_percentile = 100 - (1 - contrast_factor) * 5
         vmin = np.percentile(img_display, low_percentile)
