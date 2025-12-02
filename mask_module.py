@@ -237,18 +237,23 @@ class MaskModule(GUIBase):
         layout.setSpacing(5)
         layout.setContentsMargins(10, 10, 10, 10)
 
-        # Info row
+        # Info row with position, mask status, and total pixels
         info_row = QHBoxLayout()
 
         self.position_label = QLabel("📍 Position: --")
-        self.position_label.setFont(QFont('Arial', 10))
+        self.position_label.setFont(QFont('Arial', 9))
         self.position_label.setStyleSheet("color: #333333; padding: 3px;")
         info_row.addWidget(self.position_label)
 
         self.mask_status_label = QLabel("🔴 Mask: Not loaded")
-        self.mask_status_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
+        self.mask_status_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         self.mask_status_label.setStyleSheet("color: #FF5722; padding: 3px;")
         info_row.addWidget(self.mask_status_label)
+        
+        self.total_pixels_label = QLabel("Total: --")
+        self.total_pixels_label.setFont(QFont('Arial', 9))
+        self.total_pixels_label.setStyleSheet("color: #666666; padding: 3px;")
+        info_row.addWidget(self.total_pixels_label)
 
         info_row.addStretch()
         layout.addLayout(info_row)
@@ -259,16 +264,16 @@ class MaskModule(GUIBase):
         
         # Left side: Canvas and contrast slider - Fixed size container
         canvas_container = QWidget()
-        canvas_container.setFixedSize(1050, 720)  # Fixed container size
+        canvas_container.setFixedSize(1050, 620)  # Fixed container size (reduced height)
         canvas_layout = QHBoxLayout(canvas_container)
         canvas_layout.setSpacing(5)
         canvas_layout.setContentsMargins(0, 0, 0, 0)
         
         # Matplotlib canvas - Fixed size for better display
-        self.figure = Figure(figsize=(10, 7))
+        self.figure = Figure(figsize=(10, 6))
         self.figure.subplots_adjust(left=0.07, right=0.98, top=0.97, bottom=0.07)
         self.canvas = FigureCanvas(self.figure)
-        self.canvas.setFixedSize(1000, 700)  # Fixed canvas size
+        self.canvas.setFixedSize(1000, 600)  # Fixed canvas size (reduced height)
         canvas_layout.addWidget(self.canvas)
         
         # Vertical contrast slider
@@ -285,7 +290,7 @@ class MaskModule(GUIBase):
         self.contrast_slider.setMinimum(1)
         self.contrast_slider.setMaximum(100)
         self.contrast_slider.setValue(50)
-        self.contrast_slider.setFixedHeight(500)
+        self.contrast_slider.setFixedHeight(450)  # Reduced height
         self.contrast_slider.setFixedWidth(30)
         self.contrast_slider.setStyleSheet("""
             QSlider::groove:vertical {
@@ -377,7 +382,7 @@ class MaskModule(GUIBase):
             }}
         """)
         panel.setFixedWidth(250)  # Fixed width
-        panel.setFixedHeight(720)  # Fixed height to match canvas
+        panel.setFixedHeight(620)  # Fixed height to match canvas (reduced)
         
         layout = QVBoxLayout(panel)
         layout.setSpacing(8)
@@ -388,16 +393,23 @@ class MaskModule(GUIBase):
         action_label.setStyleSheet("font-weight: bold; color: #555555; font-size: 10pt;")
         layout.addWidget(action_label)
         
+        # Action radio buttons in same row
+        action_row = QHBoxLayout()
+        action_row.setSpacing(10)
+        
         self.mask_radio = QRadioButton("✓ Mask")
         self.mask_radio.setChecked(True)
         self.mask_radio.setToolTip("Add to mask")
         self.mask_radio.setStyleSheet("font-size: 9pt;")
-        layout.addWidget(self.mask_radio)
+        action_row.addWidget(self.mask_radio)
         
         self.unmask_radio = QRadioButton("✗ Unmask")
         self.unmask_radio.setToolTip("Remove from mask")
         self.unmask_radio.setStyleSheet("font-size: 9pt;")
-        layout.addWidget(self.unmask_radio)
+        action_row.addWidget(self.unmask_radio)
+        
+        action_row.addStretch()
+        layout.addLayout(action_row)
         
         self.action_group = QButtonGroup(panel)
         self.action_group.addButton(self.mask_radio)
@@ -475,7 +487,10 @@ class MaskModule(GUIBase):
         threshold_mode_label.setStyleSheet("font-weight: bold; color: #555555; font-size: 9pt;")
         layout.addWidget(threshold_mode_label)
         
-        # Threshold mode selection (Below / Above)
+        # Threshold mode selection (Below / Above) in same row
+        threshold_mode_row = QHBoxLayout()
+        threshold_mode_row.setSpacing(10)
+        
         self.threshold_mode_group = QButtonGroup(panel)
         
         self.threshold_below_radio = QRadioButton("Below")
@@ -483,13 +498,16 @@ class MaskModule(GUIBase):
         self.threshold_below_radio.setToolTip("Mask pixels BELOW threshold value")
         self.threshold_below_radio.setStyleSheet("font-size: 9pt;")
         self.threshold_mode_group.addButton(self.threshold_below_radio)
-        layout.addWidget(self.threshold_below_radio)
+        threshold_mode_row.addWidget(self.threshold_below_radio)
         
         self.threshold_above_radio = QRadioButton("Above")
         self.threshold_above_radio.setToolTip("Mask pixels ABOVE threshold value")
         self.threshold_above_radio.setStyleSheet("font-size: 9pt;")
         self.threshold_mode_group.addButton(self.threshold_above_radio)
-        layout.addWidget(self.threshold_above_radio)
+        threshold_mode_row.addWidget(self.threshold_above_radio)
+        
+        threshold_mode_row.addStretch()
+        layout.addLayout(threshold_mode_row)
         
         layout.addSpacing(3)
         
@@ -860,14 +878,18 @@ class MaskModule(GUIBase):
         """Update mask statistics display"""
         if self.current_mask is None or self.image_data is None:
             self.mask_stats_label.setText("No mask data")
+            self.total_pixels_label.setText("Total: --")
             return
         
         total_pixels = self.current_mask.size
         masked_pixels = np.sum(self.current_mask)
         masked_percent = (masked_pixels / total_pixels) * 100
         
-        stats_text = f"""Total: {total_pixels:,} px
-Masked: {masked_pixels:,} px
+        # Update total pixels in info row
+        self.total_pixels_label.setText(f"Total: {total_pixels:,} px")
+        
+        # Update statistics with remaining info
+        stats_text = f"""Masked: {masked_pixels:,} px
 Percentage: {masked_percent:.2f}%
 Unmasked: {total_pixels - masked_pixels:,} px"""
         
@@ -1410,10 +1432,9 @@ Unmasked: {total_pixels - masked_pixels:,} px"""
         self.update_display()
         self.update_mask_statistics()
         
-        # Provide detailed feedback
+        # Provide feedback in console instead of popup
         action = "Masked" if self.mask_radio.isChecked() else "Unmasked"
-        QMessageBox.information(self.root, "Threshold Applied", 
-                               f"{action} {affected_pixels:,} pixels {mode_text} threshold {threshold:.1f}")
+        print(f"Threshold applied: {action} {affected_pixels:,} pixels {mode_text} threshold {threshold:.1f}")
     
     def on_key_press(self, event):
         """Handle key press events"""
