@@ -1318,11 +1318,13 @@ class PowderXRDModule(GUIBase):
             )
             
             self.log("✓ Subprocess started successfully")
-            
-            # Start checking subprocess status
-            if hasattr(self, 'check_timer'):
+
+            # Stop any existing timer first
+            if hasattr(self, 'check_timer') and self.check_timer:
                 self.check_timer.stop()
-            
+                self.check_timer.deleteLater()
+
+            # Create new timer for checking subprocess status
             self.check_timer = QTimer()
             self.check_timer.timeout.connect(self._check_integration_status)
             self.check_timer.start(500)  # Check every 500ms
@@ -1387,19 +1389,27 @@ except Exception as e:
     
     def _check_integration_status(self):
         """Check subprocess status periodically"""
-        if hasattr(self, 'integration_process'):
+        try:
+            if not hasattr(self, 'integration_process'):
+                # No process to check, stop timer
+                if hasattr(self, 'check_timer') and self.check_timer:
+                    self.check_timer.stop()
+                    self.progress.stop()
+                return
+
             retcode = self.integration_process.poll()
-            
+
             if retcode is not None:
-                # Process has finished
-                self.check_timer.stop()
+                # Process has finished - stop timer and progress bar immediately
+                if hasattr(self, 'check_timer') and self.check_timer:
+                    self.check_timer.stop()
                 self.progress.stop()
-                
+
                 try:
                     stdout, stderr = self.integration_process.communicate(timeout=1)
                 except:
                     stdout, stderr = "", ""
-                
+
                 # Output complete stdout to console so users can see file search logs
                 if stdout:
                     self.log("="*60)
@@ -1409,7 +1419,7 @@ except Exception as e:
                         if line.strip():  # Skip empty lines
                             self.log(line)
                     self.log("="*60)
-                
+
                 if "INTEGRATION_SUCCESS" in stdout:
                     self.log("✓ Integration completed successfully!")
                     self.show_success("Success", "Batch integration completed!")
@@ -1422,10 +1432,19 @@ except Exception as e:
                         if len(stderr) > 1000:
                             self.log("... (error message truncated)")
                     self.show_error("Error", "Integration failed. Check log for details.")
-                
+
                 self.log("="*60)
-                
+
                 # Cleanup
+                del self.integration_process
+
+        except Exception as e:
+            # Error during status check - stop everything
+            self.log(f"⚠ Error checking integration status: {str(e)}")
+            if hasattr(self, 'check_timer') and self.check_timer:
+                self.check_timer.stop()
+            self.progress.stop()
+            if hasattr(self, 'integration_process'):
                 del self.integration_process
     
     def _on_integration_finished(self, message):

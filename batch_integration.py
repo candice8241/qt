@@ -487,16 +487,18 @@ class BatchIntegrator:
     def _extract_range_average(self, filename):
         """
         Extract range values from filename and calculate average
-        Example: 0.72_Bin001_0.0-10.0.xy -> 5.0
-                 0.72_Bin002_10.0-20.0.xy -> 15.0
+        Example: d8.612_Sector001_0.0-10.0.xy -> 5.0
+                 d36.822_Sector002_10.0-20.0.xy -> 15.0
+                 0.72_Bin001_0.0-10.0.xy -> 5.0
 
         Returns:
             float or None: Average of the range, or None if no range found
         """
         basename = os.path.basename(filename)
 
-        # Match pattern like "number-number"
-        pattern = r'(\d+\.?\d*)[_\s]*-[_\s]*(\d+\.?\d*)'
+        # Match pattern: underscore followed by "number-number" before file extension
+        # This ensures we get the last angle range, not other numbers in filename
+        pattern = r'_(\d+\.?\d*)-(\d+\.?\d*)\.\w+$'
         match = re.search(pattern, basename)
 
         if match:
