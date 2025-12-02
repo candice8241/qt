@@ -242,7 +242,7 @@ class BatchIntegrator:
     
     def batch_integrate(self, input_pattern, output_dir, npt=2000, unit="2th_deg",
                         dataset_path=None, formats=['xy'], create_stacked_plot=False,
-                        stacked_plot_offset='auto', **kwargs):
+                        stacked_plot_offset='auto', disable_progress_bar=False, **kwargs):
         """
         Batch integration for multiple HDF5 files
 
@@ -250,24 +250,111 @@ class BatchIntegrator:
             formats (list): Output formats ['xy', 'dat', 'chi', 'svg', 'png', 'fxye']
             create_stacked_plot (bool): Whether to create stacked plot
             stacked_plot_offset (str or float): Offset for stacked plot ('auto' or float value)
+            disable_progress_bar (bool): Disable tqdm progress bar (useful for GUI)
         """
-        # Enhanced file search with multiple attempts
+        # Enhanced file search with multiple attempts and detailed debugging
+        h5_files = []
+        
+        print(f"🔍 Starting file search with input: {input_pattern}")
+        print(f"   Input type: {type(input_pattern)}")
+        print(f"   Is directory: {os.path.isdir(input_pattern)}")
+        print(f"   Exists: {os.path.exists(input_pattern)}")
+        
+        # Method 1: Try the pattern as-is with recursive search
+        print(f"📂 Method 1: Trying pattern as-is with recursive=True...")
         h5_files = sorted(glob.glob(input_pattern, recursive=True))
-
-        # If no files found and pattern doesn't use **, try adding ** for recursive search
-        if not h5_files and '**' not in input_pattern:
-            # Try to construct a recursive pattern
+        # Filter out the directory itself and only keep .h5 files
+        h5_files = [f for f in h5_files if f.endswith('.h5') and os.path.isfile(f)]
+        print(f"   Result: Found {len(h5_files)} files")
+        if h5_files:
+            print(f"   ✓ Success! Sample files: {h5_files[:3]}")
+        
+        # Method 2: If no files and it's a directory path, search for **/*.h5 recursively
+        if not h5_files and os.path.isdir(input_pattern):
+            print(f"📂 Method 2: Directory detected, searching recursively for **/*.h5...")
+            pattern = os.path.join(input_pattern, '**', '*.h5')
+            print(f"   Pattern: {pattern}")
+            h5_files = sorted(glob.glob(pattern, recursive=True))
+            print(f"   Result: Found {len(h5_files)} files")
+            if h5_files:
+                print(f"   ✓ Success! Found {len(h5_files)} .h5 files in directory: {input_pattern}")
+                print(f"   Sample files: {h5_files[:3]}")
+        
+        # Method 3: If pattern contains *.h5 but no **, try recursive search
+        if not h5_files and '*.h5' in input_pattern and '**' not in input_pattern:
+            print(f"📂 Method 3: Converting *.h5 pattern to recursive **/*.h5...")
+            # Extract directory part
             if input_pattern.endswith('*.h5'):
-                # Replace *.h5 with **/*.h5 for recursive search
+                base_dir = input_pattern[:-len('*.h5')].rstrip('/\\')
+                if not base_dir:
+                    base_dir = '.'
+                recursive_pattern = os.path.join(base_dir, '**', '*.h5')
+            else:
                 recursive_pattern = input_pattern.replace('*.h5', '**/*.h5')
+            print(f"   Pattern: {recursive_pattern}")
+            h5_files = sorted(glob.glob(recursive_pattern, recursive=True))
+            print(f"   Result: Found {len(h5_files)} files")
+            if h5_files:
+                print(f"   ✓ Success! Using recursive pattern")
+                print(f"   Sample files: {h5_files[:3]}")
+        
+        # Method 4: Try as directory with recursive **/*.h5
+        if not h5_files:
+            print(f"📂 Method 4: Trying to interpret as directory with recursive search...")
+            # Strip trailing wildcards if any
+            clean_path = input_pattern.rstrip('/*')
+            if os.path.isdir(clean_path):
+                recursive_pattern = os.path.join(clean_path, '**', '*.h5')
+                print(f"   Pattern: {recursive_pattern}")
                 h5_files = sorted(glob.glob(recursive_pattern, recursive=True))
+                print(f"   Result: Found {len(h5_files)} files")
                 if h5_files:
-                    print(f"ℹ Using recursive search pattern: {recursive_pattern}")
+                    print(f"   ✓ Success! Found files in cleaned directory path")
+                    print(f"   Sample files: {h5_files[:3]}")
+        
+        # Method 5: Try parent directory if path looks like it might be incomplete
+        if not h5_files and os.path.sep in input_pattern:
+            print(f"📂 Method 5: Trying parent directory...")
+            parent_dir = os.path.dirname(input_pattern)
+            if parent_dir and os.path.isdir(parent_dir):
+                recursive_pattern = os.path.join(parent_dir, '**', '*.h5')
+                print(f"   Pattern: {recursive_pattern}")
+                h5_files = sorted(glob.glob(recursive_pattern, recursive=True))
+                print(f"   Result: Found {len(h5_files)} files")
+                if h5_files:
+                    print(f"   ✓ Success! Found files in parent directory: {parent_dir}")
+                    print(f"   Sample files: {h5_files[:3]}")
 
         if not h5_files:
-            print(f"⚠ No matching files found: {input_pattern}")
-            print(f"  Tip: Use '**/*.h5' pattern for recursive directory search")
+            print(f"\n⚠ ERROR: No matching .h5 files found!")
+            print(f"  Input pattern: {input_pattern}")
+            print(f"  Absolute path: {os.path.abspath(input_pattern)}")
+            print(f"  Current directory: {os.getcwd()}")
+            print(f"\n  💡 Tips:")
+            print(f"    - For all files in a directory (recursive): /path/to/dir")
+            print(f"    - For files matching pattern: /path/to/dir/*.h5")
+            print(f"    - For recursive search: /path/to/dir/**/*.h5")
+            print(f"    - Check if the path exists and contains .h5 files")
+            
+            # List what's actually in the directory if it exists
+            if os.path.isdir(input_pattern):
+                print(f"\n  📋 Directory contents:")
+                try:
+                    for root, dirs, files in os.walk(input_pattern):
+                        h5_in_dir = [f for f in files if f.endswith('.h5')]
+                        if h5_in_dir:
+                            print(f"    {root}: {len(h5_in_dir)} .h5 files")
+                except Exception as e:
+                    print(f"    Error listing directory: {e}")
+            
             return
+        
+        print(f"\n✓ Final result: Found {len(h5_files)} HDF5 files to process")
+        if len(h5_files) > 5:
+            print(f"  First 5 files: {h5_files[:5]}")
+            print(f"  Last file: {h5_files[-1]}")
+        else:
+            print(f"  Files: {h5_files}")
 
         print(f"\nFound {len(h5_files)} HDF5 files to process")
         print(f"Output directory: {output_dir}")
@@ -279,7 +366,10 @@ class BatchIntegrator:
         success_count = 0
         failed_files = []
 
-        for h5_file in tqdm(h5_files, desc="Processing"):
+        # Use tqdm only if not disabled (disable for GUI to prevent hanging)
+        iterator = h5_files if disable_progress_bar else tqdm(h5_files, desc="Processing")
+        
+        for h5_file in iterator:
             basename = os.path.splitext(os.path.basename(h5_file))[0]
             output_base = os.path.join(output_dir, basename)
 
@@ -470,16 +560,21 @@ class BatchIntegrator:
             y_offset = idx * calc_offset
             color_idx = int(range_avg // 90) if range_avg is not None else idx
             color = base_colors[color_idx % len(base_colors)]
-            label = f'{range_avg:.1f}' if range_avg is not None else f'Data {idx+1}'
+            label = f'{range_avg:.1f}°' if range_avg is not None else f'Data {idx+1}'
             plt.plot(data[:, 0], data[:, 1] + y_offset,
                     color=color, linewidth=1.2, label=label)
 
-            # Add label anchored to the offset-adjusted curve
+            # Add label at the ACTUAL middle of the curve
+            # Curve's actual y range after offset: [min(data)+y_offset, max(data)+y_offset]
+            # So label should be at the middle of this range
             x_pos = data[0, 0] + (data[-1, 0] - data[0, 0]) * 0.02
-            y_pos = y_offset + np.max(data[:, 1]) * 0.3
+            min_intensity = np.min(data[:, 1])
+            max_intensity = np.max(data[:, 1])
+            # Position label at the actual middle of the curve
+            y_pos = y_offset + (min_intensity + max_intensity) / 2.0
 
             plt.text(x_pos, y_pos, label,
-                    fontsize=9, verticalalignment='bottom',
+                    fontsize=9, verticalalignment='center',
                     bbox=dict(boxstyle='round,pad=0.3', facecolor=color, alpha=0.3))
 
         plt.xlabel('2θ (degrees)', fontsize=12)
@@ -579,13 +674,17 @@ class BatchIntegrator:
             plt.plot(data[:, 0], data[:, 1] + y_offset,
                     color=colors[color_idx], linewidth=1.2, label=label)
 
-            # Add pressure label on the left side
-            # Position it above the baseline of current curve
+            # Add pressure label at the ACTUAL middle of the curve
+            # Curve's actual y range after offset: [min(data)+y_offset, max(data)+y_offset]
+            # So label should be at the middle of this range
             x_pos = data[0, 0] + (data[-1, 0] - data[0, 0]) * 0.02
-            y_pos = y_offset + np.max(data[:, 1]) * 0.3
+            min_intensity = np.min(data[:, 1])
+            max_intensity = np.max(data[:, 1])
+            # Position label at the actual middle of the curve
+            y_pos = y_offset + (min_intensity + max_intensity) / 2.0
 
             plt.text(x_pos, y_pos, label,
-                    fontsize=9, verticalalignment='bottom',
+                    fontsize=9, verticalalignment='center',
                     bbox=dict(boxstyle='round,pad=0.3', facecolor=colors[color_idx], alpha=0.3))
 
         plt.xlabel('2θ (degrees)', fontsize=12)
@@ -653,7 +752,8 @@ def run_batch_integration(
     unit='2th_deg',
     formats=['xy', 'dat', 'chi', 'svg', 'png', 'fxye'],
     create_stacked_plot=True,
-    stacked_plot_offset='auto'
+    stacked_plot_offset='auto',
+    disable_progress_bar=False
 ):
     """
     Run batch 1D integration using pyFAI
@@ -669,6 +769,7 @@ def run_batch_integration(
         formats (list): Output formats ['xy', 'dat', 'chi', 'svg', 'png', 'fxye']
         create_stacked_plot (bool): Whether to create stacked plot
         stacked_plot_offset (str or float): Offset for stacked plot
+        disable_progress_bar (bool): Disable tqdm progress bar (useful for GUI)
     """
 
     integration_kwargs = {
@@ -693,6 +794,7 @@ def run_batch_integration(
         formats=formats,
         create_stacked_plot=create_stacked_plot,
         stacked_plot_offset=stacked_plot_offset,
+        disable_progress_bar=disable_progress_bar,
         **integration_kwargs
     )
 def main():

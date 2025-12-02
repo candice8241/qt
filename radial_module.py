@@ -13,11 +13,12 @@ from PyQt6.QtWidgets import (QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushBut
                               QLineEdit, QTextEdit, QCheckBox, QComboBox, QGroupBox,
                               QFileDialog, QMessageBox, QFrame, QScrollArea, QRadioButton,
                               QButtonGroup)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
+from PyQt6.QtCore import Qt, QObject, pyqtSignal, QTimer
 # Import configuration dialogs
 from unified_config_dialog import UnifiedConfigDialog
 from h5_preview_dialog import H5PreviewDialog
 from PyQt6.QtGui import QFont
+import threading
 import os
 import glob
 import h5py
@@ -50,25 +51,44 @@ except ImportError:
     print("⚠ Warning: matplotlib not available. Plotting features will be disabled.")
 
 
-class WorkerThread(QThread):
-    """Worker thread for background processing"""
+class WorkerSignals(QObject):
+    """Signals for worker thread"""
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
     progress = pyqtSignal(str)
 
-    def __init__(self, target_func, *args, **kwargs):
-        super().__init__()
+
+class WorkerThread(threading.Thread):
+    """Worker thread for background processing using Python threading"""
+    
+    def __init__(self, target_func, signals, *args, **kwargs):
+        super().__init__(daemon=True)
         self.target_func = target_func
+        self.signals = signals
         self.args = args
         self.kwargs = kwargs
 
     def run(self):
-        """Run the target function"""
+        """Run the target function with stdout/stderr redirection"""
+        import sys
+        from io import StringIO
+        
+        # Redirect stdout and stderr to prevent GUI blocking
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
+        sys.stdout = StringIO()
+        sys.stderr = StringIO()
+        
         try:
             result = self.target_func(*self.args, **self.kwargs)
-            self.finished.emit(str(result) if result else "Task completed successfully")
+            self.signals.finished.emit(str(result) if result else "Task completed successfully")
         except Exception as e:
-            self.error.emit(f"Error: {str(e)}")
+            import traceback
+            self.signals.error.emit(f"Error: {str(e)}\n{traceback.format_exc()}")
+        finally:
+            # Restore stdout and stderr
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
 
 
 class AzimuthalIntegrationModule(GUIBase):
@@ -950,9 +970,11 @@ class AzimuthalIntegrationModule(GUIBase):
             def integration_work():
                 return self._do_integration()
             
-            worker = WorkerThread(integration_work)
-            worker.finished.connect(lambda msg: self._on_integration_finished(msg))
-            worker.error.connect(lambda err: self._on_integration_error(err))
+            signals = WorkerSignals()
+            signals.finished.connect(lambda msg: self._on_integration_finished(msg))
+            signals.error.connect(lambda err: self._on_integration_error(err))
+            
+            worker = WorkerThread(integration_work, signals)
             self.running_threads.append(worker)
             worker.start()
             
@@ -970,13 +992,64 @@ class AzimuthalIntegrationModule(GUIBase):
                 self.mask_path if self.mask_path else None
             )
             
-            # Find input files
-            input_files = glob.glob(self.input_pattern)
-            if not input_files:
-                raise ValueError(f"No files found matching pattern: {self.input_pattern}")
+            # Find input files with intelligent fallback mechanism
+            input_files = []
             
-            input_files.sort()
-            self.log(f"Found {len(input_files)} files to process")
+            self.log(f"🔍 Searching for input files: {self.input_pattern}")
+            
+            # Method 1: Try the pattern as-is with recursive search
+            input_files = sorted(glob.glob(self.input_pattern, recursive=True))
+            # Filter out directories and only keep .h5 files
+            input_files = [f for f in input_files if f.endswith('.h5') and os.path.isfile(f)]
+            if input_files:
+                self.log(f"✓ Method 1: Found {len(input_files)} files")
+            
+            # Method 2: If no files and it's a directory path, search for **/*.h5 recursively
+            if not input_files and os.path.isdir(self.input_pattern):
+                pattern = os.path.join(self.input_pattern, '**', '*.h5')
+                self.log(f"📂 Method 2: Searching recursively in directory...")
+                input_files = sorted(glob.glob(pattern, recursive=True))
+                if input_files:
+                    self.log(f"✓ Method 2: Found {len(input_files)} files")
+            
+            # Method 3: If pattern contains *.h5 but no **, try recursive search
+            if not input_files and '*.h5' in self.input_pattern and '**' not in self.input_pattern:
+                if self.input_pattern.endswith('*.h5'):
+                    base_dir = self.input_pattern[:-len('*.h5')].rstrip('/\\')
+                    if not base_dir:
+                        base_dir = '.'
+                    recursive_pattern = os.path.join(base_dir, '**', '*.h5')
+                else:
+                    recursive_pattern = self.input_pattern.replace('*.h5', '**/*.h5')
+                self.log(f"📂 Method 3: Converting to recursive pattern...")
+                input_files = sorted(glob.glob(recursive_pattern, recursive=True))
+                if input_files:
+                    self.log(f"✓ Method 3: Found {len(input_files)} files")
+            
+            # Method 4: Try as directory with recursive **/*.h5
+            if not input_files:
+                clean_path = self.input_pattern.rstrip('/*')
+                if os.path.isdir(clean_path):
+                    recursive_pattern = os.path.join(clean_path, '**', '*.h5')
+                    self.log(f"📂 Method 4: Trying cleaned directory path...")
+                    input_files = sorted(glob.glob(recursive_pattern, recursive=True))
+                    if input_files:
+                        self.log(f"✓ Method 4: Found {len(input_files)} files")
+            
+            # Method 5: Try parent directory
+            if not input_files and os.path.sep in self.input_pattern:
+                parent_dir = os.path.dirname(self.input_pattern)
+                if parent_dir and os.path.isdir(parent_dir):
+                    recursive_pattern = os.path.join(parent_dir, '**', '*.h5')
+                    self.log(f"📂 Method 5: Trying parent directory...")
+                    input_files = sorted(glob.glob(recursive_pattern, recursive=True))
+                    if input_files:
+                        self.log(f"✓ Method 5: Found {len(input_files)} files")
+            
+            if not input_files:
+                raise ValueError(f"No .h5 files found matching pattern: {self.input_pattern}")
+            
+            self.log(f"✓ Total found: {len(input_files)} files to process")
             
             # Create output directory if needed
             os.makedirs(self.output_dir, exist_ok=True)
@@ -1565,12 +1638,16 @@ class BatchIntegrator:
             plt.plot(data[:, 0], data[:, 1] + y_offset,
                     color=color, linewidth=1.2, label=label)
             
-            # Add label
+            # Add label at the ACTUAL middle of the curve
+            # Curve's actual y range after offset: [min(data)+y_offset, max(data)+y_offset]
             x_pos = data[0, 0] + (data[-1, 0] - data[0, 0]) * 0.02
-            y_pos = y_offset + np.max(data[:, 1]) * 0.3
+            min_intensity = np.min(data[:, 1])
+            max_intensity = np.max(data[:, 1])
+            # Position label at the actual middle of the curve
+            y_pos = y_offset + (min_intensity + max_intensity) / 2.0
             
             plt.text(x_pos, y_pos, label,
-                    fontsize=9, verticalalignment='bottom',
+                    fontsize=9, verticalalignment='center',
                     bbox=dict(boxstyle='round,pad=0.3', facecolor=color, alpha=0.3))
         
         plt.xlabel('2θ (degrees)', fontsize=12)
@@ -1653,12 +1730,16 @@ class BatchIntegrator:
             plt.plot(data[:, 0], data[:, 1] + y_offset,
                     color=colors[color_idx], linewidth=1.2, label=label)
             
-            # Add pressure label
+            # Add pressure label at the ACTUAL middle of the curve
+            # Curve's actual y range after offset: [min(data)+y_offset, max(data)+y_offset]
             x_pos = data[0, 0] + (data[-1, 0] - data[0, 0]) * 0.02
-            y_pos = y_offset + np.max(data[:, 1]) * 0.3
+            min_intensity = np.min(data[:, 1])
+            max_intensity = np.max(data[:, 1])
+            # Position label at the actual middle of the curve
+            y_pos = y_offset + (min_intensity + max_intensity) / 2.0
             
             plt.text(x_pos, y_pos, label,
-                    fontsize=9, verticalalignment='bottom',
+                    fontsize=9, verticalalignment='center',
                     bbox=dict(boxstyle='round,pad=0.3', facecolor=colors[color_idx], alpha=0.3))
         
         plt.xlabel('2θ (degrees)', fontsize=12)
