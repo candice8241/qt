@@ -1228,7 +1228,25 @@ class PowderXRDModule(GUIBase):
             # Priority: bin_config (Single Sector) > sector_config (Multiple Sectors) > sector_params (H5 Preview)
             if self.bin_config:
                 # Single Sector mode (from unified config dialog)
-                bins_param = self.bin_config
+                # Add angle average to bin names for stacked plot visualization
+                bins_param = []
+                for bin_data in self.bin_config:
+                    bin_start = bin_data['start']
+                    bin_end = bin_data['end']
+                    angle_avg = (bin_start + bin_end) / 2.0
+
+                    # Create new bin name with angle range for stacked plot identification
+                    original_name = bin_data['name']
+                    new_name = f"{original_name}_{bin_start:.1f}-{bin_end:.1f}"
+
+                    bins_param.append({
+                        'name': new_name,
+                        'start': bin_start,
+                        'end': bin_end,
+                        'rad_min': bin_data.get('rad_min', 0.0),
+                        'rad_max': bin_data.get('rad_max', 0.0)
+                    })
+
                 self.log(f"Using Single Sector mode: {len(bins_param)} bins configured")
             elif self.sector_config:
                 # Multiple Sectors mode (from unified config dialog)
@@ -1251,7 +1269,10 @@ class PowderXRDModule(GUIBase):
                     for i in range(num_bins):
                         bin_start = azim_start + i * bin_size
                         bin_end = min(azim_start + (i + 1) * bin_size, azim_end)
-                        bin_name = f"{sector_name}_Bin{i+1:03d}"
+                        angle_avg = (bin_start + bin_end) / 2.0
+
+                        # Include angle range in bin name for stacked plot visualization
+                        bin_name = f"{sector_name}_Bin{i+1:03d}_{bin_start:.1f}-{bin_end:.1f}"
 
                         bins_param.append({
                             'name': bin_name,
