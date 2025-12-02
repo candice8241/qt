@@ -48,7 +48,7 @@ class MaskModule(GUIBase):
         self.image_data = None
         
         # Drawing mode and state
-        self.draw_mode = 'circle'  # 'circle', 'rectangle', 'polygon', 'point', 'threshold'
+        self.draw_mode = 'circle'  # 'circle', 'rectangle', 'polygon', 'point'
         self.drawing = False
         self.draw_start = None
         self.draw_current = None
@@ -257,15 +257,18 @@ class MaskModule(GUIBase):
         main_canvas_layout = QHBoxLayout()
         main_canvas_layout.setSpacing(10)
         
-        # Left side: Canvas and contrast slider
-        canvas_layout = QHBoxLayout()
+        # Left side: Canvas and contrast slider - Fixed size container
+        canvas_container = QWidget()
+        canvas_container.setFixedSize(1050, 720)  # Fixed container size
+        canvas_layout = QHBoxLayout(canvas_container)
         canvas_layout.setSpacing(5)
+        canvas_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Matplotlib canvas - Larger size for better display
+        # Matplotlib canvas - Fixed size for better display
         self.figure = Figure(figsize=(10, 7))
         self.figure.subplots_adjust(left=0.07, right=0.98, top=0.97, bottom=0.07)
         self.canvas = FigureCanvas(self.figure)
-        self.canvas.setFixedSize(1000, 700)  # Larger canvas for better viewing
+        self.canvas.setFixedSize(1000, 700)  # Fixed canvas size
         canvas_layout.addWidget(self.canvas)
         
         # Vertical contrast slider
@@ -327,7 +330,7 @@ class MaskModule(GUIBase):
         slider_layout.addStretch()
         canvas_layout.addLayout(slider_layout)
         
-        main_canvas_layout.addLayout(canvas_layout)
+        main_canvas_layout.addWidget(canvas_container)
         
         # Right side: Operations panel
         operations_panel = self.create_operations_panel()
@@ -355,9 +358,9 @@ class MaskModule(GUIBase):
     
     def create_operations_panel(self):
         """Create comprehensive operations panel for the right side with drawing tools"""
-        from PyQt6.QtWidgets import QRadioButton, QButtonGroup
+        from PyQt6.QtWidgets import QRadioButton, QButtonGroup, QGridLayout
         
-        panel = QGroupBox("Drawing Tools & Operations")
+        panel = QGroupBox("Tools & Operations")
         panel.setStyleSheet(f"""
             QGroupBox {{
                 border: 2px solid {self.colors['border']};
@@ -373,70 +376,89 @@ class MaskModule(GUIBase):
                 padding: 0 3px;
             }}
         """)
-        panel.setFixedWidth(220)
+        panel.setFixedWidth(250)  # Fixed width
+        panel.setFixedHeight(720)  # Fixed height to match canvas
         
         layout = QVBoxLayout(panel)
         layout.setSpacing(8)
         layout.setContentsMargins(10, 15, 10, 10)
         
-        # ===== DRAWING TOOLS SECTION =====
-        tools_title = QLabel("🎨 Drawing Tools")
-        tools_title.setStyleSheet("font-size: 11pt; font-weight: bold; color: #333333;")
-        layout.addWidget(tools_title)
-        
-        # Tool radio buttons
-        self.tool_group = QButtonGroup(panel)
-        
-        self.circle_radio = QRadioButton("🔵 Circle")
-        self.circle_radio.setChecked(True)
-        self.circle_radio.setToolTip("Draw circular mask regions")
-        self.circle_radio.toggled.connect(lambda: self.on_tool_changed("circle"))
-        self.tool_group.addButton(self.circle_radio)
-        layout.addWidget(self.circle_radio)
-        
-        self.rect_radio = QRadioButton("▭ Rectangle")
-        self.rect_radio.setToolTip("Draw rectangular mask regions")
-        self.rect_radio.toggled.connect(lambda: self.on_tool_changed("rectangle"))
-        self.tool_group.addButton(self.rect_radio)
-        layout.addWidget(self.rect_radio)
-        
-        self.polygon_radio = QRadioButton("⬡ Polygon")
-        self.polygon_radio.setToolTip("Draw polygon mask (right-click or Enter to finish)")
-        self.polygon_radio.toggled.connect(lambda: self.on_tool_changed("polygon"))
-        self.tool_group.addButton(self.polygon_radio)
-        layout.addWidget(self.polygon_radio)
-        
-        self.point_radio = QRadioButton("⊙ Point")
-        self.point_radio.setToolTip("Click to mask/unmask individual points")
-        self.point_radio.toggled.connect(lambda: self.on_tool_changed("point"))
-        self.tool_group.addButton(self.point_radio)
-        layout.addWidget(self.point_radio)
-        
-        self.threshold_radio = QRadioButton("📊 Threshold")
-        self.threshold_radio.setToolTip("Mask pixels based on intensity threshold")
-        self.threshold_radio.toggled.connect(lambda: self.on_tool_changed("threshold"))
-        self.tool_group.addButton(self.threshold_radio)
-        layout.addWidget(self.threshold_radio)
-        
-        layout.addSpacing(10)
-        
-        # Action selection
+        # ===== ACTION SECTION (moved to top) =====
         action_label = QLabel("Action:")
-        action_label.setStyleSheet("font-weight: bold; color: #555555;")
+        action_label.setStyleSheet("font-weight: bold; color: #555555; font-size: 10pt;")
         layout.addWidget(action_label)
         
         self.mask_radio = QRadioButton("✓ Mask")
         self.mask_radio.setChecked(True)
         self.mask_radio.setToolTip("Add to mask")
+        self.mask_radio.setStyleSheet("font-size: 9pt;")
         layout.addWidget(self.mask_radio)
         
         self.unmask_radio = QRadioButton("✗ Unmask")
         self.unmask_radio.setToolTip("Remove from mask")
+        self.unmask_radio.setStyleSheet("font-size: 9pt;")
         layout.addWidget(self.unmask_radio)
         
         self.action_group = QButtonGroup(panel)
         self.action_group.addButton(self.mask_radio)
         self.action_group.addButton(self.unmask_radio)
+        
+        layout.addSpacing(5)
+        
+        # Separator line
+        separator0 = QFrame()
+        separator0.setFrameShape(QFrame.Shape.HLine)
+        separator0.setStyleSheet("background-color: #CCCCCC;")
+        layout.addWidget(separator0)
+        
+        # ===== DRAWING TOOLS SECTION (4 tools in 2x2 grid) =====
+        tools_title = QLabel("🎨 Drawing Tools")
+        tools_title.setStyleSheet("font-size: 10pt; font-weight: bold; color: #333333;")
+        layout.addWidget(tools_title)
+        
+        # Tool radio buttons in 2x2 grid
+        tools_widget = QWidget()
+        tools_grid = QGridLayout(tools_widget)
+        tools_grid.setSpacing(4)
+        tools_grid.setContentsMargins(0, 0, 0, 0)
+        
+        self.tool_group = QButtonGroup(panel)
+        
+        # Row 0, Col 0 - Circle
+        self.circle_radio = QRadioButton("🔵 Circle")
+        self.circle_radio.setChecked(True)
+        self.circle_radio.setToolTip("Draw circular mask regions")
+        self.circle_radio.setStyleSheet("font-size: 9pt;")
+        self.circle_radio.toggled.connect(lambda: self.on_tool_changed("circle"))
+        self.tool_group.addButton(self.circle_radio)
+        tools_grid.addWidget(self.circle_radio, 0, 0)
+        
+        # Row 0, Col 1 - Rectangle
+        self.rect_radio = QRadioButton("▭ Rectangle")
+        self.rect_radio.setToolTip("Draw rectangular mask regions")
+        self.rect_radio.setStyleSheet("font-size: 9pt;")
+        self.rect_radio.toggled.connect(lambda: self.on_tool_changed("rectangle"))
+        self.tool_group.addButton(self.rect_radio)
+        tools_grid.addWidget(self.rect_radio, 0, 1)
+        
+        # Row 1, Col 0 - Polygon
+        self.polygon_radio = QRadioButton("⬡ Polygon")
+        self.polygon_radio.setToolTip("Draw polygon mask (right-click or Enter to finish)")
+        self.polygon_radio.setStyleSheet("font-size: 9pt;")
+        self.polygon_radio.toggled.connect(lambda: self.on_tool_changed("polygon"))
+        self.tool_group.addButton(self.polygon_radio)
+        tools_grid.addWidget(self.polygon_radio, 1, 0)
+        
+        # Row 1, Col 1 - Point
+        self.point_radio = QRadioButton("⊙ Point")
+        self.point_radio.setToolTip("Click to mask/unmask individual points")
+        self.point_radio.setStyleSheet("font-size: 9pt;")
+        self.point_radio.toggled.connect(lambda: self.on_tool_changed("point"))
+        self.tool_group.addButton(self.point_radio)
+        tools_grid.addWidget(self.point_radio, 1, 1)
+        
+        layout.addWidget(tools_widget)
+        layout.addSpacing(5)
         
         # Separator line
         separator1 = QFrame()
@@ -444,67 +466,68 @@ class MaskModule(GUIBase):
         separator1.setStyleSheet("background-color: #CCCCCC;")
         layout.addWidget(separator1)
         
-        # ===== THRESHOLD CONTROLS (shown only when threshold tool is selected) =====
-        self.threshold_widget = QWidget()
-        threshold_layout = QVBoxLayout(self.threshold_widget)
-        threshold_layout.setContentsMargins(0, 0, 0, 0)
-        threshold_layout.setSpacing(5)
+        # ===== THRESHOLD CONTROLS (always visible) =====
+        threshold_title = QLabel("📊 Threshold")
+        threshold_title.setStyleSheet("font-size: 10pt; font-weight: bold; color: #333333;")
+        layout.addWidget(threshold_title)
         
-        threshold_mode_label = QLabel("Threshold Mode:")
-        threshold_mode_label.setStyleSheet("font-weight: bold; color: #555555;")
-        threshold_layout.addWidget(threshold_mode_label)
+        threshold_mode_label = QLabel("Mode:")
+        threshold_mode_label.setStyleSheet("font-weight: bold; color: #555555; font-size: 9pt;")
+        layout.addWidget(threshold_mode_label)
         
         # Threshold mode selection (Below / Above)
-        self.threshold_mode_group = QButtonGroup(self.threshold_widget)
+        self.threshold_mode_group = QButtonGroup(panel)
         
-        self.threshold_below_radio = QRadioButton("Below Threshold")
+        self.threshold_below_radio = QRadioButton("Below")
         self.threshold_below_radio.setChecked(True)
         self.threshold_below_radio.setToolTip("Mask pixels BELOW threshold value")
+        self.threshold_below_radio.setStyleSheet("font-size: 9pt;")
         self.threshold_mode_group.addButton(self.threshold_below_radio)
-        threshold_layout.addWidget(self.threshold_below_radio)
+        layout.addWidget(self.threshold_below_radio)
         
-        self.threshold_above_radio = QRadioButton("Above Threshold")
+        self.threshold_above_radio = QRadioButton("Above")
         self.threshold_above_radio.setToolTip("Mask pixels ABOVE threshold value")
+        self.threshold_above_radio.setStyleSheet("font-size: 9pt;")
         self.threshold_mode_group.addButton(self.threshold_above_radio)
-        threshold_layout.addWidget(self.threshold_above_radio)
+        layout.addWidget(self.threshold_above_radio)
         
-        threshold_layout.addSpacing(5)
+        layout.addSpacing(3)
         
         # Threshold value input
-        threshold_value_label = QLabel("Threshold Value:")
-        threshold_value_label.setStyleSheet("font-weight: bold; color: #555555;")
-        threshold_layout.addWidget(threshold_value_label)
+        threshold_value_label = QLabel("Value:")
+        threshold_value_label.setStyleSheet("font-weight: bold; color: #555555; font-size: 9pt;")
+        layout.addWidget(threshold_value_label)
         
         self.threshold_input = QLineEdit()
-        self.threshold_input.setFixedHeight(30)
+        self.threshold_input.setFixedHeight(28)
         self.threshold_input.setPlaceholderText("e.g. 1000")
         self.threshold_input.setStyleSheet("""
             QLineEdit {
-                padding: 5px;
+                padding: 4px;
                 border: 1px solid #CCCCCC;
                 border-radius: 3px;
-                font-size: 10pt;
+                font-size: 9pt;
             }
         """)
-        threshold_layout.addWidget(self.threshold_input)
+        layout.addWidget(self.threshold_input)
         
         self.threshold_range_label = QLabel("Range: 0 - N/A")
-        self.threshold_range_label.setStyleSheet("color: #666666; font-size: 9pt;")
+        self.threshold_range_label.setStyleSheet("color: #666666; font-size: 8pt;")
         self.threshold_range_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        threshold_layout.addWidget(self.threshold_range_label)
+        layout.addWidget(self.threshold_range_label)
         
         # Apply threshold button
         apply_threshold_btn = QPushButton("Apply Threshold")
-        apply_threshold_btn.setFixedHeight(35)
+        apply_threshold_btn.setFixedHeight(32)
         apply_threshold_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['primary']};
                 color: white;
                 border: none;
-                padding: 6px;
+                padding: 5px;
                 border-radius: 4px;
                 font-weight: bold;
-                font-size: 10pt;
+                font-size: 9pt;
             }}
             QPushButton:hover {{
                 background-color: #6A1B9A;
@@ -514,10 +537,9 @@ class MaskModule(GUIBase):
             }}
         """)
         apply_threshold_btn.clicked.connect(self.apply_threshold_mask)
-        threshold_layout.addWidget(apply_threshold_btn)
+        layout.addWidget(apply_threshold_btn)
         
-        layout.addWidget(self.threshold_widget)
-        self.threshold_widget.setVisible(False)  # Initially hidden
+        layout.addSpacing(5)
         
         # Separator line
         separator2 = QFrame()
@@ -526,23 +548,23 @@ class MaskModule(GUIBase):
         layout.addWidget(separator2)
         
         # ===== MASK OPERATIONS SECTION =====
-        ops_title = QLabel("🔧 Mask Operations")
-        ops_title.setStyleSheet("font-size: 11pt; font-weight: bold; color: #333333;")
+        ops_title = QLabel("🔧 Operations")
+        ops_title.setStyleSheet("font-size: 10pt; font-weight: bold; color: #333333;")
         layout.addWidget(ops_title)
         
         # Invert button
         invert_btn = QPushButton("↕️ Invert")
-        invert_btn.setFixedHeight(35)
+        invert_btn.setFixedHeight(32)
         invert_btn.setToolTip("Flip masked and unmasked regions")
         invert_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['secondary']};
                 color: white;
                 border: none;
-                padding: 6px;
+                padding: 5px;
                 border-radius: 4px;
                 font-weight: bold;
-                font-size: 10pt;
+                font-size: 9pt;
             }}
             QPushButton:hover {{
                 background-color: #7E57C2;
@@ -556,17 +578,17 @@ class MaskModule(GUIBase):
         
         # Grow button
         grow_btn = QPushButton("➕ Grow")
-        grow_btn.setFixedHeight(35)
+        grow_btn.setFixedHeight(32)
         grow_btn.setToolTip("Expand mask regions by 1 pixel")
         grow_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: #4CAF50;
                 color: white;
                 border: none;
-                padding: 6px;
+                padding: 5px;
                 border-radius: 4px;
                 font-weight: bold;
-                font-size: 10pt;
+                font-size: 9pt;
             }}
             QPushButton:hover {{
                 background-color: #45A049;
@@ -580,17 +602,17 @@ class MaskModule(GUIBase):
         
         # Shrink button
         shrink_btn = QPushButton("➖ Shrink")
-        shrink_btn.setFixedHeight(35)
+        shrink_btn.setFixedHeight(32)
         shrink_btn.setToolTip("Shrink mask regions by 1 pixel")
         shrink_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: #FF9800;
                 color: white;
                 border: none;
-                padding: 6px;
+                padding: 5px;
                 border-radius: 4px;
                 font-weight: bold;
-                font-size: 10pt;
+                font-size: 9pt;
             }}
             QPushButton:hover {{
                 background-color: #FB8C00;
@@ -604,17 +626,17 @@ class MaskModule(GUIBase):
         
         # Fill holes button
         fill_btn = QPushButton("🔧 Fill Holes")
-        fill_btn.setFixedHeight(35)
+        fill_btn.setFixedHeight(32)
         fill_btn.setToolTip("Fill enclosed holes in masked regions")
         fill_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: #2196F3;
                 color: white;
                 border: none;
-                padding: 6px;
+                padding: 5px;
                 border-radius: 4px;
                 font-weight: bold;
-                font-size: 10pt;
+                font-size: 9pt;
             }}
             QPushButton:hover {{
                 background-color: #1E88E5;
@@ -625,6 +647,8 @@ class MaskModule(GUIBase):
         """)
         fill_btn.clicked.connect(self.fill_holes)
         layout.addWidget(fill_btn)
+        
+        layout.addSpacing(5)
         
         # Separator line
         separator3 = QFrame()
@@ -640,8 +664,8 @@ class MaskModule(GUIBase):
         self.mask_stats_label = QLabel("No mask data")
         self.mask_stats_label.setStyleSheet("""
             color: #555555; 
-            font-size: 9pt; 
-            padding: 6px;
+            font-size: 8pt; 
+            padding: 5px;
             background-color: #F5F5F5;
             border-radius: 3px;
         """)
@@ -652,7 +676,7 @@ class MaskModule(GUIBase):
         # Help text
         layout.addStretch()
         help_text = QLabel("💡 Scroll to zoom\n🖱️ Drag to draw")
-        help_text.setStyleSheet("color: #888888; font-size: 9pt; font-style: italic;")
+        help_text.setStyleSheet("color: #888888; font-size: 8pt; font-style: italic;")
         help_text.setWordWrap(True)
         help_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(help_text)
@@ -828,10 +852,6 @@ class MaskModule(GUIBase):
         self.draw_current = None
         self.polygon_points = []
         self.temp_shape = None
-        
-        # Show/hide threshold controls based on mode
-        is_threshold_mode = (self.draw_mode == 'threshold')
-        self.threshold_widget.setVisible(is_threshold_mode)
         
         if self.image_data is not None:
             self.update_display()
