@@ -63,6 +63,7 @@ class MaskModule(GUIBase):
         self.cached_vmax = None
         self.last_preview_update = 0  # Throttle preview updates
         self.display_downsample = 1  # Downsample factor for display
+        self.mask_artist = None  # Cache mask overlay artist for fast update
 
     def setup_ui(self):
         """Setup UI components"""
@@ -235,177 +236,159 @@ class MaskModule(GUIBase):
         """)
 
         layout = QVBoxLayout(group)
-        layout.setSpacing(8)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(4)
+        layout.setContentsMargins(8, 8, 8, 8)
 
-        # Row 1: Drawing tools - Radio buttons
-        tool_row = QHBoxLayout()
-        tool_row.setSpacing(10)
+        # Single row: Tools + Action + Operations all combined
+        all_row = QHBoxLayout()
+        all_row.setSpacing(6)
         
-        tool_row.addWidget(QLabel("Tool:"))
+        all_row.addWidget(QLabel("Tool:"))
 
         # Tool radio buttons
         from PyQt6.QtWidgets import QRadioButton, QButtonGroup
         
         self.tool_group = QButtonGroup(group)
         
-        self.select_radio = QRadioButton("Select")
+        self.select_radio = QRadioButton("Sel")
         self.select_radio.setChecked(True)
         self.select_radio.toggled.connect(lambda: self.on_tool_changed("select"))
         self.tool_group.addButton(self.select_radio)
-        tool_row.addWidget(self.select_radio)
+        all_row.addWidget(self.select_radio)
         
-        self.circle_radio = QRadioButton("Circle")
+        self.circle_radio = QRadioButton("Cir")
         self.circle_radio.toggled.connect(lambda: self.on_tool_changed("circle"))
         self.tool_group.addButton(self.circle_radio)
-        tool_row.addWidget(self.circle_radio)
+        all_row.addWidget(self.circle_radio)
         
-        self.rect_radio = QRadioButton("Rectangle")
+        self.rect_radio = QRadioButton("Rect")
         self.rect_radio.toggled.connect(lambda: self.on_tool_changed("rectangle"))
         self.tool_group.addButton(self.rect_radio)
-        tool_row.addWidget(self.rect_radio)
+        all_row.addWidget(self.rect_radio)
         
-        self.polygon_radio = QRadioButton("Polygon")
+        self.polygon_radio = QRadioButton("Poly")
         self.polygon_radio.toggled.connect(lambda: self.on_tool_changed("polygon"))
         self.tool_group.addButton(self.polygon_radio)
-        tool_row.addWidget(self.polygon_radio)
+        all_row.addWidget(self.polygon_radio)
         
-        self.point_radio = QRadioButton("Point")
+        self.point_radio = QRadioButton("Pt")
         self.point_radio.toggled.connect(lambda: self.on_tool_changed("point"))
         self.tool_group.addButton(self.point_radio)
-        tool_row.addWidget(self.point_radio)
+        all_row.addWidget(self.point_radio)
         
-        self.threshold_radio = QRadioButton("Threshold")
+        self.threshold_radio = QRadioButton("Thres")
         self.threshold_radio.toggled.connect(lambda: self.on_tool_changed("threshold"))
         self.tool_group.addButton(self.threshold_radio)
-        tool_row.addWidget(self.threshold_radio)
+        all_row.addWidget(self.threshold_radio)
 
-        tool_row.addStretch()
-        layout.addLayout(tool_row)
-
-        # Row 2: Action and Operations (combined)
-        action_row = QHBoxLayout()
-        action_row.setSpacing(8)
+        # Separator
+        all_row.addWidget(QLabel("|"))
         
-        action_row.addWidget(QLabel("Action:"))
+        all_row.addWidget(QLabel("Action:"))
         
         self.mask_radio = QRadioButton("Mask")
         self.mask_radio.setChecked(True)
-        self.mask_radio.setStyleSheet(f"""
-            QRadioButton {{
-                color: {self.colors['text_dark']};
-            }}
-            QRadioButton::indicator {{
-                width: 12px;
-                height: 12px;
-            }}
-        """)
-        action_row.addWidget(self.mask_radio)
+        all_row.addWidget(self.mask_radio)
         
         self.unmask_radio = QRadioButton("Unmask")
-        self.unmask_radio.setStyleSheet(f"""
-            QRadioButton {{
-                color: {self.colors['text_dark']};
-            }}
-            QRadioButton::indicator {{
-                width: 12px;
-                height: 12px;
-            }}
-        """)
-        action_row.addWidget(self.unmask_radio)
+        all_row.addWidget(self.unmask_radio)
         
         self.action_group = QButtonGroup(group)
         self.action_group.addButton(self.mask_radio)
         self.action_group.addButton(self.unmask_radio)
         
         # Separator
-        action_row.addWidget(QLabel("|"))
+        all_row.addWidget(QLabel("|"))
         
         # Operations on same row
-        action_row.addWidget(QLabel("Operations:"))
+        all_row.addWidget(QLabel("Ops:"))
         
         # Invert button
-        invert_btn = QPushButton("↕️ Invert")
-        invert_btn.setFixedWidth(70)
+        invert_btn = QPushButton("↕️")
+        invert_btn.setFixedWidth(35)
+        invert_btn.setToolTip("Invert mask")
         invert_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['secondary']};
                 color: white;
                 border: none;
-                padding: 4px;
-                border-radius: 4px;
+                padding: 3px;
+                border-radius: 3px;
                 font-weight: bold;
-                font-size: 9pt;
+                font-size: 11pt;
             }}
             QPushButton:hover {{
                 background-color: #7E57C2;
             }}
         """)
         invert_btn.clicked.connect(self.invert_mask)
-        action_row.addWidget(invert_btn)
+        all_row.addWidget(invert_btn)
         
         # Grow button
-        grow_btn = QPushButton("➕ Grow")
-        grow_btn.setFixedWidth(65)
+        grow_btn = QPushButton("➕")
+        grow_btn.setFixedWidth(35)
+        grow_btn.setToolTip("Grow mask")
         grow_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['secondary']};
                 color: white;
                 border: none;
-                padding: 4px;
-                border-radius: 4px;
+                padding: 3px;
+                border-radius: 3px;
                 font-weight: bold;
-                font-size: 9pt;
+                font-size: 11pt;
             }}
             QPushButton:hover {{
                 background-color: #7E57C2;
             }}
         """)
         grow_btn.clicked.connect(self.grow_mask)
-        action_row.addWidget(grow_btn)
+        all_row.addWidget(grow_btn)
         
         # Shrink button
-        shrink_btn = QPushButton("➖ Shrink")
-        shrink_btn.setFixedWidth(65)
+        shrink_btn = QPushButton("➖")
+        shrink_btn.setFixedWidth(35)
+        shrink_btn.setToolTip("Shrink mask")
         shrink_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['secondary']};
                 color: white;
                 border: none;
-                padding: 4px;
-                border-radius: 4px;
+                padding: 3px;
+                border-radius: 3px;
                 font-weight: bold;
-                font-size: 9pt;
+                font-size: 11pt;
             }}
             QPushButton:hover {{
                 background-color: #7E57C2;
             }}
         """)
         shrink_btn.clicked.connect(self.shrink_mask)
-        action_row.addWidget(shrink_btn)
+        all_row.addWidget(shrink_btn)
         
         # Fill holes button
-        fill_btn = QPushButton("🔧 Fill")
-        fill_btn.setFixedWidth(65)
+        fill_btn = QPushButton("🔧")
+        fill_btn.setFixedWidth(35)
+        fill_btn.setToolTip("Fill holes")
         fill_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['secondary']};
                 color: white;
                 border: none;
-                padding: 4px;
-                border-radius: 4px;
+                padding: 3px;
+                border-radius: 3px;
                 font-weight: bold;
-                font-size: 9pt;
+                font-size: 11pt;
             }}
             QPushButton:hover {{
                 background-color: #7E57C2;
             }}
         """)
         fill_btn.clicked.connect(self.fill_holes)
-        action_row.addWidget(fill_btn)
+        all_row.addWidget(fill_btn)
 
-        action_row.addStretch()
-        layout.addLayout(action_row)
+        all_row.addStretch()
+        layout.addLayout(all_row)
 
         return group
 
@@ -450,11 +433,11 @@ class MaskModule(GUIBase):
         canvas_layout = QHBoxLayout()
         canvas_layout.addStretch(1)  # Left spacer for centering
         
-        # Matplotlib canvas - Wider and more compact
-        self.figure = Figure(figsize=(10, 4.8))
-        self.figure.subplots_adjust(left=0.06, right=0.98, top=0.96, bottom=0.08)
+        # Matplotlib canvas - Much wider for better viewing
+        self.figure = Figure(figsize=(12, 4.5))
+        self.figure.subplots_adjust(left=0.05, right=0.98, top=0.96, bottom=0.08)
         self.canvas = FigureCanvas(self.figure)
-        self.canvas.setFixedSize(1000, 480)  # Wider, shorter canvas
+        self.canvas.setFixedSize(1200, 450)  # Much wider, compact height
         canvas_layout.addWidget(self.canvas)
         
         # Vertical contrast slider
@@ -471,7 +454,7 @@ class MaskModule(GUIBase):
         self.contrast_slider.setMinimum(1)
         self.contrast_slider.setMaximum(100)
         self.contrast_slider.setValue(50)
-        self.contrast_slider.setFixedHeight(300)
+        self.contrast_slider.setFixedHeight(280)
         self.contrast_slider.setFixedWidth(30)
         self.contrast_slider.setStyleSheet("""
             QSlider::groove:vertical {
@@ -832,11 +815,13 @@ class MaskModule(GUIBase):
             else:
                 img_data = self.image_data
             
-            # Apply log scale and contrast
+            # Apply log scale and contrast - improved algorithm
             img_display = np.log10(img_data + 1)
             contrast_factor = current_contrast / 100.0
-            low_percentile = contrast_factor * 20
-            high_percentile = 100 - (1 - contrast_factor) * 5
+            
+            # Better contrast mapping for clearer images
+            low_percentile = 0.5 + contrast_factor * 5
+            high_percentile = 99.5 - (1 - contrast_factor) * 10
             
             # Use faster percentile calculation for large images
             if img_display.size > 1000000:
@@ -861,12 +846,16 @@ class MaskModule(GUIBase):
                       extent=[0, self.image_data.shape[1],
                              0, self.image_data.shape[0]])
 
-        # Overlay mask if exists
+        # Overlay mask if exists - Pure red color for better visibility
         if self.current_mask is not None:
+            from matplotlib.colors import ListedColormap
+            # Create pure red colormap (not pink)
+            pure_red = ListedColormap(['none', 'red'])
             mask_overlay = np.ma.masked_where(~self.current_mask, self.current_mask)
-            self.ax.imshow(mask_overlay, cmap='Reds', alpha=0.3, origin='lower',
-                          extent=[0, self.image_data.shape[1],
-                                 0, self.image_data.shape[0]])
+            self.mask_artist = self.ax.imshow(mask_overlay, cmap=pure_red, alpha=0.5, origin='lower',
+                                             extent=[0, self.image_data.shape[1],
+                                                    0, self.image_data.shape[0]], 
+                                             interpolation='nearest', zorder=10)
 
         # Draw temporary shape being drawn
         self._draw_preview_shapes()
@@ -906,6 +895,31 @@ class MaskModule(GUIBase):
                 rect = Rectangle((x1, y1), width, height, fill=False,
                                edgecolor='yellow', linewidth=2, linestyle='--')
                 self.ax.add_patch(rect)
+    
+    def update_mask_only(self):
+        """Ultra-fast mask overlay update without redrawing image"""
+        if self.image_data is None or self.current_mask is None:
+            return
+        
+        # Remove old mask overlay artist if exists
+        if hasattr(self, 'mask_artist') and self.mask_artist:
+            try:
+                self.mask_artist.remove()
+            except:
+                pass
+        
+        # Draw only mask overlay
+        from matplotlib.colors import ListedColormap
+        pure_red = ListedColormap(['none', 'red'])
+        mask_overlay = np.ma.masked_where(~self.current_mask, self.current_mask)
+        self.mask_artist = self.ax.imshow(mask_overlay, cmap=pure_red, alpha=0.5, 
+                                          origin='lower',
+                                          extent=[0, self.image_data.shape[1],
+                                                 0, self.image_data.shape[0]],
+                                          interpolation='nearest', zorder=10)
+        
+        # Very fast update
+        self.canvas.draw_idle()
     
     def update_preview_only(self):
         """Fast preview update without full redraw - for mouse move"""
@@ -1028,22 +1042,29 @@ class MaskModule(GUIBase):
         self.update_display()
     
     def apply_point_mask(self, x, y, radius=5):
-        """Apply mask/unmask at a point"""
+        """Apply mask/unmask at a point - optimized"""
         if self.current_mask is None:
             return
         
-        # Create circular region around point
-        Y, X = np.ogrid[:self.current_mask.shape[0], :self.current_mask.shape[1]]
-        dist = np.sqrt((X - x)**2 + (Y - y)**2)
+        # Optimized: only check region around point
+        y_min = max(0, int(y - radius - 1))
+        y_max = min(self.current_mask.shape[0], int(y + radius + 2))
+        x_min = max(0, int(x - radius - 1))
+        x_max = min(self.current_mask.shape[1], int(x + radius + 2))
+        
+        # Create local grid
+        yy, xx = np.ogrid[y_min:y_max, x_min:x_max]
+        dist = np.sqrt((xx - x)**2 + (yy - y)**2)
         mask_region = dist <= radius
         
-        # Apply mask or unmask
+        # Apply mask or unmask locally
         if self.mask_radio.isChecked():
-            self.current_mask[mask_region] = True
+            self.current_mask[y_min:y_max, x_min:x_max][mask_region] = True
         else:
-            self.current_mask[mask_region] = False
+            self.current_mask[y_min:y_max, x_min:x_max][mask_region] = False
         
-        self.update_display()
+        # Fast mask-only update instead of full redraw
+        self.update_mask_only()
     
     def apply_circle_mask(self, start, end):
         """Apply circular mask"""
