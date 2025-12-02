@@ -1650,7 +1650,8 @@ class BatchIntegrator:
             # Add label in the gap between current curve and next curve
             x_pos = data[0, 0] + (data[-1, 0] - data[0, 0]) * 0.02
             # Position label slightly above the current curve's maximum
-            y_pos = y_offset + np.max(data[:, 1]) * 1.05
+            max_intensity = np.max(data[:, 1])
+            y_pos = y_offset + max_intensity + calc_offset * 0.05
             
             plt.text(x_pos, y_pos, label,
                     fontsize=8, verticalalignment='bottom',
@@ -1739,7 +1740,8 @@ class BatchIntegrator:
             # Add pressure label in the gap between current curve and next curve
             x_pos = data[0, 0] + (data[-1, 0] - data[0, 0]) * 0.02
             # Position label slightly above the current curve's maximum
-            y_pos = y_offset + np.max(data[:, 1]) * 1.05
+            max_intensity = np.max(data[:, 1])
+            y_pos = y_offset + max_intensity + calc_offset * 0.05
             
             plt.text(x_pos, y_pos, label,
                     fontsize=8, verticalalignment='bottom',
