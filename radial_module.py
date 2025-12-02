@@ -992,13 +992,64 @@ class AzimuthalIntegrationModule(GUIBase):
                 self.mask_path if self.mask_path else None
             )
             
-            # Find input files
-            input_files = glob.glob(self.input_pattern)
-            if not input_files:
-                raise ValueError(f"No files found matching pattern: {self.input_pattern}")
+            # Find input files with intelligent fallback mechanism
+            input_files = []
             
-            input_files.sort()
-            self.log(f"Found {len(input_files)} files to process")
+            self.log(f"🔍 Searching for input files: {self.input_pattern}")
+            
+            # Method 1: Try the pattern as-is with recursive search
+            input_files = sorted(glob.glob(self.input_pattern, recursive=True))
+            # Filter out directories and only keep .h5 files
+            input_files = [f for f in input_files if f.endswith('.h5') and os.path.isfile(f)]
+            if input_files:
+                self.log(f"✓ Method 1: Found {len(input_files)} files")
+            
+            # Method 2: If no files and it's a directory path, search for **/*.h5 recursively
+            if not input_files and os.path.isdir(self.input_pattern):
+                pattern = os.path.join(self.input_pattern, '**', '*.h5')
+                self.log(f"📂 Method 2: Searching recursively in directory...")
+                input_files = sorted(glob.glob(pattern, recursive=True))
+                if input_files:
+                    self.log(f"✓ Method 2: Found {len(input_files)} files")
+            
+            # Method 3: If pattern contains *.h5 but no **, try recursive search
+            if not input_files and '*.h5' in self.input_pattern and '**' not in self.input_pattern:
+                if self.input_pattern.endswith('*.h5'):
+                    base_dir = self.input_pattern[:-len('*.h5')].rstrip('/\\')
+                    if not base_dir:
+                        base_dir = '.'
+                    recursive_pattern = os.path.join(base_dir, '**', '*.h5')
+                else:
+                    recursive_pattern = self.input_pattern.replace('*.h5', '**/*.h5')
+                self.log(f"📂 Method 3: Converting to recursive pattern...")
+                input_files = sorted(glob.glob(recursive_pattern, recursive=True))
+                if input_files:
+                    self.log(f"✓ Method 3: Found {len(input_files)} files")
+            
+            # Method 4: Try as directory with recursive **/*.h5
+            if not input_files:
+                clean_path = self.input_pattern.rstrip('/*')
+                if os.path.isdir(clean_path):
+                    recursive_pattern = os.path.join(clean_path, '**', '*.h5')
+                    self.log(f"📂 Method 4: Trying cleaned directory path...")
+                    input_files = sorted(glob.glob(recursive_pattern, recursive=True))
+                    if input_files:
+                        self.log(f"✓ Method 4: Found {len(input_files)} files")
+            
+            # Method 5: Try parent directory
+            if not input_files and os.path.sep in self.input_pattern:
+                parent_dir = os.path.dirname(self.input_pattern)
+                if parent_dir and os.path.isdir(parent_dir):
+                    recursive_pattern = os.path.join(parent_dir, '**', '*.h5')
+                    self.log(f"📂 Method 5: Trying parent directory...")
+                    input_files = sorted(glob.glob(recursive_pattern, recursive=True))
+                    if input_files:
+                        self.log(f"✓ Method 5: Found {len(input_files)} files")
+            
+            if not input_files:
+                raise ValueError(f"No .h5 files found matching pattern: {self.input_pattern}")
+            
+            self.log(f"✓ Total found: {len(input_files)} files to process")
             
             # Create output directory if needed
             os.makedirs(self.output_dir, exist_ok=True)
