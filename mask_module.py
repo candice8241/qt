@@ -301,21 +301,20 @@ class MaskModule(GUIBase):
         all_row.addWidget(QLabel("|"))
         
         # Operations on same row
-        all_row.addWidget(QLabel("Ops:"))
+        all_row.addWidget(QLabel("Operations:"))
         
         # Invert button
-        invert_btn = QPushButton("↕️")
-        invert_btn.setFixedWidth(35)
-        invert_btn.setToolTip("Invert mask")
+        invert_btn = QPushButton("↕️ Invert")
+        invert_btn.setFixedWidth(75)
         invert_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['secondary']};
                 color: white;
                 border: none;
-                padding: 3px;
+                padding: 4px;
                 border-radius: 3px;
                 font-weight: bold;
-                font-size: 11pt;
+                font-size: 9pt;
             }}
             QPushButton:hover {{
                 background-color: #7E57C2;
@@ -325,18 +324,17 @@ class MaskModule(GUIBase):
         all_row.addWidget(invert_btn)
         
         # Grow button
-        grow_btn = QPushButton("➕")
-        grow_btn.setFixedWidth(35)
-        grow_btn.setToolTip("Grow mask")
+        grow_btn = QPushButton("➕ Grow")
+        grow_btn.setFixedWidth(70)
         grow_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['secondary']};
                 color: white;
                 border: none;
-                padding: 3px;
+                padding: 4px;
                 border-radius: 3px;
                 font-weight: bold;
-                font-size: 11pt;
+                font-size: 9pt;
             }}
             QPushButton:hover {{
                 background-color: #7E57C2;
@@ -346,18 +344,17 @@ class MaskModule(GUIBase):
         all_row.addWidget(grow_btn)
         
         # Shrink button
-        shrink_btn = QPushButton("➖")
-        shrink_btn.setFixedWidth(35)
-        shrink_btn.setToolTip("Shrink mask")
+        shrink_btn = QPushButton("➖ Shrink")
+        shrink_btn.setFixedWidth(75)
         shrink_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['secondary']};
                 color: white;
                 border: none;
-                padding: 3px;
+                padding: 4px;
                 border-radius: 3px;
                 font-weight: bold;
-                font-size: 11pt;
+                font-size: 9pt;
             }}
             QPushButton:hover {{
                 background-color: #7E57C2;
@@ -367,18 +364,17 @@ class MaskModule(GUIBase):
         all_row.addWidget(shrink_btn)
         
         # Fill holes button
-        fill_btn = QPushButton("🔧")
-        fill_btn.setFixedWidth(35)
-        fill_btn.setToolTip("Fill holes")
+        fill_btn = QPushButton("🔧 Fill")
+        fill_btn.setFixedWidth(65)
         fill_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['secondary']};
                 color: white;
                 border: none;
-                padding: 3px;
+                padding: 4px;
                 border-radius: 3px;
                 font-weight: bold;
-                font-size: 11pt;
+                font-size: 9pt;
             }}
             QPushButton:hover {{
                 background-color: #7E57C2;
@@ -433,11 +429,11 @@ class MaskModule(GUIBase):
         canvas_layout = QHBoxLayout()
         canvas_layout.addStretch(1)  # Left spacer for centering
         
-        # Matplotlib canvas - Large for h5 images, no horizontal scroll
-        self.figure = Figure(figsize=(13, 8))
-        self.figure.subplots_adjust(left=0.05, right=0.98, top=0.97, bottom=0.06)
+        # Matplotlib canvas - Optimized size for no scrolling
+        self.figure = Figure(figsize=(11.5, 6.5))
+        self.figure.subplots_adjust(left=0.06, right=0.98, top=0.97, bottom=0.06)
         self.canvas = FigureCanvas(self.figure)
-        self.canvas.setFixedSize(1300, 800)  # Large canvas without horizontal scroll
+        self.canvas.setFixedSize(1150, 650)  # Optimized size without scrolling
         canvas_layout.addWidget(self.canvas)
         
         # Vertical contrast slider
@@ -454,7 +450,7 @@ class MaskModule(GUIBase):
         self.contrast_slider.setMinimum(1)
         self.contrast_slider.setMaximum(100)
         self.contrast_slider.setValue(50)
-        self.contrast_slider.setFixedHeight(500)
+        self.contrast_slider.setFixedHeight(450)
         self.contrast_slider.setFixedWidth(30)
         self.contrast_slider.setStyleSheet("""
             QSlider::groove:vertical {
@@ -847,15 +843,21 @@ class MaskModule(GUIBase):
                              0, self.image_data.shape[0]])
 
         # Overlay mask if exists - Pure red #FF0000 for better visibility
-        if self.current_mask is not None:
+        if self.current_mask is not None and np.any(self.current_mask):
             from matplotlib.colors import ListedColormap
-            # Create pure red colormap #FF0000 (not pink or light red)
-            pure_red = ListedColormap([(0, 0, 0, 0), (1, 0, 0, 1)])  # RGBA: transparent, pure red
-            mask_overlay = np.ma.masked_where(~self.current_mask, self.current_mask)
-            self.mask_artist = self.ax.imshow(mask_overlay, cmap=pure_red, alpha=0.6, origin='lower',
+            # Create pure red colormap #FF0000
+            # Index 0 = transparent (False), Index 1 = red (True)
+            pure_red = ListedColormap([(0, 0, 0, 0), (1, 0, 0, 1)])  # RGBA
+            
+            # Use mask directly as image data (0=False=transparent, 1=True=red)
+            mask_display = self.current_mask.astype(np.uint8)
+            self.mask_artist = self.ax.imshow(mask_display, cmap=pure_red, alpha=0.7, 
+                                             origin='lower',
                                              extent=[0, self.image_data.shape[1],
                                                     0, self.image_data.shape[0]], 
-                                             interpolation='nearest', zorder=10)
+                                             interpolation='nearest', 
+                                             vmin=0, vmax=1,  # Map 0->transparent, 1->red
+                                             zorder=10)
 
         # Draw temporary shape being drawn
         self._draw_preview_shapes()
@@ -910,13 +912,17 @@ class MaskModule(GUIBase):
         
         # Draw only mask overlay with pure red #FF0000
         from matplotlib.colors import ListedColormap
-        pure_red = ListedColormap([(0, 0, 0, 0), (1, 0, 0, 1)])  # RGBA: transparent, pure red
-        mask_overlay = np.ma.masked_where(~self.current_mask, self.current_mask)
-        self.mask_artist = self.ax.imshow(mask_overlay, cmap=pure_red, alpha=0.6, 
+        pure_red = ListedColormap([(0, 0, 0, 0), (1, 0, 0, 1)])  # RGBA
+        
+        # Use mask directly as image data (0=False=transparent, 1=True=red)
+        mask_display = self.current_mask.astype(np.uint8)
+        self.mask_artist = self.ax.imshow(mask_display, cmap=pure_red, alpha=0.7, 
                                           origin='lower',
                                           extent=[0, self.image_data.shape[1],
                                                  0, self.image_data.shape[0]],
-                                          interpolation='nearest', zorder=10)
+                                          interpolation='nearest',
+                                          vmin=0, vmax=1,  # Map 0->transparent, 1->red
+                                          zorder=10)
         
         # Very fast update
         self.canvas.draw_idle()
