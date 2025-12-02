@@ -71,22 +71,12 @@ class MaskModule(GUIBase):
         scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setStyleSheet(f"background-color: {self.colors['bg']}; border: none;")
 
-        # Content widget with center alignment
-        content_container = QWidget()
-        container_layout = QHBoxLayout(content_container)
-        container_layout.setContentsMargins(0, 0, 0, 0)
-        
-        container_layout.addStretch(1)  # Left spacer
-        
+        # Content widget - Full width
         content_widget = QWidget()
-        content_widget.setMaximumWidth(1200)  # Limit width for better centering
         content_widget.setStyleSheet(f"background-color: {self.colors['bg']};")
         content_layout = QVBoxLayout(content_widget)
         content_layout.setContentsMargins(20, 8, 20, 8)
         content_layout.setSpacing(6)
-        
-        container_layout.addWidget(content_widget)
-        container_layout.addStretch(1)  # Right spacer
 
         # Title
         title = QLabel("🎭 Mask Creation & Management")
@@ -113,8 +103,8 @@ class MaskModule(GUIBase):
             preview_group = self.create_preview_group()
             content_layout.addWidget(preview_group)
         
-        # Add content container to scroll area
-        scroll.setWidget(content_container)
+        # Add content widget to scroll area
+        scroll.setWidget(content_widget)
         layout.addWidget(scroll)
 
     def create_control_group(self):
@@ -460,29 +450,83 @@ class MaskModule(GUIBase):
         info_row.addStretch()
         layout.addLayout(info_row)
 
-        # Canvas layout (no contrast slider)
+        # Canvas and contrast slider layout
         canvas_layout = QHBoxLayout()
-        canvas_layout.addStretch()  # Center the canvas
         
-        # Matplotlib canvas - Compact size
-        self.figure = Figure(figsize=(7, 5))
-        self.figure.subplots_adjust(left=0.10, right=0.98, top=0.96, bottom=0.12)
+        # Matplotlib canvas - Full size
+        self.figure = Figure(figsize=(10, 7))
+        self.figure.subplots_adjust(left=0.08, right=0.98, top=0.96, bottom=0.08)
         self.canvas = FigureCanvas(self.figure)
-        self.canvas.setFixedSize(700, 500)  # Compact size to fit in one page
+        self.canvas.setMinimumSize(800, 600)
         canvas_layout.addWidget(self.canvas)
         
-        canvas_layout.addStretch()  # Center the canvas
+        # Vertical contrast slider
+        slider_layout = QVBoxLayout()
+        slider_layout.setSpacing(2)
+        slider_layout.addStretch()
+        
+        max_label = QLabel("High")
+        max_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        max_label.setStyleSheet("color: #666666; font-size: 9px;")
+        slider_layout.addWidget(max_label)
+        
+        self.contrast_slider = QSlider(Qt.Orientation.Vertical)
+        self.contrast_slider.setMinimum(1)
+        self.contrast_slider.setMaximum(100)
+        self.contrast_slider.setValue(50)
+        self.contrast_slider.setFixedHeight(400)
+        self.contrast_slider.setFixedWidth(30)
+        self.contrast_slider.setStyleSheet("""
+            QSlider::groove:vertical {
+                border: 1px solid #BBBBBB;
+                width: 8px;
+                background: #FFFFFF;
+                margin: 0 0;
+            }
+            QSlider::handle:vertical {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #E0E0E0, stop:1 #F5F5F5);
+                border: 1px solid #AAAAAA;
+                height: 18px;
+                width: 20px;
+                margin: 0 -6px;
+            }
+            QSlider::handle:vertical:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #D0D0D0, stop:1 #E5E5E5);
+                border: 1px solid #888888;
+            }
+        """)
+        self.contrast_slider.valueChanged.connect(self.on_contrast_changed)
+        slider_layout.addWidget(self.contrast_slider, alignment=Qt.AlignmentFlag.AlignCenter)
+        
+        min_label = QLabel("Low")
+        min_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        min_label.setStyleSheet("color: #666666; font-size: 9px;")
+        slider_layout.addWidget(min_label)
+        
+        self.contrast_label = QLabel("50%")
+        self.contrast_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.contrast_label.setFixedWidth(50)
+        self.contrast_label.setStyleSheet("color: #333333; font-weight: bold; font-size: 11px;")
+        slider_layout.addWidget(self.contrast_label)
+        
+        contrast_text = QLabel("Contrast")
+        contrast_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        contrast_text.setStyleSheet("color: #666666; font-size: 9px;")
+        slider_layout.addWidget(contrast_text)
+        
+        slider_layout.addStretch()
+        canvas_layout.addLayout(slider_layout)
         
         layout.addLayout(canvas_layout)
-        
-        # Contrast value (fixed, no slider)
-        self.contrast_value = 50  # Default contrast
 
         # Connect mouse events
         self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
         self.canvas.mpl_connect('button_press_event', self.on_mouse_press)
         self.canvas.mpl_connect('button_release_event', self.on_mouse_release)
         self.canvas.mpl_connect('key_press_event', self.on_key_press)
+        self.canvas.mpl_connect('scroll_event', self.on_scroll)
 
         # Initial plot
         self.ax = self.figure.add_subplot(111)
@@ -704,7 +748,7 @@ class MaskModule(GUIBase):
 
         # Apply log scale and contrast
         img_display = np.log10(self.image_data + 1)
-        contrast_factor = self.contrast_value / 100.0
+        contrast_factor = self.contrast_slider.value() / 100.0
         low_percentile = contrast_factor * 20
         high_percentile = 100 - (1 - contrast_factor) * 5
         vmin = np.percentile(img_display, low_percentile)
@@ -1008,6 +1052,60 @@ class MaskModule(GUIBase):
                 # Cancel polygon
                 self.polygon_points = []
                 self.update_display()
+    
+    def on_contrast_changed(self, value):
+        """Handle contrast slider change"""
+        self.contrast_label.setText(f"{value}%")
+        if self.image_data is not None:
+            self.update_display()
+    
+    def on_scroll(self, event):
+        """Handle mouse wheel scroll for zooming"""
+        if event.inaxes != self.ax or self.image_data is None:
+            return
+        
+        # Get current axis limits
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+        
+        # Get mouse position in data coordinates
+        xdata = event.xdata
+        ydata = event.ydata
+        
+        # Zoom factor
+        zoom_factor = 1.2 if event.button == 'up' else 0.8
+        
+        # Calculate new limits centered on mouse position
+        x_range = xlim[1] - xlim[0]
+        y_range = ylim[1] - ylim[0]
+        
+        new_x_range = x_range / zoom_factor
+        new_y_range = y_range / zoom_factor
+        
+        # Calculate new limits
+        x_center_ratio = (xdata - xlim[0]) / x_range
+        y_center_ratio = (ydata - ylim[0]) / y_range
+        
+        new_xlim = [
+            xdata - new_x_range * x_center_ratio,
+            xdata + new_x_range * (1 - x_center_ratio)
+        ]
+        new_ylim = [
+            ydata - new_y_range * y_center_ratio,
+            ydata + new_y_range * (1 - y_center_ratio)
+        ]
+        
+        # Constrain to image bounds
+        new_xlim[0] = max(0, new_xlim[0])
+        new_xlim[1] = min(self.image_data.shape[1], new_xlim[1])
+        new_ylim[0] = max(0, new_ylim[0])
+        new_ylim[1] = min(self.image_data.shape[0], new_ylim[1])
+        
+        # Apply new limits
+        self.ax.set_xlim(new_xlim)
+        self.ax.set_ylim(new_ylim)
+        
+        self.canvas.draw_idle()
 
 
 # Test code
