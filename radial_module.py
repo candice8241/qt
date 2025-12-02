@@ -1647,14 +1647,14 @@ class BatchIntegrator:
             plt.plot(data[:, 0], data[:, 1] + y_offset,
                     color=color, linewidth=1.2, label=label)
             
-            # Add label above the curve
+            # Add label in the gap between current curve and next curve
             x_pos = data[0, 0] + (data[-1, 0] - data[0, 0]) * 0.02
-            # Position label at the top of the curve
-            y_pos = y_offset + np.max(data[:, 1])
+            # Position label slightly above the current curve's maximum
+            y_pos = y_offset + np.max(data[:, 1]) * 1.05
             
             plt.text(x_pos, y_pos, label,
-                    fontsize=9, verticalalignment='bottom',
-                    color='black')
+                    fontsize=8, verticalalignment='bottom',
+                    color='black', fontname='Arial')
         
         plt.xlabel('2θ (degrees)', fontsize=12)
         plt.ylabel('Intensity (offset)', fontsize=12)
@@ -1736,14 +1736,14 @@ class BatchIntegrator:
             plt.plot(data[:, 0], data[:, 1] + y_offset,
                     color=colors[color_idx], linewidth=1.2, label=label)
             
-            # Add pressure label above the curve
+            # Add pressure label in the gap between current curve and next curve
             x_pos = data[0, 0] + (data[-1, 0] - data[0, 0]) * 0.02
-            # Position label at the top of the curve
-            y_pos = y_offset + np.max(data[:, 1])
+            # Position label slightly above the current curve's maximum
+            y_pos = y_offset + np.max(data[:, 1]) * 1.05
             
             plt.text(x_pos, y_pos, label,
-                    fontsize=9, verticalalignment='bottom',
-                    color='black')
+                    fontsize=8, verticalalignment='bottom',
+                    color='black', fontname='Arial')
         
         plt.xlabel('2θ (degrees)', fontsize=12)
         plt.ylabel('Intensity (offset)', fontsize=12)
