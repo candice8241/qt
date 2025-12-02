@@ -564,17 +564,15 @@ class BatchIntegrator:
             plt.plot(data[:, 0], data[:, 1] + y_offset,
                     color=color, linewidth=1.2, label=label)
 
-            # Add label between current curve peak and next curve baseline
+            # Add label between current baseline and next baseline
             x_pos = data[0, 0] + (data[-1, 0] - data[0, 0]) * 0.02
-            # Calculate position in the gap between curves
-            current_peak = y_offset + np.max(data[:, 1])
+            # Position in the middle between current and next baseline
             if idx < len(data_list) - 1:
-                # Not the last curve: place in middle of gap to next curve
-                next_baseline = (idx + 1) * calc_offset
-                y_pos = (current_peak + next_baseline) / 2
+                # Not the last curve: middle between two baselines
+                y_pos = y_offset + calc_offset / 2
             else:
-                # Last curve: place slightly above its peak
-                y_pos = current_peak + calc_offset * 0.05
+                # Last curve: above its baseline
+                y_pos = y_offset + calc_offset * 0.3
 
             plt.text(x_pos, y_pos, label,
                     fontsize=8, verticalalignment='center',
@@ -677,17 +675,15 @@ class BatchIntegrator:
             plt.plot(data[:, 0], data[:, 1] + y_offset,
                     color=colors[color_idx], linewidth=1.2, label=label)
 
-            # Add pressure label between current curve peak and next curve baseline
+            # Add pressure label between current baseline and next baseline
             x_pos = data[0, 0] + (data[-1, 0] - data[0, 0]) * 0.02
-            # Calculate position in the gap between curves
-            current_peak = y_offset + np.max(data[:, 1])
+            # Position in the middle between current and next baseline
             if idx < len(data_list) - 1:
-                # Not the last curve: place in middle of gap to next curve
-                next_baseline = (idx + 1) * calc_offset
-                y_pos = (current_peak + next_baseline) / 2
+                # Not the last curve: middle between two baselines
+                y_pos = y_offset + calc_offset / 2
             else:
-                # Last curve: place slightly above its peak
-                y_pos = current_peak + calc_offset * 0.05
+                # Last curve: above its baseline
+                y_pos = y_offset + calc_offset * 0.3
 
             plt.text(x_pos, y_pos, label,
                     fontsize=8, verticalalignment='center',
