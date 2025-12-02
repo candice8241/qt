@@ -54,6 +54,10 @@ class MaskModule(GUIBase):
         self.draw_current = None
         self.polygon_points = []
         self.temp_shape = None  # Temporary shape being drawn
+        
+        # Zoom state
+        self.zoom_scale = 1.0
+        self.zoom_center = None
 
     def setup_ui(self):
         """Setup UI components"""
@@ -67,7 +71,7 @@ class MaskModule(GUIBase):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         scroll.setStyleSheet(f"background-color: {self.colors['bg']}; border: none;")
 
         # Content widget
@@ -246,25 +250,56 @@ class MaskModule(GUIBase):
         layout.setSpacing(8)
         layout.setContentsMargins(10, 10, 10, 10)
 
-        # Row 1: Drawing tools
+        # Row 1: Drawing tools - Radio buttons
         tool_row = QHBoxLayout()
         tool_row.setSpacing(10)
         
         tool_row.addWidget(QLabel("Tool:"))
-        
-        self.tool_combo = QComboBox()
-        self.tool_combo.addItems(["Select", "Circle", "Rectangle", "Polygon", "Point", "Threshold"])
-        self.tool_combo.setFixedWidth(100)
-        self.tool_combo.currentTextChanged.connect(self.on_tool_changed)
-        tool_row.addWidget(self.tool_combo)
 
-        # Separator
-        tool_row.addWidget(QLabel("|"))
-
-        # Mask/Unmask radio buttons
-        tool_row.addWidget(QLabel("Action:"))
-        
+        # Tool radio buttons
         from PyQt6.QtWidgets import QRadioButton, QButtonGroup
+        
+        self.tool_group = QButtonGroup(group)
+        
+        self.select_radio = QRadioButton("Select")
+        self.select_radio.setChecked(True)
+        self.select_radio.toggled.connect(lambda: self.on_tool_changed("select"))
+        self.tool_group.addButton(self.select_radio)
+        tool_row.addWidget(self.select_radio)
+        
+        self.circle_radio = QRadioButton("Circle")
+        self.circle_radio.toggled.connect(lambda: self.on_tool_changed("circle"))
+        self.tool_group.addButton(self.circle_radio)
+        tool_row.addWidget(self.circle_radio)
+        
+        self.rect_radio = QRadioButton("Rectangle")
+        self.rect_radio.toggled.connect(lambda: self.on_tool_changed("rectangle"))
+        self.tool_group.addButton(self.rect_radio)
+        tool_row.addWidget(self.rect_radio)
+        
+        self.polygon_radio = QRadioButton("Polygon")
+        self.polygon_radio.toggled.connect(lambda: self.on_tool_changed("polygon"))
+        self.tool_group.addButton(self.polygon_radio)
+        tool_row.addWidget(self.polygon_radio)
+        
+        self.point_radio = QRadioButton("Point")
+        self.point_radio.toggled.connect(lambda: self.on_tool_changed("point"))
+        self.tool_group.addButton(self.point_radio)
+        tool_row.addWidget(self.point_radio)
+        
+        self.threshold_radio = QRadioButton("Threshold")
+        self.threshold_radio.toggled.connect(lambda: self.on_tool_changed("threshold"))
+        self.tool_group.addButton(self.threshold_radio)
+        tool_row.addWidget(self.threshold_radio)
+
+        tool_row.addStretch()
+        layout.addLayout(tool_row)
+
+        # Row 2: Mask/Unmask action
+        action_row = QHBoxLayout()
+        action_row.setSpacing(10)
+        
+        action_row.addWidget(QLabel("Action:"))
         
         self.mask_radio = QRadioButton("Mask")
         self.mask_radio.setChecked(True)
@@ -277,7 +312,7 @@ class MaskModule(GUIBase):
                 height: 12px;
             }}
         """)
-        tool_row.addWidget(self.mask_radio)
+        action_row.addWidget(self.mask_radio)
         
         self.unmask_radio = QRadioButton("Unmask")
         self.unmask_radio.setStyleSheet(f"""
@@ -289,16 +324,16 @@ class MaskModule(GUIBase):
                 height: 12px;
             }}
         """)
-        tool_row.addWidget(self.unmask_radio)
+        action_row.addWidget(self.unmask_radio)
         
         self.action_group = QButtonGroup(group)
         self.action_group.addButton(self.mask_radio)
         self.action_group.addButton(self.unmask_radio)
 
-        tool_row.addStretch()
-        layout.addLayout(tool_row)
+        action_row.addStretch()
+        layout.addLayout(action_row)
 
-        # Row 2: Mask operations
+        # Row 3: Mask operations
         op_row = QHBoxLayout()
         op_row.setSpacing(8)
         
@@ -425,11 +460,11 @@ class MaskModule(GUIBase):
         # Canvas and contrast slider layout
         canvas_layout = QHBoxLayout()
         
-        # Matplotlib canvas
-        self.figure = Figure(figsize=(10, 8))
+        # Matplotlib canvas - Fixed size
+        self.figure = Figure(figsize=(8, 6))
         self.figure.subplots_adjust(left=0.10, right=0.98, top=0.96, bottom=0.12)
         self.canvas = FigureCanvas(self.figure)
-        self.canvas.setMinimumHeight(500)
+        self.canvas.setFixedSize(800, 600)  # Fixed size for consistent layout
         canvas_layout.addWidget(self.canvas)
         
         # Vertical contrast slider
@@ -498,6 +533,7 @@ class MaskModule(GUIBase):
         self.canvas.mpl_connect('button_press_event', self.on_mouse_press)
         self.canvas.mpl_connect('button_release_event', self.on_mouse_release)
         self.canvas.mpl_connect('key_press_event', self.on_key_press)
+        self.canvas.mpl_connect('scroll_event', self.on_scroll)
 
         # Initial plot
         self.ax = self.figure.add_subplot(111)
@@ -986,6 +1022,54 @@ class MaskModule(GUIBase):
                 # Cancel polygon
                 self.polygon_points = []
                 self.update_display()
+    
+    def on_scroll(self, event):
+        """Handle mouse wheel scroll for zooming"""
+        if event.inaxes != self.ax or self.image_data is None:
+            return
+        
+        # Get current axis limits
+        xlim = self.ax.get_xlim()
+        ylim = self.ax.get_ylim()
+        
+        # Get mouse position in data coordinates
+        xdata = event.xdata
+        ydata = event.ydata
+        
+        # Zoom factor
+        zoom_factor = 1.2 if event.button == 'up' else 0.8
+        
+        # Calculate new limits centered on mouse position
+        x_range = xlim[1] - xlim[0]
+        y_range = ylim[1] - ylim[0]
+        
+        new_x_range = x_range / zoom_factor
+        new_y_range = y_range / zoom_factor
+        
+        # Calculate new limits
+        x_center_ratio = (xdata - xlim[0]) / x_range
+        y_center_ratio = (ydata - ylim[0]) / y_range
+        
+        new_xlim = [
+            xdata - new_x_range * x_center_ratio,
+            xdata + new_x_range * (1 - x_center_ratio)
+        ]
+        new_ylim = [
+            ydata - new_y_range * y_center_ratio,
+            ydata + new_y_range * (1 - y_center_ratio)
+        ]
+        
+        # Constrain to image bounds
+        new_xlim[0] = max(0, new_xlim[0])
+        new_xlim[1] = min(self.image_data.shape[1], new_xlim[1])
+        new_ylim[0] = max(0, new_ylim[0])
+        new_ylim[1] = min(self.image_data.shape[0], new_ylim[1])
+        
+        # Apply new limits
+        self.ax.set_xlim(new_xlim)
+        self.ax.set_ylim(new_ylim)
+        
+        self.canvas.draw_idle()
 
 
 # Test code
