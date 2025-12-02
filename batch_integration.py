@@ -564,18 +564,16 @@ class BatchIntegrator:
             plt.plot(data[:, 0], data[:, 1] + y_offset,
                     color=color, linewidth=1.2, label=label)
 
-            # Add label at the ACTUAL middle of the curve
-            # Curve's actual y range after offset: [min(data)+y_offset, max(data)+y_offset]
-            # So label should be at the middle of this range
+            # Add label between current baseline and next baseline
             x_pos = data[0, 0] + (data[-1, 0] - data[0, 0]) * 0.02
-            min_intensity = np.min(data[:, 1])
-            max_intensity = np.max(data[:, 1])
-            # Position label at the actual middle of the curve
-            y_pos = y_offset + (min_intensity + max_intensity) / 2.0
+            # Position at 75% between current and next baseline to avoid overlap
+            # y_offset is current baseline (idx * calc_offset)
+            # Next baseline is (idx + 1) * calc_offset = y_offset + calc_offset
+            y_pos = y_offset + calc_offset * 0.95
 
             plt.text(x_pos, y_pos, label,
-                    fontsize=9, verticalalignment='center',
-                    bbox=dict(boxstyle='round,pad=0.3', facecolor=color, alpha=0.3))
+                    fontsize=8, verticalalignment='bottom',
+                    color='black', fontname='Arial')
 
         plt.xlabel('2θ (degrees)', fontsize=12)
         plt.ylabel('Intensity (offset)', fontsize=12)
@@ -674,18 +672,16 @@ class BatchIntegrator:
             plt.plot(data[:, 0], data[:, 1] + y_offset,
                     color=colors[color_idx], linewidth=1.2, label=label)
 
-            # Add pressure label at the ACTUAL middle of the curve
-            # Curve's actual y range after offset: [min(data)+y_offset, max(data)+y_offset]
-            # So label should be at the middle of this range
+            # Add pressure label between current baseline and next baseline
             x_pos = data[0, 0] + (data[-1, 0] - data[0, 0]) * 0.02
-            min_intensity = np.min(data[:, 1])
-            max_intensity = np.max(data[:, 1])
-            # Position label at the actual middle of the curve
-            y_pos = y_offset + (min_intensity + max_intensity) / 2.0
+            # Position at 75% between current and next baseline to avoid overlap
+            # y_offset is current baseline (idx * calc_offset)
+            # Next baseline is (idx + 1) * calc_offset = y_offset + calc_offset
+            y_pos = y_offset + calc_offset * 0.75
 
             plt.text(x_pos, y_pos, label,
-                    fontsize=9, verticalalignment='center',
-                    bbox=dict(boxstyle='round,pad=0.3', facecolor=colors[color_idx], alpha=0.3))
+                    fontsize=8, verticalalignment='bottom',
+                    color='black', fontname='Arial')
 
         plt.xlabel('2θ (degrees)', fontsize=12)
         plt.ylabel('Intensity (offset)', fontsize=12)
