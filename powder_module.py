@@ -1115,20 +1115,30 @@ except Exception as e:
                 except:
                     stdout, stderr = "", ""
                 
+                # ✅ 输出完整的stdout到Console，这样用户能看到文件查找日志
+                if stdout:
+                    self.log("="*60)
+                    self.log("Subprocess Output:")
+                    self.log("="*60)
+                    for line in stdout.splitlines():
+                        if line.strip():  # 跳过空行
+                            self.log(line)
+                    self.log("="*60)
+                
                 if "INTEGRATION_SUCCESS" in stdout:
                     self.log("✓ Integration completed successfully!")
-                    self.log("="*60)
                     self.show_success("Success", "Batch integration completed!")
                 else:
                     self.log("❌ Integration failed or was interrupted")
                     if stderr:
-                        # Show first 500 chars of error
-                        error_preview = stderr[:500]
+                        # Show first 1000 chars of error
+                        error_preview = stderr[:1000]
                         self.log(f"Error output:\n{error_preview}")
-                        if len(stderr) > 500:
+                        if len(stderr) > 1000:
                             self.log("... (error message truncated)")
-                    self.log("="*60)
                     self.show_error("Error", "Integration failed. Check log for details.")
+                
+                self.log("="*60)
                 
                 # Cleanup
                 del self.integration_process
