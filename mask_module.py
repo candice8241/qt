@@ -250,33 +250,33 @@ class MaskModule(GUIBase):
         
         self.tool_group = QButtonGroup(group)
         
-        self.select_radio = QRadioButton("Sel")
+        self.select_radio = QRadioButton("Select")
         self.select_radio.setChecked(True)
         self.select_radio.toggled.connect(lambda: self.on_tool_changed("select"))
         self.tool_group.addButton(self.select_radio)
         all_row.addWidget(self.select_radio)
         
-        self.circle_radio = QRadioButton("Cir")
+        self.circle_radio = QRadioButton("Circle")
         self.circle_radio.toggled.connect(lambda: self.on_tool_changed("circle"))
         self.tool_group.addButton(self.circle_radio)
         all_row.addWidget(self.circle_radio)
         
-        self.rect_radio = QRadioButton("Rect")
+        self.rect_radio = QRadioButton("Rectangle")
         self.rect_radio.toggled.connect(lambda: self.on_tool_changed("rectangle"))
         self.tool_group.addButton(self.rect_radio)
         all_row.addWidget(self.rect_radio)
         
-        self.polygon_radio = QRadioButton("Poly")
+        self.polygon_radio = QRadioButton("Polygon")
         self.polygon_radio.toggled.connect(lambda: self.on_tool_changed("polygon"))
         self.tool_group.addButton(self.polygon_radio)
         all_row.addWidget(self.polygon_radio)
         
-        self.point_radio = QRadioButton("Pt")
+        self.point_radio = QRadioButton("Point")
         self.point_radio.toggled.connect(lambda: self.on_tool_changed("point"))
         self.tool_group.addButton(self.point_radio)
         all_row.addWidget(self.point_radio)
         
-        self.threshold_radio = QRadioButton("Thres")
+        self.threshold_radio = QRadioButton("Threshold")
         self.threshold_radio.toggled.connect(lambda: self.on_tool_changed("threshold"))
         self.tool_group.addButton(self.threshold_radio)
         all_row.addWidget(self.threshold_radio)
@@ -433,11 +433,11 @@ class MaskModule(GUIBase):
         canvas_layout = QHBoxLayout()
         canvas_layout.addStretch(1)  # Left spacer for centering
         
-        # Matplotlib canvas - Much wider for better viewing
-        self.figure = Figure(figsize=(12, 4.5))
-        self.figure.subplots_adjust(left=0.05, right=0.98, top=0.96, bottom=0.08)
+        # Matplotlib canvas - Very large for h5 images
+        self.figure = Figure(figsize=(14, 8))
+        self.figure.subplots_adjust(left=0.05, right=0.98, top=0.97, bottom=0.06)
         self.canvas = FigureCanvas(self.figure)
-        self.canvas.setFixedSize(1200, 450)  # Much wider, compact height
+        self.canvas.setFixedSize(1400, 800)  # Very large canvas for better viewing
         canvas_layout.addWidget(self.canvas)
         
         # Vertical contrast slider
@@ -454,7 +454,7 @@ class MaskModule(GUIBase):
         self.contrast_slider.setMinimum(1)
         self.contrast_slider.setMaximum(100)
         self.contrast_slider.setValue(50)
-        self.contrast_slider.setFixedHeight(280)
+        self.contrast_slider.setFixedHeight(500)
         self.contrast_slider.setFixedWidth(30)
         self.contrast_slider.setStyleSheet("""
             QSlider::groove:vertical {
@@ -846,13 +846,13 @@ class MaskModule(GUIBase):
                       extent=[0, self.image_data.shape[1],
                              0, self.image_data.shape[0]])
 
-        # Overlay mask if exists - Pure red color for better visibility
+        # Overlay mask if exists - Pure red #FF0000 for better visibility
         if self.current_mask is not None:
             from matplotlib.colors import ListedColormap
-            # Create pure red colormap (not pink)
-            pure_red = ListedColormap(['none', 'red'])
+            # Create pure red colormap #FF0000 (not pink or light red)
+            pure_red = ListedColormap([(0, 0, 0, 0), (1, 0, 0, 1)])  # RGBA: transparent, pure red
             mask_overlay = np.ma.masked_where(~self.current_mask, self.current_mask)
-            self.mask_artist = self.ax.imshow(mask_overlay, cmap=pure_red, alpha=0.5, origin='lower',
+            self.mask_artist = self.ax.imshow(mask_overlay, cmap=pure_red, alpha=0.6, origin='lower',
                                              extent=[0, self.image_data.shape[1],
                                                     0, self.image_data.shape[0]], 
                                              interpolation='nearest', zorder=10)
@@ -908,11 +908,11 @@ class MaskModule(GUIBase):
             except:
                 pass
         
-        # Draw only mask overlay
+        # Draw only mask overlay with pure red #FF0000
         from matplotlib.colors import ListedColormap
-        pure_red = ListedColormap(['none', 'red'])
+        pure_red = ListedColormap([(0, 0, 0, 0), (1, 0, 0, 1)])  # RGBA: transparent, pure red
         mask_overlay = np.ma.masked_where(~self.current_mask, self.current_mask)
-        self.mask_artist = self.ax.imshow(mask_overlay, cmap=pure_red, alpha=0.5, 
+        self.mask_artist = self.ax.imshow(mask_overlay, cmap=pure_red, alpha=0.6, 
                                           origin='lower',
                                           extent=[0, self.image_data.shape[1],
                                                  0, self.image_data.shape[0]],
