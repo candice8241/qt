@@ -749,7 +749,8 @@ def run_batch_integration(
     formats=['xy', 'dat', 'chi', 'svg', 'png', 'fxye'],
     create_stacked_plot=True,
     stacked_plot_offset='auto',
-    disable_progress_bar=False
+    disable_progress_bar=False,
+    sector_kwargs=None
 ):
     """
     Run batch 1D integration using pyFAI
@@ -766,6 +767,7 @@ def run_batch_integration(
         create_stacked_plot (bool): Whether to create stacked plot
         stacked_plot_offset (str or float): Offset for stacked plot
         disable_progress_bar (bool): Disable tqdm progress bar (useful for GUI)
+        sector_kwargs (dict): Sector integration parameters (e.g., {'azimuth_range': (min, max)})
     """
 
     integration_kwargs = {
@@ -775,6 +777,11 @@ def run_batch_integration(
         'safe': True,
         'normalization_factor': 1.0
     }
+    
+    # Add sector parameters if provided
+    if sector_kwargs:
+        integration_kwargs.update(sector_kwargs)
+        print(f"✓ Sector integration enabled: {sector_kwargs}")
 
     if not os.path.exists(poni_file):
         raise FileNotFoundError(f"Calibration file not found: {poni_file}")

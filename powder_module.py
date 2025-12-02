@@ -39,6 +39,7 @@ import os
 from gui_base import GUIBase
 from theme_module import CuteSheepProgressBar, ModernButton
 from custom_widgets import SpinboxStyleButton, CustomSpinbox
+from h5_preview_dialog import H5PreviewDialog
 
 
 class WorkerSignals(QObject):
@@ -128,6 +129,9 @@ class PowderXRDModule(GUIBase):
         # Stacked plot options
         self.create_stacked_plot = False
         self.stacked_plot_offset = 'auto'
+        
+        # Sector integration parameters from H5 preview
+        self.sector_params = None
 
         # Phase analysis variables
         self.phase_peak_csv = ""
@@ -262,6 +266,47 @@ class PowderXRDModule(GUIBase):
         self.create_file_input(left_layout, "Input Pattern:", "input_pattern")
         self.create_folder_input(left_layout, "Output Directory:", "output_dir")
         self.create_text_input(left_layout, "Dataset Directory:", "dataset_path", placeholder="entry/data/data", with_browse=True)
+
+        # Add H5 Preview and Sector Selection section
+        h5_sector_container = QWidget()
+        h5_sector_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
+        h5_sector_layout = QVBoxLayout(h5_sector_container)
+        h5_sector_layout.setContentsMargins(0, 0, 0, 8)
+        h5_sector_layout.setSpacing(5)
+
+        # Label and button row
+        h5_btn_row = QWidget()
+        h5_btn_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
+        h5_btn_row_layout = QHBoxLayout(h5_btn_row)
+        h5_btn_row_layout.setContentsMargins(0, 0, 0, 0)
+        h5_btn_row_layout.setSpacing(5)
+
+        h5_label = QLabel("Sector Integration (Optional):")
+        h5_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        h5_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
+        h5_btn_row_layout.addWidget(h5_label)
+
+        h5_preview_btn = ModernButton(
+            "🔍 H5 Preview & Select Region",
+            self.open_h5_preview,
+            bg_color="#2196F3",
+            hover_color="#1976D2",
+            width=200, height=28,
+            parent=h5_btn_row
+        )
+        h5_preview_btn.setFont(QFont('Arial', 9))
+        h5_btn_row_layout.addWidget(h5_preview_btn)
+        h5_btn_row_layout.addStretch()
+
+        h5_sector_layout.addWidget(h5_btn_row)
+
+        # Info label to show selected sector parameters
+        self.sector_info_label = QLabel("No sector selected (full integration)")
+        self.sector_info_label.setFont(QFont('Arial', 8))
+        self.sector_info_label.setStyleSheet(f"color: #666666; background-color: {self.colors['card_bg']}; padding-left: 2px;")
+        h5_sector_layout.addWidget(self.sector_info_label)
+
+        left_layout.addWidget(h5_sector_container)
 
         # Add Run Integration button centered
         run_int_btn_row = QWidget()
@@ -957,6 +1002,43 @@ class PowderXRDModule(GUIBase):
         if folder:
             entry.setText(folder)
 
+    def open_h5_preview(self):
+        """Open H5 preview dialog to select integration region"""
+        # Get initial file from input pattern if it's an H5 file
+        initial_file = None
+        if self.input_pattern and self.input_pattern.lower().endswith('.h5'):
+            initial_file = self.input_pattern
+        elif self.input_pattern and '*.h5' in self.input_pattern:
+            # Extract directory from pattern
+            import glob
+            pattern_dir = self.input_pattern.replace('**/', '').replace('*.h5', '')
+            files = glob.glob(os.path.join(pattern_dir, '*.h5'))
+            if files:
+                initial_file = files[0]
+        
+        # Create and show H5 preview dialog
+        dialog = H5PreviewDialog(parent=self.root, initial_file=initial_file)
+        result = dialog.exec()
+        
+        if result == dialog.DialogCode.Accepted:
+            # Get sector parameters
+            self.sector_params = dialog.get_sector_parameters()
+            
+            # Update info label
+            params = self.sector_params
+            info_text = (f"✓ Sector selected: Azim [{params['azim_start']:.1f}° - {params['azim_end']:.1f}°], "
+                        f"Radial [{params['rad_min']:.1f} - {params['rad_max']:.1f if params['rad_max'] > 0 else 'auto'} px]")
+            self.sector_info_label.setText(info_text)
+            self.sector_info_label.setStyleSheet(f"color: #4CAF50; background-color: {self.colors['card_bg']}; padding-left: 2px; font-weight: bold;")
+            
+            # Auto-fill input pattern if not set
+            if not self.input_pattern and params['h5_file']:
+                directory = os.path.dirname(params['h5_file'])
+                pattern = os.path.join(directory, '**', '*.h5')
+                self.input_pattern_entry.setText(pattern)
+            
+            self.log(f"Sector parameters selected from H5 preview: {info_text}")
+
     def log(self, message):
         """Add message to log"""
         self.log_text.append(message)
@@ -1030,6 +1112,16 @@ class PowderXRDModule(GUIBase):
             # Start progress animation
             self.progress.start()
             
+            # Prepare sector parameters if available
+            sector_kwargs = {}
+            if self.sector_params:
+                # Convert azimuthal angles from degrees to radians for pyFAI
+                import math
+                azim_start_rad = math.radians(self.sector_params['azim_start'])
+                azim_end_rad = math.radians(self.sector_params['azim_end'])
+                sector_kwargs['azimuth_range'] = (azim_start_rad, azim_end_rad)
+                self.log(f"Using sector integration: Azimuth {self.sector_params['azim_start']:.1f}° - {self.sector_params['azim_end']:.1f}°")
+            
             # Create integration script for subprocess
             script = self._create_integration_script(
                 poni_path=self.poni_path,
@@ -1041,7 +1133,8 @@ class PowderXRDModule(GUIBase):
                 unit=unit_pyFAI,
                 formats=formats,
                 create_stacked_plot=self.create_stacked_plot,
-                stacked_plot_offset=self.stacked_plot_offset
+                stacked_plot_offset=self.stacked_plot_offset,
+                sector_kwargs=sector_kwargs
             )
             
             # Start subprocess
@@ -1074,6 +1167,12 @@ class PowderXRDModule(GUIBase):
         def escape(s):
             return s.replace('\\', '\\\\').replace('"', '\\"') if s else ""
         
+        # Build sector kwargs string
+        sector_kwargs = params.get('sector_kwargs', {})
+        sector_kwargs_str = ""
+        if sector_kwargs:
+            sector_kwargs_str = ", sector_kwargs=" + str(sector_kwargs)
+        
         return f'''
 import sys
 import os
@@ -1097,7 +1196,7 @@ try:
         formats={params['formats']},
         create_stacked_plot={params['create_stacked_plot']},
         stacked_plot_offset="{params['stacked_plot_offset']}",
-        disable_progress_bar=True
+        disable_progress_bar=True{sector_kwargs_str}
     )
     
     print("\\n\\n=== INTEGRATION_SUCCESS ===", flush=True)
