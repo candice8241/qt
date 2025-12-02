@@ -574,8 +574,8 @@ class BatchIntegrator:
             y_pos = y_offset + (min_intensity + max_intensity) / 2.0
 
             plt.text(x_pos, y_pos, label,
-                    fontsize=9, verticalalignment='center',
-                    bbox=dict(boxstyle='round,pad=0.3', facecolor=color, alpha=0.3))
+                    fontsize=10, verticalalignment='center',
+                    color=color, fontweight='bold')
 
         plt.xlabel('2θ (degrees)', fontsize=12)
         plt.ylabel('Intensity (offset)', fontsize=12)
@@ -684,8 +684,8 @@ class BatchIntegrator:
             y_pos = y_offset + (min_intensity + max_intensity) / 2.0
 
             plt.text(x_pos, y_pos, label,
-                    fontsize=9, verticalalignment='center',
-                    bbox=dict(boxstyle='round,pad=0.3', facecolor=colors[color_idx], alpha=0.3))
+                    fontsize=10, verticalalignment='center',
+                    color=colors[color_idx], fontweight='bold')
 
         plt.xlabel('2θ (degrees)', fontsize=12)
         plt.ylabel('Intensity (offset)', fontsize=12)
