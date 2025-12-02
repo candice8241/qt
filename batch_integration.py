@@ -145,7 +145,7 @@ class BatchIntegrator:
             raise ValueError("No suitable image dataset found in HDF5 file")
     
     def integrate_single(self, h5_file, output_base, npt=2000, unit="2th_deg",
-                        dataset_path=None, frame_index=0, formats=['xy'], **kwargs):
+                        dataset_path=None, frame_index=0, formats=['xy'], bins=None, **kwargs):
         """
         Integrate a single HDF5 file and save in multiple formats
 
@@ -157,36 +157,78 @@ class BatchIntegrator:
             dataset_path (str, optional): Dataset path
             frame_index (int): Frame index (for multi-frame)
             formats (list): List of output formats ['xy', 'dat', 'chi', 'fxye']
+            bins (list, optional): List of bin configs [{'name': str, 'start': float, 'end': float}, ...]
             **kwargs: Additional arguments to integrate1d
         """
         try:
             img_data = self._read_h5_image(h5_file, dataset_path, frame_index)
 
-            # Perform integration
-            result = self.ai.integrate1d(
-                img_data,
-                npt=npt,
-                mask=self.mask,
-                unit=unit,
-                **kwargs
-            )
-
-            # Save in multiple formats
-            for fmt in formats:
-                output_file = f"{output_base}.{fmt}"
-
-                if fmt == 'xy':
-                    self._save_xy(result, output_file)
-                elif fmt == 'dat':
-                    self._save_dat(result, output_file)
-                elif fmt == 'chi':
-                    self._save_chi(result, output_file)
-                elif fmt == 'fxye':
-                    self._save_fxye(result, output_file)
-                elif fmt == 'svg':
-                    self._save_svg(result, output_file)
-                elif fmt == 'png':
-                    self._save_png(result, output_file)
+            # If bins are provided, integrate each bin separately
+            if bins:
+                import math
+                for bin_data in bins:
+                    # Convert degrees to radians
+                    azim_start_rad = math.radians(bin_data['start'])
+                    azim_end_rad = math.radians(bin_data['end'])
+                    
+                    # Create kwargs for this bin
+                    bin_kwargs = kwargs.copy()
+                    bin_kwargs['azimuth_range'] = (azim_start_rad, azim_end_rad)
+                    
+                    # Perform integration for this bin
+                    result = self.ai.integrate1d(
+                        img_data,
+                        npt=npt,
+                        mask=self.mask,
+                        unit=unit,
+                        **bin_kwargs
+                    )
+                    
+                    # Save with bin name in filename
+                    bin_output_base = f"{output_base}_{bin_data['name']}"
+                    
+                    # Save in multiple formats
+                    for fmt in formats:
+                        output_file = f"{bin_output_base}.{fmt}"
+                        
+                        if fmt == 'xy':
+                            self._save_xy(result, output_file)
+                        elif fmt == 'dat':
+                            self._save_dat(result, output_file)
+                        elif fmt == 'chi':
+                            self._save_chi(result, output_file)
+                        elif fmt == 'fxye':
+                            self._save_fxye(result, output_file)
+                        elif fmt == 'svg':
+                            self._save_svg(result, output_file)
+                        elif fmt == 'png':
+                            self._save_png(result, output_file)
+            else:
+                # Single integration (no binning)
+                result = self.ai.integrate1d(
+                    img_data,
+                    npt=npt,
+                    mask=self.mask,
+                    unit=unit,
+                    **kwargs
+                )
+                
+                # Save in multiple formats
+                for fmt in formats:
+                    output_file = f"{output_base}.{fmt}"
+                    
+                    if fmt == 'xy':
+                        self._save_xy(result, output_file)
+                    elif fmt == 'dat':
+                        self._save_dat(result, output_file)
+                    elif fmt == 'chi':
+                        self._save_chi(result, output_file)
+                    elif fmt == 'fxye':
+                        self._save_fxye(result, output_file)
+                    elif fmt == 'svg':
+                        self._save_svg(result, output_file)
+                    elif fmt == 'png':
+                        self._save_png(result, output_file)
 
             return True, None
 
@@ -242,7 +284,7 @@ class BatchIntegrator:
     
     def batch_integrate(self, input_pattern, output_dir, npt=2000, unit="2th_deg",
                         dataset_path=None, formats=['xy'], create_stacked_plot=False,
-                        stacked_plot_offset='auto', disable_progress_bar=False, **kwargs):
+                        stacked_plot_offset='auto', disable_progress_bar=False, bins=None, **kwargs):
         """
         Batch integration for multiple HDF5 files
 
@@ -251,6 +293,7 @@ class BatchIntegrator:
             create_stacked_plot (bool): Whether to create stacked plot
             stacked_plot_offset (str or float): Offset for stacked plot ('auto' or float value)
             disable_progress_bar (bool): Disable tqdm progress bar (useful for GUI)
+            bins (list, optional): List of bin configs for azimuthal binning
         """
         # Enhanced file search with multiple attempts and detailed debugging
         h5_files = []
@@ -359,7 +402,10 @@ class BatchIntegrator:
         print(f"\nFound {len(h5_files)} HDF5 files to process")
         print(f"Output directory: {output_dir}")
         print(f"Integration parameters: {npt} points, unit={unit}")
-        print(f"Output formats: {', '.join(formats)}\n")
+        print(f"Output formats: {', '.join(formats)}")
+        if bins:
+            print(f"Bin mode: {len(bins)} azimuthal bins configured")
+        print()
 
         os.makedirs(output_dir, exist_ok=True)
 
@@ -374,7 +420,7 @@ class BatchIntegrator:
             output_base = os.path.join(output_dir, basename)
 
             success, error_msg = self.integrate_single(
-                h5_file, output_base, npt, unit, dataset_path, formats=formats, **kwargs
+                h5_file, output_base, npt, unit, dataset_path, formats=formats, bins=bins, **kwargs
             )
 
             if success:
@@ -749,7 +795,9 @@ def run_batch_integration(
     formats=['xy', 'dat', 'chi', 'svg', 'png', 'fxye'],
     create_stacked_plot=True,
     stacked_plot_offset='auto',
-    disable_progress_bar=False
+    disable_progress_bar=False,
+    sector_kwargs=None,
+    bins=None
 ):
     """
     Run batch 1D integration using pyFAI
@@ -766,6 +814,8 @@ def run_batch_integration(
         create_stacked_plot (bool): Whether to create stacked plot
         stacked_plot_offset (str or float): Offset for stacked plot
         disable_progress_bar (bool): Disable tqdm progress bar (useful for GUI)
+        sector_kwargs (dict): Sector integration parameters (e.g., {'azimuth_range': (min, max)})
+        bins (list): List of bin configs for azimuthal binning [{'name': str, 'start': float, 'end': float}, ...]
     """
 
     integration_kwargs = {
@@ -775,6 +825,15 @@ def run_batch_integration(
         'safe': True,
         'normalization_factor': 1.0
     }
+    
+    # Add sector parameters if provided (only if bins are not used)
+    if sector_kwargs and not bins:
+        integration_kwargs.update(sector_kwargs)
+        print(f"✓ Sector integration enabled: {sector_kwargs}")
+    
+    # Note: If bins are provided, azimuth_range will be set per bin in integrate_single
+    if bins:
+        print(f"✓ Bin mode enabled: {len(bins)} bins configured")
 
     if not os.path.exists(poni_file):
         raise FileNotFoundError(f"Calibration file not found: {poni_file}")
@@ -791,6 +850,7 @@ def run_batch_integration(
         create_stacked_plot=create_stacked_plot,
         stacked_plot_offset=stacked_plot_offset,
         disable_progress_bar=disable_progress_bar,
+        bins=bins,
         **integration_kwargs
     )
 def main():

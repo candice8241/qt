@@ -11,6 +11,7 @@ from PyQt6.QtGui import QFont, QIcon
 import sys
 import os
 from theme_module import GUIBase, ModernButton, ModernTab, CuteSheepProgressBar
+from mask_module import MaskModule
 from powder_module import PowderXRDModule
 from radial_module import AzimuthalIntegrationModule
 from single_crystal_module import SingleCrystalModule
@@ -47,6 +48,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         self.setStyleSheet(f"background-color: {self.colors['bg']};")
 
         # Initialize modules
+        self.mask_module = None
         self.powder_module = None
         self.radial_module = None
         self.single_crystal_module = None
@@ -55,6 +57,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
 
         # Containers for each module (prebuilt and stacked to avoid flicker)
         self.module_frames = {
+            "mask": None,
             "powder": None,
             "single": None,
             "radial": None,
@@ -127,14 +130,18 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         sidebar_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
 
         # Create navigation buttons (store references for state management)
-        self.powder_btn = self.create_sidebar_button("⚗️  Powder Int.", lambda: self.switch_tab("powder"), is_active=True)
+        self.mask_btn = self.create_sidebar_button("🎭  Mask", lambda: self.switch_tab("mask"), is_active=False)
+        sidebar_layout.addWidget(self.mask_btn)
+        
+        self.powder_btn = self.create_sidebar_button("⚗️  Batch Int.", lambda: self.switch_tab("powder"), is_active=True)
         sidebar_layout.addWidget(self.powder_btn)
 
-        self.radial_btn = self.create_sidebar_button("🔄  Radial Int.", lambda: self.switch_tab("radial"), is_active=False)
-        sidebar_layout.addWidget(self.radial_btn)
-
-        self.single_btn = self.create_sidebar_button("🔬  SC", lambda: self.switch_tab("single"), is_active=False)
-        sidebar_layout.addWidget(self.single_btn)
+        # Hidden buttons - SC and Radial Int
+        # self.radial_btn = self.create_sidebar_button("🔄  Radial Int.", lambda: self.switch_tab("radial"), is_active=False)
+        # sidebar_layout.addWidget(self.radial_btn)
+        #
+        # self.single_btn = self.create_sidebar_button("🔬  SC", lambda: self.switch_tab("single"), is_active=False)
+        # sidebar_layout.addWidget(self.single_btn)
 
         self.bcdi_cal_btn = self.create_sidebar_button("🔬  BCDI Cal.", lambda: self.switch_tab("bcdi_cal"), is_active=False)
         sidebar_layout.addWidget(self.bcdi_cal_btn)
@@ -332,9 +339,10 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
     def update_sidebar_buttons(self, active_tab):
         """Update sidebar button styles based on active tab (None = no active module)"""
         buttons = {
+            "mask": self.mask_btn,
             "powder": self.powder_btn,
-            "radial": self.radial_btn,
-            "single": self.single_btn,
+            # "radial": self.radial_btn,  # Hidden
+            # "single": self.single_btn,  # Hidden
             "bcdi_cal": self.bcdi_cal_btn,
             "dioptas": self.dioptas_btn,
             "curvefit": self.curvefit_btn,
@@ -407,6 +415,13 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
 
     def prebuild_modules(self):
         """Construct all module frames and their UIs ahead of first use to avoid initial flash."""
+        # Prebuild mask module
+        mask_frame = self._ensure_frame("mask")
+        if self.mask_module is None:
+            self.mask_module = MaskModule(mask_frame, self)
+            self.mask_module.setup_ui()
+        mask_frame.hide()  # Ensure hidden after prebuild
+        
         # Only prebuild non-active modules in background
         radial_frame = self._ensure_frame("radial")
         if self.radial_module is None:
@@ -474,7 +489,13 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
 
         # Show appropriate module
         target_frame = None
-        if tab_name == "powder":
+        if tab_name == "mask":
+            target_frame = self._ensure_frame("mask")
+            if self.mask_module is None:
+                self.mask_module = MaskModule(target_frame, self)
+                self.mask_module.setup_ui()
+        
+        elif tab_name == "powder":
             target_frame = self._ensure_frame("powder")
             if self.powder_module is None:
                 self.powder_module = PowderXRDModule(target_frame, self)

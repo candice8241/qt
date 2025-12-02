@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Bin Mode Configuration Dialog
-用于配置方位角分bin的对话框
+Dialog for configuring azimuthal binning
 """
 
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
@@ -15,9 +15,9 @@ import numpy as np
 
 
 class BinConfigDialog(QDialog):
-    """Bin Mode配置对话框"""
+    """Bin Mode Configuration Dialog"""
     
-    # 信号：配置完成，返回bin列表
+    # Signal: configuration completed, returns bin list
     bins_configured = pyqtSignal(list)
     
     def __init__(self, parent=None):
@@ -26,7 +26,7 @@ class BinConfigDialog(QDialog):
         self.setModal(True)
         self.setMinimumSize(600, 500)
         
-        # 颜色主题
+        # Color theme
         self.colors = {
             'primary': '#7C4DFF',
             'background': '#F5F5F5',
@@ -35,36 +35,36 @@ class BinConfigDialog(QDialog):
             'text_dark': '#333333'
         }
         
-        # 数据
+        # Data storage
         self.bins = []  # List of dicts: {'start': float, 'end': float, 'name': str}
         
         self.setup_ui()
     
     def setup_ui(self):
-        """设置UI"""
+        """Setup UI components"""
         layout = QVBoxLayout(self)
         layout.setSpacing(15)
         layout.setContentsMargins(20, 20, 20, 20)
         
-        # 标题
+        # Title
         title = QLabel("Azimuthal Bin Configuration")
         title.setFont(QFont('Arial', 14, QFont.Weight.Bold))
         title.setStyleSheet(f"color: {self.colors['primary']};")
         layout.addWidget(title)
         
-        # 快速生成组
+        # Quick generate group
         quick_group = self.create_quick_generate_group()
         layout.addWidget(quick_group)
         
-        # Bin列表
+        # Bin list group
         list_group = self.create_bin_list_group()
         layout.addWidget(list_group)
         
-        # 手动添加组
+        # Manual add group
         manual_group = self.create_manual_add_group()
         layout.addWidget(manual_group)
         
-        # 按钮
+        # Bottom buttons
         button_layout = QHBoxLayout()
         button_layout.addStretch()
         
@@ -125,7 +125,7 @@ class BinConfigDialog(QDialog):
         layout.addLayout(button_layout)
     
     def create_quick_generate_group(self):
-        """创建快速生成组"""
+        """Create quick generate group"""
         group = QGroupBox("Quick Generate")
         group.setStyleSheet(f"""
             QGroupBox {{
@@ -144,7 +144,7 @@ class BinConfigDialog(QDialog):
         
         layout = QVBoxLayout(group)
         
-        # 参数行
+        # Parameter row
         param_layout = QHBoxLayout()
         
         # Start angle
@@ -193,7 +193,7 @@ class BinConfigDialog(QDialog):
         return group
     
     def create_bin_list_group(self):
-        """创建Bin列表组"""
+        """Create bin list group"""
         group = QGroupBox("Bin List")
         group.setStyleSheet(f"""
             QGroupBox {{
@@ -230,7 +230,7 @@ class BinConfigDialog(QDialog):
         return group
     
     def create_manual_add_group(self):
-        """创建手动添加组"""
+        """Create manual add group"""
         group = QGroupBox("Manual Add")
         group.setStyleSheet(f"""
             QGroupBox {{
@@ -292,7 +292,7 @@ class BinConfigDialog(QDialog):
         return group
     
     def quick_generate(self):
-        """快速生成bins"""
+        """Quickly generate bins"""
         try:
             start = float(self.quick_start.text())
             end = float(self.quick_end.text())
@@ -306,10 +306,10 @@ class BinConfigDialog(QDialog):
                 QMessageBox.warning(self, "Error", "Number of bins must be at least 1")
                 return
             
-            # 清空现有bins
+            # Clear existing bins
             self.bins = []
             
-            # 生成bins
+            # Generate bins
             bin_width = (end - start) / num_bins
             for i in range(num_bins):
                 bin_start = start + i * bin_width
@@ -328,7 +328,7 @@ class BinConfigDialog(QDialog):
             QMessageBox.warning(self, "Error", f"Invalid input: {str(e)}")
     
     def manual_add(self):
-        """手动添加bin"""
+        """Manually add a bin"""
         try:
             name = self.manual_name.text().strip()
             if not name:
@@ -349,14 +349,14 @@ class BinConfigDialog(QDialog):
             
             self.update_table()
             
-            # 清空输入框
+            # Clear input fields
             self.manual_name.clear()
             
         except ValueError as e:
             QMessageBox.warning(self, "Error", f"Invalid input: {str(e)}")
     
     def update_table(self):
-        """更新表格"""
+        """Update table display"""
         self.bin_table.setRowCount(len(self.bins))
         
         for i, bin_data in enumerate(self.bins):
@@ -393,13 +393,13 @@ class BinConfigDialog(QDialog):
             self.bin_table.setCellWidget(i, 3, delete_btn)
     
     def delete_bin(self, index):
-        """删除bin"""
+        """Delete a bin"""
         if 0 <= index < len(self.bins):
             del self.bins[index]
             self.update_table()
     
     def clear_bins(self):
-        """清空所有bins"""
+        """Clear all bins"""
         reply = QMessageBox.question(
             self, 'Confirm', 'Clear all bins?',
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
@@ -410,7 +410,7 @@ class BinConfigDialog(QDialog):
             self.update_table()
     
     def accept_config(self):
-        """接受配置"""
+        """Accept configuration"""
         if not self.bins:
             QMessageBox.warning(self, "Error", "Please add at least one bin")
             return
@@ -419,11 +419,11 @@ class BinConfigDialog(QDialog):
         self.accept()
     
     def get_bins(self):
-        """获取bins列表"""
+        """Get bins list"""
         return self.bins
 
 
-# 测试代码
+# Test code
 if __name__ == "__main__":
     from PyQt6.QtWidgets import QApplication
     import sys

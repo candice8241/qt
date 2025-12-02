@@ -93,6 +93,26 @@ class H5PreviewDialog(QDialog):
         button_layout = QHBoxLayout()
         button_layout.addStretch()
 
+        # Use for Integration button
+        use_btn = QPushButton("✓ Use for Integration")
+        use_btn.setFixedWidth(160)
+        use_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 8px;
+                border-radius: 4px;
+                font-weight: bold;
+                font-size: 11px;
+            }}
+            QPushButton:hover {{
+                background-color: #45A049;
+            }}
+        """)
+        use_btn.clicked.connect(self.use_for_integration)
+        button_layout.addWidget(use_btn)
+
         close_btn = QPushButton("Close")
         close_btn.setFixedWidth(100)
         close_btn.setStyleSheet(f"""
@@ -100,7 +120,7 @@ class H5PreviewDialog(QDialog):
                 background-color: {self.colors['primary']};
                 color: white;
                 border: none;
-                padding: 5px;
+                padding: 8px;
                 border-radius: 4px;
                 font-weight: bold;
             }}
@@ -108,7 +128,7 @@ class H5PreviewDialog(QDialog):
                 background-color: #6A1B9A;
             }}
         """)
-        close_btn.clicked.connect(self.accept)
+        close_btn.clicked.connect(self.reject)
         button_layout.addWidget(close_btn)
 
         layout.addLayout(button_layout)
@@ -626,6 +646,31 @@ class H5PreviewDialog(QDialog):
         # Update image display if image is loaded
         if self.current_image is not None:
             self.update_image_display()
+
+    def use_for_integration(self):
+        """Use selected sector parameters for integration"""
+        if not self.show_sector:
+            QMessageBox.warning(self, "Warning", "Please draw a sector first using the Draw button")
+            return
+        
+        if self.h5_file_path is None:
+            QMessageBox.warning(self, "Warning", "Please load an H5 file first")
+            return
+        
+        # Accept dialog and return parameters
+        self.accept()
+    
+    def get_sector_parameters(self):
+        """Get current sector parameters"""
+        return {
+            'h5_file': self.h5_file_path,
+            'azim_start': self.sector_azim_start,
+            'azim_end': self.sector_azim_end,
+            'rad_min': self.sector_rad_min,
+            'rad_max': self.sector_rad_max,
+            'center_x': self.center_x,
+            'center_y': self.center_y
+        }
 
 
 # Test code

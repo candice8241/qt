@@ -1,1130 +1,1008 @@
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
-Mask Editor Module - Qt Version
-Comprehensive mask creation and editing for X-ray diffraction images
-
-Features:
-- Multiple mask drawing modes (Rectangle, Circle, Polygon, Point)
-- Threshold-based masking
-- Cosmic ray removal
-- Grow/Shrink masks
-- Invert masks
-- Load/Save masks (EDF, NPY formats)
-
-Created: 2025
-@author: XRD Processing Suite
+Mask Creation and Management Module
+Module for creating and managing diffraction masks
 """
 
-from PyQt6.QtWidgets import (QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton,
-                              QLineEdit, QTextEdit, QCheckBox, QComboBox, QGroupBox,
-                              QFileDialog, QMessageBox, QFrame, QSlider, QSpinBox,
-                              QRadioButton, QButtonGroup, QSplitter, QScrollArea)
-from PyQt6.QtCore import Qt, pyqtSignal, QObject
+from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
+                              QPushButton, QGroupBox, QFileDialog, QMessageBox,
+                              QLineEdit, QCheckBox, QSlider, QComboBox, QSpinBox,
+                              QScrollArea, QFrame)
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
-import os
 import numpy as np
+import os
 from gui_base import GUIBase
-from theme_module import ModernButton
 
+# Import matplotlib for image display
 try:
-    from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
+    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+    from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
     from matplotlib.figure import Figure
-    from matplotlib.patches import Rectangle, Circle
-    import matplotlib.pyplot as plt
+    from matplotlib.patches import Circle, Rectangle, Polygon
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
-
-try:
-    import fabio
-    FABIO_AVAILABLE = True
-except ImportError:
-    FABIO_AVAILABLE = False
+    print("⚠ Warning: matplotlib not available. Mask preview will be disabled.")
 
 
-class MaskCanvas(FigureCanvas):
-    """Canvas for mask creation and editing"""
-    
-    mask_changed = pyqtSignal()  # Signal emitted when mask changes
-    
-    def __init__(self, parent=None, width=8, height=8, dpi=100):
-        self.fig = Figure(figsize=(width, height), dpi=dpi)
-        self.axes = self.fig.add_subplot(111)
-        super().__init__(self.fig)
-        self.setParent(parent)
-        
-        self.image_data = None
-        self.mask_data = None
-        self.drawing = False
-        self.mask_mode = 'rectangle'  # rectangle, circle, point, polygon
-        self.mask_value = True  # True = mask, False = unmask
-        self.start_point = None
-        self.preview_patch = None
-        self._last_mouse_pos = None
-        
-        # Polygon drawing
-        self.polygon_points = []
-        self.polygon_lines = []
-        
-        # Point drawing
-        self.point_radius = 10
-        
-        # Zoom and contrast
-        self.zoom_level = 1.0
-        self.contrast_min = None
-        self.contrast_max = None
-        self.base_xlim = None
-        self.base_ylim = None
-        
-        # Connect mouse events
-        self.mpl_connect('button_press_event', self.on_mouse_press)
-        self.mpl_connect('button_release_event', self.on_mouse_release)
-        self.mpl_connect('motion_notify_event', self.on_mouse_move)
-        self.mpl_connect('scroll_event', self.on_scroll)
-        self.mpl_connect('key_press_event', self.on_key_press)
-    
-    def load_image(self, image_path):
-        """Load image for mask editing"""
-        try:
-            if FABIO_AVAILABLE:
-                img = fabio.open(image_path)
-                self.image_data = img.data
-            else:
-                from PIL import Image
-                img = Image.open(image_path)
-                self.image_data = np.array(img)
-            
-            # Initialize mask
-            if self.mask_data is None or self.mask_data.shape != self.image_data.shape:
-                self.mask_data = np.zeros(self.image_data.shape, dtype=bool)
-            
-            self.display_image()
-            return True
-        except Exception as e:
-            print(f"Error loading image: {e}")
-            return False
-    
-    def set_image_data(self, image_data):
-        """Set image data directly (from array)"""
-        self.image_data = image_data
-        
-        # Initialize mask
-        if self.mask_data is None or self.mask_data.shape != self.image_data.shape:
-            self.mask_data = np.zeros(self.image_data.shape, dtype=bool)
-        
-        self.display_image()
-    
-    def display_image(self):
-        """Display image with mask overlay - optimized for performance"""
-        self.axes.clear()
-        
-        if self.image_data is None:
-            return
-        
-        # Display image with log scale
-        if self.contrast_min is not None and self.contrast_max is not None:
-            display_data = np.clip(self.image_data, self.contrast_min, self.contrast_max)
-            vmin, vmax = np.log10(self.contrast_min + 1), np.log10(self.contrast_max + 1)
-        else:
-            display_data = self.image_data
-            vmin, vmax = None, None
-        
-        # Use faster interpolation for large images
-        interp = 'nearest' if self.image_data.size > 4000000 else 'bilinear'
-        self.axes.imshow(np.log10(display_data + 1), cmap='viridis', 
-                        origin='lower', vmin=vmin, vmax=vmax, interpolation=interp)
-        
-        # Overlay mask in semi-transparent red (optimized)
-        if self.mask_data is not None and np.any(self.mask_data):
-            mask_rgba = np.zeros((*self.mask_data.shape, 4), dtype=np.float32)
-            mask_rgba[self.mask_data, 0] = 1.0  # Red
-            mask_rgba[self.mask_data, 3] = 0.5  # Semi-transparent
-            self.axes.imshow(mask_rgba, origin='lower', interpolation='nearest', zorder=2)
-        
-        # Redraw polygon lines if in polygon mode
-        if self.mask_mode == 'polygon' and self.polygon_points:
-            for line in self.polygon_lines:
-                try:
-                    line.remove()
-                except:
-                    pass
-            self.polygon_lines = []
-            
-            points = np.array(self.polygon_points)
-            for i in range(len(points) - 1):
-                line = self.axes.plot([points[i][0], points[i+1][0]], 
-                                     [points[i][1], points[i+1][1]], 
-                                     'y-', linewidth=2)[0]
-                self.polygon_lines.append(line)
-            
-            # Draw points
-            self.axes.plot(points[:, 0], points[:, 1], 'yo', markersize=6)
-        
-        self.axes.set_title(f'Mask Editor - Mode: {self.mask_mode.capitalize()}')
-        
-        # Store/restore zoom
-        if self.base_xlim is None:
-            self.base_xlim = self.axes.get_xlim()
-            self.base_ylim = self.axes.get_ylim()
-        
-        self.figure.canvas.draw_idle()
-    
-    def on_mouse_press(self, event):
-        """Handle mouse press"""
-        if event.inaxes != self.axes or event.button != 1:
-            return
-        
-        if self.mask_mode == 'polygon':
-            # Add point to polygon
-            x, y = int(event.xdata), int(event.ydata)
-            self.polygon_points.append((x, y))
-            self.display_image()
-        elif self.mask_mode == 'point':
-            # Draw point mask
-            x, y = int(event.xdata), int(event.ydata)
-            self.apply_point_mask(x, y)
-            self.display_image()
-            self.mask_changed.emit()
-        else:
-            # Start drawing rectangle/circle
-            self.drawing = True
-            self.start_point = (int(event.xdata), int(event.ydata))
-    
-    def on_mouse_release(self, event):
-        """Handle mouse release"""
-        if not self.drawing or self.mask_mode in ['polygon', 'point']:
-            return
-        
-        # Remove preview
-        if self.preview_patch is not None:
-            try:
-                self.preview_patch.remove()
-            except:
-                pass
-            self.preview_patch = None
-        
-        # Get end point
-        if event.inaxes != self.axes:
-            if self._last_mouse_pos is None:
-                self.drawing = False
-                return
-            end_point = self._last_mouse_pos
-        else:
-            end_point = (int(event.xdata), int(event.ydata))
-        
-        # Apply mask
-        try:
-            if self.mask_mode == 'rectangle':
-                self.apply_rectangle_mask(self.start_point, end_point)
-            elif self.mask_mode == 'circle':
-                self.apply_circle_mask(self.start_point, end_point)
-            
-            self.mask_changed.emit()
-        except Exception as e:
-            print(f"Error applying mask: {e}")
-        
-        self.drawing = False
-        self.display_image()
-    
-    def on_mouse_move(self, event):
-        """Handle mouse move"""
-        if not self.drawing or event.inaxes != self.axes:
-            return
-        
-        current_point = (int(event.xdata), int(event.ydata))
-        self._last_mouse_pos = current_point
-        
-        # Remove old preview
-        if self.preview_patch is not None:
-            try:
-                self.preview_patch.remove()
-            except:
-                pass
-            self.preview_patch = None
-        
-        # Draw preview
-        try:
-            if self.mask_mode == 'rectangle':
-                x1, y1 = self.start_point
-                x2, y2 = current_point
-                width = x2 - x1
-                height = y2 - y1
-                self.preview_patch = Rectangle((x1, y1), width, height,
-                                              edgecolor='yellow', facecolor='red',
-                                              alpha=0.3, linewidth=2)
-                self.axes.add_patch(self.preview_patch)
-            elif self.mask_mode == 'circle':
-                cx, cy = self.start_point
-                ex, ey = current_point
-                radius = np.sqrt((ex - cx)**2 + (ey - cy)**2)
-                self.preview_patch = Circle((cx, cy), radius,
-                                           edgecolor='yellow', facecolor='red',
-                                           alpha=0.3, linewidth=2)
-                self.axes.add_patch(self.preview_patch)
-        except Exception as e:
-            print(f"Error drawing preview: {e}")
-        
-        self.figure.canvas.draw_idle()
-    
-    def on_key_press(self, event):
-        """Handle key press for polygon mode"""
-        if event.key == 'enter' and self.mask_mode == 'polygon':
-            # Finish polygon
-            if len(self.polygon_points) >= 3:
-                self.apply_polygon_mask()
-                self.polygon_points = []
-                self.polygon_lines = []
-                self.display_image()
-                self.mask_changed.emit()
-        elif event.key == 'escape' and self.mask_mode == 'polygon':
-            # Cancel polygon
-            self.polygon_points = []
-            self.polygon_lines = []
-            self.display_image()
-    
-    def on_scroll(self, event):
-        """Handle scroll for zoom"""
-        if event.inaxes != self.axes:
-            return
-        
-        cur_xlim = self.axes.get_xlim()
-        cur_ylim = self.axes.get_ylim()
-        xdata, ydata = event.xdata, event.ydata
-        
-        scale_factor = 0.9 if event.button == 'up' else 1.1
-        
-        new_width = (cur_xlim[1] - cur_xlim[0]) * scale_factor
-        new_height = (cur_ylim[1] - cur_ylim[0]) * scale_factor
-        
-        relx = (cur_xlim[1] - xdata) / (cur_xlim[1] - cur_xlim[0])
-        rely = (cur_ylim[1] - ydata) / (cur_ylim[1] - cur_ylim[0])
-        
-        self.axes.set_xlim([xdata - new_width * (1 - relx), xdata + new_width * relx])
-        self.axes.set_ylim([ydata - new_height * (1 - rely), ydata + new_height * rely])
-        
-        self.zoom_level = (self.base_xlim[1] - self.base_xlim[0]) / new_width
-        self.draw_idle()
-    
-    def apply_rectangle_mask(self, start, end):
-        """Apply rectangular mask"""
-        if self.mask_data is None:
-            return
-        
-        x1, y1 = min(start[0], end[0]), min(start[1], end[1])
-        x2, y2 = max(start[0], end[0]), max(start[1], end[1])
-        
-        # Clamp to bounds
-        height, width = self.mask_data.shape
-        x1 = max(0, min(x1, width - 1))
-        x2 = max(0, min(x2, width - 1))
-        y1 = max(0, min(y1, height - 1))
-        y2 = max(0, min(y2, height - 1))
-        
-        self.mask_data[y1:y2+1, x1:x2+1] = self.mask_value
-    
-    def apply_circle_mask(self, center, edge):
-        """Apply circular mask"""
-        if self.mask_data is None:
-            return
-        
-        cx, cy = center
-        ex, ey = edge
-        radius = np.sqrt((ex - cx)**2 + (ey - cy)**2)
-        
-        height, width = self.mask_data.shape
-        y, x = np.ogrid[0:height, 0:width]
-        
-        circle_mask = (x - cx)**2 + (y - cy)**2 <= radius**2
-        self.mask_data[circle_mask] = self.mask_value
-    
-    def apply_polygon_mask(self):
-        """Apply polygon mask"""
-        if self.mask_data is None or len(self.polygon_points) < 3:
-            return
-        
-        from matplotlib.path import Path
-        
-        height, width = self.mask_data.shape
-        y, x = np.mgrid[:height, :width]
-        points = np.vstack((x.ravel(), y.ravel())).T
-        
-        path = Path(self.polygon_points)
-        mask = path.contains_points(points)
-        mask = mask.reshape(height, width)
-        
-        self.mask_data[mask] = self.mask_value
-    
-    def apply_point_mask(self, x, y):
-        """Apply point mask with radius"""
-        if self.mask_data is None:
-            return
-        
-        height, width = self.mask_data.shape
-        yy, xx = np.ogrid[0:height, 0:width]
-        
-        circle_mask = (xx - x)**2 + (yy - y)**2 <= self.point_radius**2
-        self.mask_data[circle_mask] = self.mask_value
-    
-    def apply_threshold_mask(self, threshold_min, threshold_max):
-        """Apply intensity threshold mask"""
-        if self.image_data is None or self.mask_data is None:
-            return
-        
-        mask_threshold = (self.image_data < threshold_min) | (self.image_data > threshold_max)
-        self.mask_data[mask_threshold] = self.mask_value
-        self.display_image()
-        self.mask_changed.emit()
-    
-    def clear_mask(self):
-        """Clear all mask"""
-        if self.mask_data is not None:
-            self.mask_data = np.zeros(self.mask_data.shape, dtype=bool)
-            self.display_image()
-            self.mask_changed.emit()
-    
-    def invert_mask(self):
-        """Invert mask"""
-        if self.mask_data is not None:
-            self.mask_data = ~self.mask_data
-            self.display_image()
-            self.mask_changed.emit()
-    
-    def grow_mask(self, pixels=1):
-        """Grow mask by specified pixels"""
-        if self.mask_data is None:
-            return
-        
-        from scipy.ndimage import binary_dilation
-        self.mask_data = binary_dilation(self.mask_data, iterations=pixels)
-        self.display_image()
-        self.mask_changed.emit()
-    
-    def shrink_mask(self, pixels=1):
-        """Shrink mask by specified pixels"""
-        if self.mask_data is None:
-            return
-        
-        from scipy.ndimage import binary_erosion
-        self.mask_data = binary_erosion(self.mask_data, iterations=pixels)
-        self.display_image()
-        self.mask_changed.emit()
-    
-    def reset_zoom(self):
-        """Reset zoom"""
-        if self.base_xlim is not None:
-            self.axes.set_xlim(self.base_xlim)
-            self.axes.set_ylim(self.base_ylim)
-            self.zoom_level = 1.0
-            self.draw_idle()
-    
-    def set_contrast(self, vmin, vmax):
-        """Set contrast limits"""
-        self.contrast_min = vmin
-        self.contrast_max = vmax
-        if self.image_data is not None:
-            self.display_image()
-    
-    def get_mask(self):
-        """Get current mask"""
-        return self.mask_data
-    
-    def set_mask(self, mask):
-        """Set mask"""
-        if mask is not None:
-            self.mask_data = mask.astype(bool)
-            self.display_image()
-            self.mask_changed.emit()
+class MaskModule(GUIBase):
+    """Mask Creation and Management Module"""
 
-
-class MaskModule(QObject, GUIBase):
-    """Mask editor module"""
-    
-    mask_updated = pyqtSignal(object)  # Signal emitted when mask is updated
-    
     def __init__(self, parent, root):
-        QObject.__init__(self)
-        GUIBase.__init__(self)
+        """
+        Initialize Mask module
+        
+        Args:
+            parent: Parent widget to contain this module
+            root: Root window for dialogs
+        """
+        super().__init__()
         self.parent = parent
         self.root = root
+
+        # Mask data
+        self.current_mask = None
+        self.mask_file_path = None
+        self.image_data = None
         
-        # Colors
-        self.colors = {
-            'bg': '#F5F5F5',
-            'card_bg': '#FFFFFF',
-            'primary': '#FF6B9D',  # Pink for mask module
-            'primary_hover': '#FF5A8D',
-            'secondary': '#FFA8C5',
-            'accent': '#E67E73',
-            'text_dark': '#2C3E50',
-            'text_light': '#7F8C8D',
-            'border': '#D1D9E6',
-            'success': '#6FA86F',
-            'error': '#E67E73',
-        }
-        
-        self.current_image = None
-        self.current_image_path = None
-        self.mask_path = None
-    
+        # Drawing mode and state
+        self.draw_mode = 'select'  # 'select', 'circle', 'rectangle', 'polygon', 'point', 'threshold'
+        self.drawing = False
+        self.draw_start = None
+        self.draw_current = None
+        self.polygon_points = []
+        self.temp_shape = None  # Temporary shape being drawn
+
     def setup_ui(self):
-        """Setup mask editor UI"""
-        # Check if UI is already set up
-        if hasattr(self, '_ui_initialized') and self._ui_initialized:
-            return
-        
+        """Setup UI components"""
+        # Get or create layout for parent
         layout = self.parent.layout()
         if layout is None:
             layout = QVBoxLayout(self.parent)
             layout.setContentsMargins(0, 0, 0, 0)
-        else:
-            # Clear existing items
-            while layout.count():
-                item = layout.takeAt(0)
-                if item.widget():
-                    item.widget().deleteLater()
         
-        # Main horizontal splitter
-        main_splitter = QSplitter(Qt.Orientation.Horizontal)
-        
-        # Left: Display
-        left_widget = QWidget()
-        left_layout = QVBoxLayout(left_widget)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        
-        if MATPLOTLIB_AVAILABLE:
-            # Horizontal layout for canvas and contrast slider
-            canvas_container = QWidget()
-            canvas_layout = QHBoxLayout(canvas_container)
-            canvas_layout.setContentsMargins(0, 0, 0, 0)
-            canvas_layout.setSpacing(5)
-            
-            self.mask_canvas = MaskCanvas(canvas_container, width=10, height=8, dpi=100)
-            self.mask_canvas.mask_changed.connect(self.on_mask_changed)
-            canvas_layout.addWidget(self.mask_canvas)
-            
-            # Vertical contrast slider on right side (limited height)
-            contrast_widget = QWidget()
-            contrast_widget.setMaximumWidth(40)
-            contrast_layout = QVBoxLayout(contrast_widget)
-            contrast_layout.setContentsMargins(0, 0, 0, 0)
-            contrast_layout.setSpacing(2)
-            
-            # Add stretch at top
-            contrast_layout.addStretch(1)
-            
-            # Max label (top)
-            max_lbl = QLabel("Max")
-            max_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            max_lbl.setFont(QFont('Arial', 7))
-            contrast_layout.addWidget(max_lbl)
-            
-            # Vertical slider with fixed height
-            self.contrast_slider = QSlider(Qt.Orientation.Vertical)
-            self.contrast_slider.setMinimum(0)
-            self.contrast_slider.setMaximum(65535)
-            self.contrast_slider.setValue(65535)
-            self.contrast_slider.setInvertedAppearance(True)  # Max at top
-            self.contrast_slider.setFixedHeight(300)  # Limit height
-            self.contrast_slider.valueChanged.connect(self.on_contrast_slider_changed)
-            contrast_layout.addWidget(self.contrast_slider)
-            
-            # Min label (bottom)
-            min_lbl = QLabel("Min")
-            min_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            min_lbl.setFont(QFont('Arial', 7))
-            contrast_layout.addWidget(min_lbl)
-            
-            # Add stretch at bottom
-            contrast_layout.addStretch(1)
-            
-            canvas_layout.addWidget(contrast_widget)
-            
-            left_layout.addWidget(canvas_container)
-        else:
-            no_plot_label = QLabel("Matplotlib not available")
-            no_plot_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            left_layout.addWidget(no_plot_label)
-        
-        # Status bar
-        status_frame = QFrame()
-        status_layout = QHBoxLayout(status_frame)
-        status_layout.setContentsMargins(6, 6, 6, 6)
-        
-        self.mask_info_lbl = QLabel("No mask loaded")
-        self.mask_info_lbl.setFont(QFont('Arial', 9))
-        status_layout.addWidget(self.mask_info_lbl)
-        status_layout.addStretch()
-        
-        left_layout.addWidget(status_frame)
-        
-        # Right: Controls (with scroll area to prevent overflow)
-        right_scroll = QScrollArea()
-        right_scroll.setWidgetResizable(True)
-        right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        right_scroll.setMinimumWidth(320)
-        right_scroll.setMaximumWidth(320)
-        
-        right_widget = QWidget()
-        right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(5, 5, 5, 5)
-        right_layout.setSpacing(8)
-        
-        # File operations
-        self.setup_file_operations(right_layout)
-        
+        # Create scroll area
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(f"background-color: {self.colors['bg']}; border: none;")
+
+        # Content widget
+        content_widget = QWidget()
+        content_widget.setStyleSheet(f"background-color: {self.colors['bg']};")
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setContentsMargins(20, 10, 20, 10)
+        content_layout.setSpacing(10)
+
+        # Title
+        title = QLabel("🎭 Mask Creation & Management")
+        title.setFont(QFont('Arial', 16, QFont.Weight.Bold))
+        title.setStyleSheet(f"color: {self.colors['primary']};")
+        content_layout.addWidget(title)
+
+        # Description
+        desc = QLabel(
+            "Create, edit, and manage detector masks for diffraction data\n"
+            "• Circle/Rectangle: Click and drag • Polygon: Click points, right-click or Enter to finish\n"
+            "• Point: Click to mask/unmask • Threshold: Click to set value"
+        )
+        desc.setWordWrap(True)
+        desc.setStyleSheet(f"color: {self.colors['text_dark']}; font-size: 9pt;")
+        content_layout.addWidget(desc)
+
+        # Control area
+        control_group = self.create_control_group()
+        content_layout.addWidget(control_group)
+
         # Drawing tools
-        self.setup_drawing_tools(right_layout)
-        
-        # Mask operations
-        self.setup_mask_operations(right_layout)
-        
-        # Display controls
-        self.setup_display_controls(right_layout)
-        
-        right_layout.addStretch()
-        
-        # Log output (compact)
-        self.log_output = QTextEdit()
-        self.log_output.setMaximumHeight(80)
-        self.log_output.setReadOnly(True)
-        self.log_output.setFont(QFont('Courier', 7))
-        right_layout.addWidget(self.log_output)
-        
-        # Set scroll area content
-        right_scroll.setWidget(right_widget)
-        
-        # Add to splitter
-        main_splitter.addWidget(left_widget)
-        main_splitter.addWidget(right_scroll)
-        main_splitter.setStretchFactor(0, 1)
-        main_splitter.setStretchFactor(1, 0)
-        
-        layout.addWidget(main_splitter)
-        
-        # Mark UI as initialized
-        self._ui_initialized = True
-    
-    def setup_file_operations(self, parent_layout):
-        """Setup file operations"""
-        file_gb = QGroupBox("File Operations")
-        file_gb.setStyleSheet(f"""
-            QGroupBox {{
+        tools_group = self.create_tools_group()
+        content_layout.addWidget(tools_group)
+
+        # Preview area
+        if MATPLOTLIB_AVAILABLE:
+            preview_group = self.create_preview_group()
+            content_layout.addWidget(preview_group, stretch=1)
+
+        # Action buttons
+        button_layout = QHBoxLayout()
+        button_layout.addStretch()
+
+        save_btn = QPushButton("💾 Save Mask")
+        save_btn.setFixedWidth(120)
+        save_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 8px;
+                border-radius: 4px;
                 font-weight: bold;
-                font-size: 10pt;
+            }}
+            QPushButton:hover {{
+                background-color: #45A049;
+            }}
+        """)
+        save_btn.clicked.connect(self.save_mask)
+        button_layout.addWidget(save_btn)
+
+        clear_btn = QPushButton("🗑️ Clear All")
+        clear_btn.setFixedWidth(120)
+        clear_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #FF5252;
+                color: white;
+                border: none;
+                padding: 8px;
+                border-radius: 4px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: #FF1744;
+            }}
+        """)
+        clear_btn.clicked.connect(self.clear_mask)
+        button_layout.addWidget(clear_btn)
+
+        content_layout.addLayout(button_layout)
+        
+        # Add content widget to scroll area
+        scroll.setWidget(content_widget)
+        layout.addWidget(scroll)
+
+    def create_control_group(self):
+        """Create file control group"""
+        group = QGroupBox("File Control")
+        group.setStyleSheet(f"""
+            QGroupBox {{
                 border: 2px solid {self.colors['border']};
-                border-radius: 5px;
-                margin-top: 15px;
-                margin-bottom: 10px;
-                padding: 15px 10px 10px 10px;
-                background-color: {self.colors['card_bg']};
+                border-radius: 4px;
+                margin-top: 5px;
+                font-weight: bold;
+                padding-top: 8px;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
                 left: 10px;
-                padding: 0 5px 0 5px;
-                color: {self.colors['text_dark']};
-                text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+                padding: 0 3px;
             }}
         """)
-        file_layout = QVBoxLayout(file_gb)
-        file_layout.setSpacing(10)
+
+        layout = QHBoxLayout(group)
+        layout.setSpacing(5)
+        layout.setContentsMargins(10, 10, 10, 10)
         
-        # Note: Image is loaded from Calibration Module
-        info_label = QLabel("Image loaded from Calibration Module")
-        info_label.setStyleSheet("color: gray; font-size: 8pt; padding: 5px;")
-        info_label.setWordWrap(True)
-        file_layout.addWidget(info_label)
-        
-        # Load mask
-        load_mask_btn = ModernButton("Load Mask",
-                                     self.load_mask,
-                                     "",
-                                     bg_color=self.colors['primary'],
-                                     hover_color=self.colors['primary_hover'],
-                                     width=280, height=35,
-                                     font_size=9,
-                                     parent=file_gb)
-        file_layout.addWidget(load_mask_btn)
-        
-        # Save mask
-        save_mask_btn = ModernButton("Save Mask",
-                                     self.save_mask,
-                                     "",
-                                     bg_color=self.colors['secondary'],
-                                     hover_color=self.colors['primary'],
-                                     width=280, height=35,
-                                     font_size=9,
-                                     parent=file_gb)
-        file_layout.addWidget(save_mask_btn)
-        
-        parent_layout.addWidget(file_gb)
-    
-    def setup_drawing_tools(self, parent_layout):
-        """Setup drawing tools"""
-        draw_gb = QGroupBox("Drawing Tools")
-        draw_gb.setStyleSheet(f"""
-            QGroupBox {{
+        # Load Image button
+        load_img_btn = QPushButton("📂 Load Image")
+        load_img_btn.setFixedWidth(110)
+        load_img_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.colors['primary']};
+                color: white;
+                border: none;
+                padding: 6px;
+                border-radius: 4px;
                 font-weight: bold;
-                font-size: 10pt;
+            }}
+            QPushButton:hover {{
+                background-color: #6A1B9A;
+            }}
+        """)
+        load_img_btn.clicked.connect(self.load_image)
+        layout.addWidget(load_img_btn)
+        
+        # Separator
+        layout.addWidget(QLabel("|"))
+
+        # Load Mask button
+        load_mask_btn = QPushButton("📂 Load Mask")
+        load_mask_btn.setFixedWidth(110)
+        load_mask_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.colors['secondary']};
+                color: white;
+                border: none;
+                padding: 6px;
+                border-radius: 4px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: #7E57C2;
+            }}
+        """)
+        load_mask_btn.clicked.connect(self.load_mask)
+        layout.addWidget(load_mask_btn)
+
+        layout.addStretch()
+        
+        # File info label
+        self.file_info_label = QLabel("No image loaded")
+        self.file_info_label.setStyleSheet("color: #666666; font-size: 9px;")
+        layout.addWidget(self.file_info_label)
+
+        return group
+    
+    def create_tools_group(self):
+        """Create drawing tools group"""
+        group = QGroupBox("Drawing Tools & Operations")
+        group.setStyleSheet(f"""
+            QGroupBox {{
                 border: 2px solid {self.colors['border']};
-                border-radius: 5px;
-                margin-top: 15px;
-                margin-bottom: 10px;
-                padding: 15px 10px 10px 10px;
-                background-color: {self.colors['card_bg']};
+                border-radius: 4px;
+                margin-top: 5px;
+                font-weight: bold;
+                padding-top: 8px;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
                 left: 10px;
-                padding: 0 5px 0 5px;
-                color: {self.colors['text_dark']};
-                text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+                padding: 0 3px;
             }}
         """)
-        draw_layout = QVBoxLayout(draw_gb)
-        draw_layout.setSpacing(10)
+
+        layout = QVBoxLayout(group)
+        layout.setSpacing(8)
+        layout.setContentsMargins(10, 10, 10, 10)
+
+        # Row 1: Drawing tools
+        tool_row = QHBoxLayout()
+        tool_row.setSpacing(10)
         
-        # Mode selection
-        mode_label = QLabel("Drawing Mode:")
-        mode_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        mode_label.setStyleSheet(f"color: {self.colors['text_dark']}; padding: 4px 0px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);")
-        draw_layout.addWidget(mode_label)
+        tool_row.addWidget(QLabel("Tool:"))
         
-        # Radio button style for mask module
-        radio_style = f"""
+        self.tool_combo = QComboBox()
+        self.tool_combo.addItems(["Select", "Circle", "Rectangle", "Polygon", "Point", "Threshold"])
+        self.tool_combo.setFixedWidth(100)
+        self.tool_combo.currentTextChanged.connect(self.on_tool_changed)
+        tool_row.addWidget(self.tool_combo)
+
+        # Separator
+        tool_row.addWidget(QLabel("|"))
+
+        # Mask/Unmask radio buttons
+        tool_row.addWidget(QLabel("Action:"))
+        
+        from PyQt6.QtWidgets import QRadioButton, QButtonGroup
+        
+        self.mask_radio = QRadioButton("Mask")
+        self.mask_radio.setChecked(True)
+        self.mask_radio.setStyleSheet(f"""
             QRadioButton {{
-                spacing: 8px;
-                padding: 6px 0px;
                 color: {self.colors['text_dark']};
             }}
             QRadioButton::indicator {{
-                width: 14px;
-                height: 14px;
-                border: 2px solid #999999;
-                border-radius: 7px;
-                background-color: white;
-            }}
-            QRadioButton::indicator:checked {{
-                background-color: {self.colors['primary']};
-                border: 2px solid {self.colors['primary']};
-                border-radius: 7px;
-                image: url(point.png);
-            }}
-            QRadioButton::indicator:hover {{
-                border: 2px solid {self.colors['primary']};
-            }}
-        """
-        
-        self.mode_group = QButtonGroup()
-        
-        self.rect_rb = QRadioButton("Rectangle")
-        self.rect_rb.setChecked(True)
-        self.rect_rb.setStyleSheet(radio_style)
-        self.rect_rb.toggled.connect(lambda: self.set_mask_mode('rectangle'))
-        self.mode_group.addButton(self.rect_rb)
-        draw_layout.addWidget(self.rect_rb)
-        
-        self.circle_rb = QRadioButton("Circle")
-        self.circle_rb.setStyleSheet(radio_style)
-        self.circle_rb.toggled.connect(lambda: self.set_mask_mode('circle'))
-        self.mode_group.addButton(self.circle_rb)
-        draw_layout.addWidget(self.circle_rb)
-        
-        self.polygon_rb = QRadioButton("Polygon (Enter to finish)")
-        self.polygon_rb.setStyleSheet(radio_style)
-        self.polygon_rb.toggled.connect(lambda: self.set_mask_mode('polygon'))
-        self.mode_group.addButton(self.polygon_rb)
-        draw_layout.addWidget(self.polygon_rb)
-        
-        self.point_rb = QRadioButton("Point")
-        self.point_rb.setStyleSheet(radio_style)
-        self.point_rb.toggled.connect(lambda: self.set_mask_mode('point'))
-        self.mode_group.addButton(self.point_rb)
-        draw_layout.addWidget(self.point_rb)
-        
-        # Point radius (only for point mode)
-        point_frame = QFrame()
-        point_layout = QHBoxLayout(point_frame)
-        point_layout.setContentsMargins(20, 0, 0, 0)
-        point_layout.addWidget(QLabel("Radius:"))
-        
-        self.point_radius_sb = QSpinBox()
-        self.point_radius_sb.setMinimum(1)
-        self.point_radius_sb.setMaximum(100)
-        self.point_radius_sb.setValue(10)
-        self.point_radius_sb.valueChanged.connect(self.on_point_radius_changed)
-        self.point_radius_sb.setFixedWidth(60)
-        point_layout.addWidget(self.point_radius_sb)
-        point_layout.addStretch()
-        
-        draw_layout.addWidget(point_frame)
-        
-        # Checkbox style for mask module
-        checkbox_style = f"""
-            QCheckBox {{
-                spacing: 8px;
-                padding: 6px 0px;
-                color: {self.colors['text_dark']};
-            }}
-            QCheckBox::indicator {{
-                width: 14px;
-                height: 14px;
-                border: 2px solid #999999;
-                border-radius: 3px;
-                background-color: white;
-            }}
-            QCheckBox::indicator:checked {{
-                background-color: {self.colors['primary']};
-                border: 2px solid {self.colors['primary']};
-                border-radius: 3px;
-                image: url(check.png);
-            }}
-            QCheckBox::indicator:hover {{
-                border: 2px solid {self.colors['primary']};
-            }}
-        """
-        
-        # Mask/Unmask toggle
-        self.mask_value_cb = QCheckBox("Mask (checked) / Unmask (unchecked)")
-        self.mask_value_cb.setChecked(True)
-        self.mask_value_cb.setStyleSheet(checkbox_style)
-        self.mask_value_cb.stateChanged.connect(self.on_mask_value_changed)
-        draw_layout.addWidget(self.mask_value_cb)
-        
-        # Threshold masking
-        separator = QFrame()
-        separator.setFrameShape(QFrame.Shape.HLine)
-        separator.setFrameShadow(QFrame.Shadow.Sunken)
-        separator.setStyleSheet(f"background-color: {self.colors['border']}; max-height: 1px; margin: 8px 0px;")
-        draw_layout.addWidget(separator)
-        
-        thresh_label = QLabel("Threshold Masking:")
-        thresh_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        thresh_label.setStyleSheet(f"color: {self.colors['text_dark']}; padding: 4px 0px; text-shadow: 1px 1px 2px rgba(0,0,0,0.1);")
-        draw_layout.addWidget(thresh_label)
-        
-        thresh_row = QHBoxLayout()
-        thresh_row.addWidget(QLabel("Min:"))
-        self.threshold_min_txt = QLineEdit("0")
-        self.threshold_min_txt.setFixedWidth(70)
-        thresh_row.addWidget(self.threshold_min_txt)
-        
-        thresh_row.addWidget(QLabel("Max:"))
-        self.threshold_max_txt = QLineEdit("65535")
-        self.threshold_max_txt.setFixedWidth(70)
-        thresh_row.addWidget(self.threshold_max_txt)
-        
-        draw_layout.addLayout(thresh_row)
-        
-        apply_thresh_btn = QPushButton("Apply Threshold")
-        apply_thresh_btn.setStyleSheet("padding: 5px;")
-        apply_thresh_btn.clicked.connect(self.apply_threshold)
-        draw_layout.addWidget(apply_thresh_btn)
-        
-        parent_layout.addWidget(draw_gb)
-    
-    def setup_mask_operations(self, parent_layout):
-        """Setup mask operations"""
-        ops_gb = QGroupBox("Mask Operations")
-        ops_gb.setStyleSheet(f"""
-            QGroupBox {{
-                font-weight: bold;
-                font-size: 10pt;
-                border: 2px solid {self.colors['border']};
-                border-radius: 5px;
-                margin-top: 15px;
-                margin-bottom: 10px;
-                padding: 15px 10px 10px 10px;
-                background-color: {self.colors['card_bg']};
-            }}
-            QGroupBox::title {{
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-                color: {self.colors['text_dark']};
-                text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+                width: 12px;
+                height: 12px;
             }}
         """)
-        ops_layout = QVBoxLayout(ops_gb)
-        ops_layout.setSpacing(10)
+        tool_row.addWidget(self.mask_radio)
         
-        # Clear/Invert row
-        row1 = QHBoxLayout()
+        self.unmask_radio = QRadioButton("Unmask")
+        self.unmask_radio.setStyleSheet(f"""
+            QRadioButton {{
+                color: {self.colors['text_dark']};
+            }}
+            QRadioButton::indicator {{
+                width: 12px;
+                height: 12px;
+            }}
+        """)
+        tool_row.addWidget(self.unmask_radio)
         
-        clear_btn = QPushButton("Clear All")
-        clear_btn.setStyleSheet("padding: 5px;")
-        clear_btn.clicked.connect(self.clear_mask)
-        row1.addWidget(clear_btn)
+        self.action_group = QButtonGroup(group)
+        self.action_group.addButton(self.mask_radio)
+        self.action_group.addButton(self.unmask_radio)
+
+        tool_row.addStretch()
+        layout.addLayout(tool_row)
+
+        # Row 2: Mask operations
+        op_row = QHBoxLayout()
+        op_row.setSpacing(8)
         
-        invert_btn = QPushButton("Invert")
-        invert_btn.setStyleSheet("padding: 5px;")
+        op_row.addWidget(QLabel("Operations:"))
+        
+        # Invert button
+        invert_btn = QPushButton("↕️ Invert")
+        invert_btn.setFixedWidth(80)
+        invert_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.colors['secondary']};
+                color: white;
+                border: none;
+                padding: 5px;
+                border-radius: 4px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: #7E57C2;
+            }}
+        """)
         invert_btn.clicked.connect(self.invert_mask)
-        row1.addWidget(invert_btn)
+        op_row.addWidget(invert_btn)
         
-        ops_layout.addLayout(row1)
-        
-        # Grow/Shrink
-        gs_label = QLabel("Grow/Shrink:")
-        gs_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        ops_layout.addWidget(gs_label)
-        
-        gs_row = QHBoxLayout()
-        gs_row.addWidget(QLabel("Pixels:"))
-        
-        self.grow_shrink_sb = QSpinBox()
-        self.grow_shrink_sb.setMinimum(1)
-        self.grow_shrink_sb.setMaximum(50)
-        self.grow_shrink_sb.setValue(1)
-        self.grow_shrink_sb.setFixedWidth(60)
-        gs_row.addWidget(self.grow_shrink_sb)
-        gs_row.addStretch()
-        
-        ops_layout.addLayout(gs_row)
-        
-        row2 = QHBoxLayout()
-        
-        grow_btn = QPushButton("Grow")
-        grow_btn.setStyleSheet("padding: 5px;")
-        grow_btn.clicked.connect(self.grow_mask)
-        row2.addWidget(grow_btn)
-        
-        shrink_btn = QPushButton("Shrink")
-        shrink_btn.setStyleSheet("padding: 5px;")
-        shrink_btn.clicked.connect(self.shrink_mask)
-        row2.addWidget(shrink_btn)
-        
-        ops_layout.addLayout(row2)
-        
-        parent_layout.addWidget(ops_gb)
-    
-    def setup_display_controls(self, parent_layout):
-        """Setup display controls"""
-        disp_gb = QGroupBox("Display Controls")
-        disp_gb.setStyleSheet(f"""
-            QGroupBox {{
+        # Grow button
+        grow_btn = QPushButton("➕ Grow")
+        grow_btn.setFixedWidth(75)
+        grow_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.colors['secondary']};
+                color: white;
+                border: none;
+                padding: 5px;
+                border-radius: 4px;
                 font-weight: bold;
-                font-size: 10pt;
+            }}
+            QPushButton:hover {{
+                background-color: #7E57C2;
+            }}
+        """)
+        grow_btn.clicked.connect(self.grow_mask)
+        op_row.addWidget(grow_btn)
+        
+        # Shrink button
+        shrink_btn = QPushButton("➖ Shrink")
+        shrink_btn.setFixedWidth(75)
+        shrink_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.colors['secondary']};
+                color: white;
+                border: none;
+                padding: 5px;
+                border-radius: 4px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: #7E57C2;
+            }}
+        """)
+        shrink_btn.clicked.connect(self.shrink_mask)
+        op_row.addWidget(shrink_btn)
+        
+        # Fill holes button
+        fill_btn = QPushButton("🔧 Fill Holes")
+        fill_btn.setFixedWidth(90)
+        fill_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.colors['secondary']};
+                color: white;
+                border: none;
+                padding: 5px;
+                border-radius: 4px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: #7E57C2;
+            }}
+        """)
+        fill_btn.clicked.connect(self.fill_holes)
+        op_row.addWidget(fill_btn)
+
+        op_row.addStretch()
+        layout.addLayout(op_row)
+
+        return group
+
+    def create_preview_group(self):
+        """Create image preview group"""
+        group = QGroupBox("Mask Preview (Click to draw)")
+        group.setStyleSheet(f"""
+            QGroupBox {{
                 border: 2px solid {self.colors['border']};
-                border-radius: 5px;
-                margin-top: 15px;
-                margin-bottom: 10px;
-                padding: 15px 10px 10px 10px;
-                background-color: {self.colors['card_bg']};
+                border-radius: 4px;
+                margin-top: 5px;
+                font-weight: bold;
+                padding-top: 8px;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
                 left: 10px;
-                padding: 0 5px 0 5px;
-                color: {self.colors['text_dark']};
-                text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+                padding: 0 3px;
             }}
         """)
-        disp_layout = QVBoxLayout(disp_gb)
-        disp_layout.setSpacing(10)
+
+        layout = QVBoxLayout(group)
+        layout.setSpacing(5)
+        layout.setContentsMargins(10, 10, 10, 10)
+
+        # Info row
+        info_row = QHBoxLayout()
+
+        self.position_label = QLabel("Position: --")
+        self.position_label.setFont(QFont('Arial', 10))
+        info_row.addWidget(self.position_label)
+
+        self.mask_status_label = QLabel("Mask: Not loaded")
+        self.mask_status_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
+        self.mask_status_label.setStyleSheet("color: #FF5722;")
+        info_row.addWidget(self.mask_status_label)
+
+        info_row.addStretch()
+        layout.addLayout(info_row)
+
+        # Canvas and contrast slider layout
+        canvas_layout = QHBoxLayout()
         
-        # Buttons
-        btn_row = QHBoxLayout()
+        # Matplotlib canvas
+        self.figure = Figure(figsize=(10, 8))
+        self.figure.subplots_adjust(left=0.10, right=0.98, top=0.96, bottom=0.12)
+        self.canvas = FigureCanvas(self.figure)
+        self.canvas.setMinimumHeight(500)
+        canvas_layout.addWidget(self.canvas)
         
-        auto_btn = QPushButton("Auto Contrast")
-        auto_btn.setStyleSheet("padding: 5px;")
-        auto_btn.clicked.connect(self.auto_contrast)
-        btn_row.addWidget(auto_btn)
+        # Vertical contrast slider
+        slider_layout = QVBoxLayout()
+        slider_layout.setSpacing(2)
+        slider_layout.addStretch()
         
-        reset_zoom_btn = QPushButton("Reset Zoom")
-        reset_zoom_btn.setStyleSheet("padding: 5px;")
-        reset_zoom_btn.clicked.connect(self.reset_zoom)
-        btn_row.addWidget(reset_zoom_btn)
+        max_label = QLabel("High")
+        max_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        max_label.setStyleSheet("color: #666666; font-size: 9px;")
+        slider_layout.addWidget(max_label)
         
-        disp_layout.addLayout(btn_row)
+        self.contrast_slider = QSlider(Qt.Orientation.Vertical)
+        self.contrast_slider.setMinimum(1)
+        self.contrast_slider.setMaximum(100)
+        self.contrast_slider.setValue(50)
+        self.contrast_slider.setFixedHeight(350)
+        self.contrast_slider.setFixedWidth(30)
+        self.contrast_slider.setStyleSheet("""
+            QSlider::groove:vertical {
+                border: 1px solid #BBBBBB;
+                width: 8px;
+                background: #FFFFFF;
+                margin: 0 0;
+            }
+            QSlider::handle:vertical {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #E0E0E0, stop:1 #F5F5F5);
+                border: 1px solid #AAAAAA;
+                height: 18px;
+                width: 20px;
+                margin: 0 -6px;
+            }
+            QSlider::handle:vertical:hover {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                    stop:0 #D0D0D0, stop:1 #E5E5E5);
+                border: 1px solid #888888;
+            }
+        """)
+        self.contrast_slider.valueChanged.connect(self.on_contrast_changed)
+        slider_layout.addWidget(self.contrast_slider, alignment=Qt.AlignmentFlag.AlignCenter)
         
-        parent_layout.addWidget(disp_gb)
-    
-    def load_mask(self):
-        """Load mask from file"""
-        filename, _ = QFileDialog.getOpenFileName(
-            None, "Load Mask", "",
-            "Mask Files (*.edf *.npy);;All Files (*.*)"
+        min_label = QLabel("Low")
+        min_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        min_label.setStyleSheet("color: #666666; font-size: 9px;")
+        slider_layout.addWidget(min_label)
+        
+        self.contrast_label = QLabel("50%")
+        self.contrast_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.contrast_label.setFixedWidth(50)
+        self.contrast_label.setStyleSheet("color: #333333; font-weight: bold; font-size: 11px;")
+        slider_layout.addWidget(self.contrast_label)
+        
+        contrast_text = QLabel("Contrast")
+        contrast_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        contrast_text.setStyleSheet("color: #666666; font-size: 9px;")
+        slider_layout.addWidget(contrast_text)
+        
+        slider_layout.addStretch()
+        canvas_layout.addLayout(slider_layout)
+        
+        layout.addLayout(canvas_layout)
+
+        # Connect mouse events
+        self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
+        self.canvas.mpl_connect('button_press_event', self.on_mouse_press)
+        self.canvas.mpl_connect('button_release_event', self.on_mouse_release)
+        self.canvas.mpl_connect('key_press_event', self.on_key_press)
+
+        # Initial plot
+        self.ax = self.figure.add_subplot(111)
+        self.ax.text(0.5, 0.5, 'Load an image to create mask\nUse drawing tools to mark regions',
+                     ha='center', va='center', fontsize=14, color='gray')
+        self.ax.set_xlim(0, 1)
+        self.ax.set_ylim(0, 1)
+        self.ax.axis('on')
+        self.canvas.draw()
+
+        return group
+
+    def load_image(self):
+        """Load diffraction image for mask creation"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self.root,
+            "Select Diffraction Image",
+            "",
+            "Image Files (*.tif *.tiff *.edf *.h5 *.hdf5);;All Files (*)"
         )
-        
-        if filename:
-            try:
-                if filename.endswith('.npy'):
-                    mask = np.load(filename)
-                elif filename.endswith('.edf') and FABIO_AVAILABLE:
-                    mask_img = fabio.open(filename)
-                    mask = mask_img.data.astype(bool)
-                else:
-                    QMessageBox.warning(None, "Error", "Unsupported mask format")
-                    return
-                
-                if MATPLOTLIB_AVAILABLE:
-                    self.mask_canvas.set_mask(mask)
-                
-                self.mask_path = filename
-                self.log(f"Mask loaded: {os.path.basename(filename)}")
-                self.update_mask_info()
-            except Exception as e:
-                QMessageBox.critical(None, "Error", f"Failed to load mask:\n{str(e)}")
-                self.log(f"Error: {str(e)}")
-    
-    def save_mask(self):
-        """Save mask to file"""
-        if not MATPLOTLIB_AVAILABLE:
+
+        if not file_path:
             return
-        
-        mask = self.mask_canvas.get_mask()
-        if mask is None or not np.any(mask):
-            QMessageBox.warning(None, "No Mask", "No mask to save")
-            return
-        
-        filename, _ = QFileDialog.getSaveFileName(
-            None, "Save Mask", "",
-            "NumPy Files (*.npy);;EDF Files (*.edf);;All Files (*.*)"
-        )
-        
-        if filename:
-            try:
-                if filename.endswith('.npy'):
-                    np.save(filename, mask)
-                elif filename.endswith('.edf') and FABIO_AVAILABLE:
-                    edf = fabio.edfimage.edfimage(data=mask.astype(np.uint8))
-                    edf.write(filename)
-                else:
-                    np.save(filename, mask)
-                
-                self.mask_path = filename
-                self.log(f"Mask saved: {os.path.basename(filename)}")
-                QMessageBox.information(None, "Success", "Mask saved successfully!")
-            except Exception as e:
-                QMessageBox.critical(None, "Error", f"Failed to save mask:\n{str(e)}")
-                self.log(f"Error: {str(e)}")
-    
-    def set_mask_mode(self, mode):
-        """Set mask drawing mode"""
-        if MATPLOTLIB_AVAILABLE:
-            self.mask_canvas.mask_mode = mode
-            self.log(f"Mask mode: {mode}")
-    
-    def on_point_radius_changed(self, value):
-        """Handle point radius change"""
-        if MATPLOTLIB_AVAILABLE:
-            self.mask_canvas.point_radius = value
-    
-    def on_mask_value_changed(self, state):
-        """Handle mask/unmask toggle"""
-        if MATPLOTLIB_AVAILABLE:
-            self.mask_canvas.mask_value = (state == Qt.CheckState.Checked.value)
-    
-    def apply_threshold(self):
-        """Apply threshold mask"""
+
         try:
-            vmin = float(self.threshold_min_txt.text())
-            vmax = float(self.threshold_max_txt.text())
+            # Load image based on file type
+            ext = os.path.splitext(file_path)[1].lower()
             
-            if MATPLOTLIB_AVAILABLE:
-                self.mask_canvas.apply_threshold_mask(vmin, vmax)
-                self.log(f"Threshold applied: {vmin} - {vmax}")
-                self.update_mask_info()
-        except ValueError:
-            QMessageBox.warning(None, "Invalid Input", "Please enter valid threshold values")
-    
+            if ext in ['.h5', '.hdf5']:
+                import h5py
+                with h5py.File(file_path, 'r') as f:
+                    # Try common dataset paths
+                    for path in ['entry/data/data', 'data', 'image']:
+                        if path in f:
+                            data = f[path]
+                            if len(data.shape) == 3:
+                                self.image_data = np.array(data[0, :, :])
+                            else:
+                                self.image_data = np.array(data[:, :])
+                            break
+            else:
+                # Try fabio for other formats
+                try:
+                    import fabio
+                    img = fabio.open(file_path)
+                    self.image_data = img.data
+                except:
+                    # Fallback to pillow
+                    from PIL import Image
+                    img = Image.open(file_path)
+                    self.image_data = np.array(img)
+
+            if self.image_data is None:
+                QMessageBox.warning(self.root, "Error", "Could not load image data")
+                return
+
+            # Initialize mask if not exists
+            if self.current_mask is None:
+                self.current_mask = np.zeros(self.image_data.shape, dtype=bool)
+
+            # Update info
+            self.file_info_label.setText(
+                f"Image: {os.path.basename(file_path)} | Shape: {self.image_data.shape}"
+            )
+
+            self.update_display()
+
+        except Exception as e:
+            QMessageBox.critical(self.root, "Error", f"Failed to load image:\n{str(e)}")
+
+    def load_mask(self):
+        """Load existing mask file"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self.root,
+            "Select Mask File",
+            "",
+            "Mask Files (*.npy *.edf *.tif *.tiff);;All Files (*)"
+        )
+
+        if not file_path:
+            return
+
+        try:
+            ext = os.path.splitext(file_path)[1].lower()
+            
+            if ext == '.npy':
+                self.current_mask = np.load(file_path)
+            else:
+                import fabio
+                mask_img = fabio.open(file_path)
+                self.current_mask = mask_img.data.astype(bool)
+
+            self.mask_file_path = file_path
+            self.mask_status_label.setText(f"Mask: {os.path.basename(file_path)}")
+            
+            self.update_display()
+
+        except Exception as e:
+            QMessageBox.critical(self.root, "Error", f"Failed to load mask:\n{str(e)}")
+
+    def save_mask(self):
+        """Save current mask"""
+        if self.current_mask is None:
+            QMessageBox.warning(self.root, "Warning", "No mask to save")
+            return
+
+        file_path, _ = QFileDialog.getSaveFileName(
+            self.root,
+            "Save Mask",
+            "",
+            "NumPy Array (*.npy);;EDF File (*.edf);;TIFF File (*.tif)"
+        )
+
+        if not file_path:
+            return
+
+        try:
+            ext = os.path.splitext(file_path)[1].lower()
+            
+            if ext == '.npy':
+                np.save(file_path, self.current_mask)
+            else:
+                import fabio
+                mask_img = fabio.edfimage.edfimage(data=self.current_mask.astype(np.uint8))
+                mask_img.write(file_path)
+
+            self.mask_file_path = file_path
+            QMessageBox.information(self.root, "Success", f"Mask saved to:\n{file_path}")
+
+        except Exception as e:
+            QMessageBox.critical(self.root, "Error", f"Failed to save mask:\n{str(e)}")
+
     def clear_mask(self):
-        """Clear mask"""
-        if MATPLOTLIB_AVAILABLE:
-            self.mask_canvas.clear_mask()
-            self.log("Mask cleared")
-            self.update_mask_info()
+        """Clear current mask"""
+        reply = QMessageBox.question(
+            self.root, 'Confirm', 'Clear all mask regions?',
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
+        )
+        
+        if reply == QMessageBox.StandardButton.Yes:
+            if self.image_data is not None:
+                self.current_mask = np.zeros(self.image_data.shape, dtype=bool)
+                self.mask_shapes = []
+                self.update_display()
+
+    def on_tool_changed(self, tool_name):
+        """Handle tool selection change"""
+        self.draw_mode = tool_name.lower()
+        # Reset drawing state
+        self.drawing = False
+        self.draw_start = None
+        self.draw_current = None
+        self.polygon_points = []
+        self.temp_shape = None
+        
+        if self.image_data is not None:
+            self.update_display()
     
     def invert_mask(self):
-        """Invert mask"""
-        if MATPLOTLIB_AVAILABLE:
-            self.mask_canvas.invert_mask()
-            self.log("Mask inverted")
-            self.update_mask_info()
+        """Invert the mask"""
+        if self.current_mask is None:
+            QMessageBox.warning(self.root, "Warning", "No mask to invert")
+            return
+        
+        self.current_mask = ~self.current_mask
+        self.update_display()
     
     def grow_mask(self):
-        """Grow mask"""
-        if MATPLOTLIB_AVAILABLE:
-            pixels = self.grow_shrink_sb.value()
-            self.mask_canvas.grow_mask(pixels)
-            self.log(f"Mask grown by {pixels} pixels")
-            self.update_mask_info()
+        """Grow (dilate) the mask"""
+        if self.current_mask is None:
+            QMessageBox.warning(self.root, "Warning", "No mask to grow")
+            return
+        
+        try:
+            from scipy import ndimage
+            self.current_mask = ndimage.binary_dilation(self.current_mask, iterations=1)
+            self.update_display()
+        except ImportError:
+            QMessageBox.warning(self.root, "Warning", "scipy not available for mask operations")
     
     def shrink_mask(self):
-        """Shrink mask"""
-        if MATPLOTLIB_AVAILABLE:
-            pixels = self.grow_shrink_sb.value()
-            self.mask_canvas.shrink_mask(pixels)
-            self.log(f"Mask shrunk by {pixels} pixels")
-            self.update_mask_info()
-    
-    def on_contrast_slider_changed(self, value):
-        """Handle contrast slider change (single vertical slider)"""
-        if MATPLOTLIB_AVAILABLE:
-            vmin = 0
-            vmax = value
-            self.mask_canvas.set_contrast(vmin, vmax)
-    
-    def auto_contrast(self):
-        """Auto contrast"""
-        if self.current_image is None:
+        """Shrink (erode) the mask"""
+        if self.current_mask is None:
+            QMessageBox.warning(self.root, "Warning", "No mask to shrink")
             return
         
-        vmin = np.percentile(self.current_image, 1)
-        vmax = np.percentile(self.current_image, 99)
-        
-        if hasattr(self, 'contrast_slider'):
-            self.contrast_slider.setValue(int(vmax))
-        
-        self.log(f"Auto contrast: 0 - {vmax:.0f}")
+        try:
+            from scipy import ndimage
+            self.current_mask = ndimage.binary_erosion(self.current_mask, iterations=1)
+            self.update_display()
+        except ImportError:
+            QMessageBox.warning(self.root, "Warning", "scipy not available for mask operations")
     
-    def reset_zoom(self):
-        """Reset zoom"""
-        if MATPLOTLIB_AVAILABLE:
-            self.mask_canvas.reset_zoom()
-            self.log("Zoom reset")
-    
-    def on_mask_changed(self):
-        """Handle mask change"""
-        self.update_mask_info()
-        
-        # Emit signal with current mask (only if mask is not None)
-        if MATPLOTLIB_AVAILABLE:
-            mask = self.mask_canvas.get_mask()
-            if mask is not None:
-                self.mask_updated.emit(mask)
-    
-    def update_mask_info(self):
-        """Update mask info label"""
-        if not MATPLOTLIB_AVAILABLE:
+    def fill_holes(self):
+        """Fill holes in the mask"""
+        if self.current_mask is None:
+            QMessageBox.warning(self.root, "Warning", "No mask to fill")
             return
         
-        mask = self.mask_canvas.get_mask()
-        if mask is not None:
-            masked_pixels = np.sum(mask)
-            total_pixels = mask.size
-            percentage = (masked_pixels / total_pixels) * 100
-            self.mask_info_lbl.setText(f"Masked: {masked_pixels:,} / {total_pixels:,} pixels ({percentage:.2f}%)")
+        try:
+            from scipy import ndimage
+            self.current_mask = ndimage.binary_fill_holes(self.current_mask)
+            self.update_display()
+        except ImportError:
+            QMessageBox.warning(self.root, "Warning", "scipy not available for mask operations")
+
+    def on_contrast_changed(self, value):
+        """Handle contrast slider change"""
+        self.contrast_label.setText(f"{value}%")
+        if self.image_data is not None:
+            self.update_display()
+
+    def update_display(self):
+        """Update image and mask display"""
+        if self.image_data is None:
+            return
+
+        self.ax.clear()
+
+        # Apply log scale and contrast
+        img_display = np.log10(self.image_data + 1)
+        contrast_factor = self.contrast_slider.value() / 100.0
+        low_percentile = contrast_factor * 20
+        high_percentile = 100 - (1 - contrast_factor) * 5
+        vmin = np.percentile(img_display, low_percentile)
+        vmax = np.percentile(img_display, high_percentile)
+        
+        # Display image
+        self.ax.imshow(img_display, cmap='viridis', origin='lower',
+                      interpolation='nearest', vmin=vmin, vmax=vmax,
+                      extent=[0, self.image_data.shape[1],
+                             0, self.image_data.shape[0]])
+
+        # Overlay mask if exists
+        if self.current_mask is not None:
+            mask_overlay = np.ma.masked_where(~self.current_mask, self.current_mask)
+            self.ax.imshow(mask_overlay, cmap='Reds', alpha=0.3, origin='lower',
+                          extent=[0, self.image_data.shape[1],
+                                 0, self.image_data.shape[0]])
+
+        # Draw temporary shape being drawn
+        if self.drawing and self.draw_start and self.draw_current:
+            if self.draw_mode == 'circle':
+                radius = np.sqrt((self.draw_current[0] - self.draw_start[0])**2 + 
+                               (self.draw_current[1] - self.draw_start[1])**2)
+                circle = Circle(self.draw_start, radius, fill=False, 
+                              edgecolor='yellow', linewidth=2, linestyle='--')
+                self.ax.add_patch(circle)
+            
+            elif self.draw_mode == 'rectangle':
+                x1, y1 = self.draw_start
+                x2, y2 = self.draw_current
+                width = x2 - x1
+                height = y2 - y1
+                rect = Rectangle((x1, y1), width, height, fill=False,
+                               edgecolor='yellow', linewidth=2, linestyle='--')
+                self.ax.add_patch(rect)
+        
+        # Draw polygon points
+        if self.draw_mode == 'polygon' and len(self.polygon_points) > 0:
+            points = np.array(self.polygon_points)
+            self.ax.plot(points[:, 0], points[:, 1], 'yo-', linewidth=2, markersize=8)
+            # Close polygon preview if more than 2 points
+            if len(self.polygon_points) > 2:
+                self.ax.plot([points[-1, 0], points[0, 0]], 
+                           [points[-1, 1], points[0, 1]], 'y--', linewidth=2)
+
+        self.ax.set_xlim(0, self.image_data.shape[1])
+        self.ax.set_ylim(0, self.image_data.shape[0])
+        self.ax.set_xlabel('X (pixels)', fontsize=10)
+        self.ax.set_ylabel('Y (pixels)', fontsize=10)
+        self.ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
+
+        self.canvas.draw_idle()
+
+    def on_mouse_move(self, event):
+        """Handle mouse move event"""
+        if event.inaxes != self.ax or self.image_data is None:
+            self.position_label.setText("Position: --")
+            return
+
+        x, y = int(event.xdata), int(event.ydata)
+        self.position_label.setText(f"Position: ({x}, {y})")
+        
+        # Update drawing preview
+        if self.drawing and self.draw_start is not None:
+            self.draw_current = (x, y)
+            self.update_display()
+
+    def on_mouse_press(self, event):
+        """Handle mouse press event for drawing"""
+        if event.inaxes != self.ax or self.image_data is None:
+            return
+        
+        x, y = int(event.xdata), int(event.ydata)
+        
+        # Right click to finish polygon
+        if event.button == 3:  # Right click
+            if self.draw_mode == 'polygon' and len(self.polygon_points) >= 3:
+                self.apply_polygon_mask()
+                self.update_display()
+            return
+        
+        if event.button != 1:  # Only left click for drawing
+            return
+        
+        if self.draw_mode == 'select':
+            return
+        
+        elif self.draw_mode == 'point':
+            # Immediately apply point mask
+            self.apply_point_mask(x, y, radius=5)
+        
+        elif self.draw_mode == 'threshold':
+            # Apply threshold masking
+            self.apply_threshold_mask()
+        
+        elif self.draw_mode == 'polygon':
+            # Add point to polygon
+            self.polygon_points.append((x, y))
+            self.update_display()
+        
+        elif self.draw_mode in ['circle', 'rectangle']:
+            # Start drawing shape
+            self.drawing = True
+            self.draw_start = (x, y)
+            self.draw_current = (x, y)
+    
+    def on_mouse_release(self, event):
+        """Handle mouse release event"""
+        if event.inaxes != self.ax or self.image_data is None:
+            return
+        
+        if event.button != 1:  # Only left click
+            return
+        
+        if not self.drawing:
+            return
+        
+        x, y = int(event.xdata), int(event.ydata)
+        self.draw_current = (x, y)
+        
+        # Apply the shape
+        if self.draw_mode == 'circle':
+            self.apply_circle_mask(self.draw_start, self.draw_current)
+        elif self.draw_mode == 'rectangle':
+            self.apply_rectangle_mask(self.draw_start, self.draw_current)
+        
+        # Reset drawing state
+        self.drawing = False
+        self.draw_start = None
+        self.draw_current = None
+        self.update_display()
+    
+    def apply_point_mask(self, x, y, radius=5):
+        """Apply mask/unmask at a point"""
+        if self.current_mask is None:
+            return
+        
+        # Create circular region around point
+        Y, X = np.ogrid[:self.current_mask.shape[0], :self.current_mask.shape[1]]
+        dist = np.sqrt((X - x)**2 + (Y - y)**2)
+        mask_region = dist <= radius
+        
+        # Apply mask or unmask
+        if self.mask_radio.isChecked():
+            self.current_mask[mask_region] = True
         else:
-            self.mask_info_lbl.setText("No mask loaded")
+            self.current_mask[mask_region] = False
+        
+        self.update_display()
     
-    def log(self, message):
-        """Log message"""
-        if hasattr(self, 'log_output'):
-            self.log_output.append(str(message))
-            scrollbar = self.log_output.verticalScrollBar()
-            scrollbar.setValue(scrollbar.maximum())
+    def apply_circle_mask(self, start, end):
+        """Apply circular mask"""
+        if self.current_mask is None:
+            return
+        
+        cx, cy = start
+        radius = np.sqrt((end[0] - start[0])**2 + (end[1] - start[1])**2)
+        
+        Y, X = np.ogrid[:self.current_mask.shape[0], :self.current_mask.shape[1]]
+        dist = np.sqrt((X - cx)**2 + (Y - cy)**2)
+        mask_region = dist <= radius
+        
+        # Apply mask or unmask
+        if self.mask_radio.isChecked():
+            self.current_mask[mask_region] = True
+        else:
+            self.current_mask[mask_region] = False
     
-    def get_current_mask(self):
-        """Get current mask for external use"""
-        if MATPLOTLIB_AVAILABLE:
-            return self.mask_canvas.get_mask()
-        return None
+    def apply_rectangle_mask(self, start, end):
+        """Apply rectangular mask"""
+        if self.current_mask is None:
+            return
+        
+        x1, y1 = start
+        x2, y2 = end
+        
+        # Ensure correct order
+        xmin, xmax = min(x1, x2), max(x1, x2)
+        ymin, ymax = min(y1, y2), max(y1, y2)
+        
+        # Clip to image bounds
+        xmin = max(0, xmin)
+        xmax = min(self.current_mask.shape[1] - 1, xmax)
+        ymin = max(0, ymin)
+        ymax = min(self.current_mask.shape[0] - 1, ymax)
+        
+        # Apply mask or unmask
+        if self.mask_radio.isChecked():
+            self.current_mask[ymin:ymax+1, xmin:xmax+1] = True
+        else:
+            self.current_mask[ymin:ymax+1, xmin:xmax+1] = False
     
-    def set_image_for_mask(self, image_data):
-        """Set image data from external source (e.g., calibration module)"""
-        self.current_image = image_data
-        if MATPLOTLIB_AVAILABLE:
-            self.mask_canvas.set_image_data(image_data)
-        self.log("Image data received from external module")
-        self.update_mask_info()
+    def apply_polygon_mask(self):
+        """Apply polygon mask"""
+        if self.current_mask is None or len(self.polygon_points) < 3:
+            return
+        
+        from matplotlib.path import Path
+        
+        # Create polygon path
+        path = Path(self.polygon_points)
+        
+        # Create grid of points
+        ny, nx = self.current_mask.shape
+        x, y = np.meshgrid(np.arange(nx), np.arange(ny))
+        points = np.vstack((x.flatten(), y.flatten())).T
+        
+        # Check which points are inside polygon
+        mask_region = path.contains_points(points).reshape(ny, nx)
+        
+        # Apply mask or unmask
+        if self.mask_radio.isChecked():
+            self.current_mask[mask_region] = True
+        else:
+            self.current_mask[mask_region] = False
+        
+        # Clear polygon points
+        self.polygon_points = []
+    
+    def apply_threshold_mask(self):
+        """Apply threshold-based masking"""
+        if self.image_data is None:
+            return
+        
+        # Ask user for threshold value
+        from PyQt6.QtWidgets import QInputDialog
+        
+        threshold, ok = QInputDialog.getDouble(
+            self.root,
+            "Threshold Value",
+            "Enter threshold value (pixels above this will be masked):",
+            value=1000.0,
+            min=0.0,
+            max=float(self.image_data.max()),
+            decimals=1
+        )
+        
+        if not ok:
+            return
+        
+        # Create mask based on threshold
+        threshold_region = self.image_data > threshold
+        
+        # Initialize mask if needed
+        if self.current_mask is None:
+            self.current_mask = np.zeros(self.image_data.shape, dtype=bool)
+        
+        # Apply mask or unmask
+        if self.mask_radio.isChecked():
+            self.current_mask[threshold_region] = True
+        else:
+            self.current_mask[threshold_region] = False
+        
+        self.update_display()
+    
+    def on_key_press(self, event):
+        """Handle key press events"""
+        if event.key == 'enter' or event.key == 'escape':
+            # Finish polygon
+            if self.draw_mode == 'polygon' and len(self.polygon_points) >= 3:
+                self.apply_polygon_mask()
+                self.update_display()
+            elif self.draw_mode == 'polygon':
+                # Cancel polygon
+                self.polygon_points = []
+                self.update_display()
+
+
+# Test code
+if __name__ == "__main__":
+    from PyQt6.QtWidgets import QApplication
+    import sys
+
+    app = QApplication(sys.argv)
+
+    # Create test widget
+    widget = QWidget()
+    
+    mask_module = MaskModule(widget, widget)
+    mask_module.setup_ui()
+    
+    widget.setWindowTitle("Mask Module Test")
+    widget.resize(1200, 900)
+    widget.show()
+
+    sys.exit(app.exec())

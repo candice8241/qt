@@ -191,7 +191,7 @@ class CuteSheepProgressBar(QWidget):
         # Draw sheep emoji
         font = QFont("Segoe UI Emoji", 48)
         painter.setFont(font)
-        painter.drawText(int(x - 24), int(y_pos + 24), "🐿️")
+        painter.drawText(int(x - 24), int(y_pos + 24), "🐰")
 
     def start(self):
         """Start the animation"""
