@@ -1,0 +1,35 @@
+===============================================
+Powder Integration Hang Fix - Change Summary
+===============================================
+
+Problem: 
+  在Powder Int中点击run integration时会卡住
+
+Root Cause:
+  1. tqdm进度条在GUI线程中造成阻塞
+  2. print语句的stdout/stderr输出阻塞GUI
+
+Files Modified:
+  ✓ powder_module.py    - WorkerThread stdout/stderr重定向
+  ✓ radial_module.py     - WorkerThread stdout/stderr重定向
+  ✓ batch_integration.py - 添加disable_progress_bar参数
+
+Key Changes:
+  1. WorkerThread.run() 添加stdout/stderr重定向到StringIO
+  2. batch_integrate() 添加disable_progress_bar参数
+  3. run_batch_integration() 添加disable_progress_bar参数
+  4. powder_module调用时传递disable_progress_bar=True
+
+Verification:
+  ✓ 语法检查通过
+  ✓ Linter检查无错误
+  ✓ 所有关键修改已验证
+  ✓ 代码结构完整
+
+Status: READY FOR TESTING
+
+Documentation:
+  - FIX_SUMMARY.md (English)
+  - 修复说明.md (Chinese)
+  - CHANGES.txt (This file)
+===============================================

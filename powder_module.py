@@ -52,12 +52,26 @@ class WorkerThread(QThread):
         self.kwargs = kwargs
 
     def run(self):
-        """Run the target function"""
+        """Run the target function with stdout/stderr redirection"""
+        import sys
+        from io import StringIO
+        
+        # Redirect stdout and stderr to prevent GUI blocking
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
+        sys.stdout = StringIO()
+        sys.stderr = StringIO()
+        
         try:
             result = self.target_func(*self.args, **self.kwargs)
             self.finished.emit(str(result) if result else "Task completed successfully")
         except Exception as e:
-            self.error.emit(f"Error: {str(e)}")
+            import traceback
+            self.error.emit(f"Error: {str(e)}\n{traceback.format_exc()}")
+        finally:
+            # Restore stdout and stderr
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
 
 
 class PowderXRDModule(GUIBase):
@@ -1015,7 +1029,8 @@ class PowderXRDModule(GUIBase):
                     unit=unit_pyFAI,
                     formats=formats,
                     create_stacked_plot=self.create_stacked_plot,
-                    stacked_plot_offset=self.stacked_plot_offset
+                    stacked_plot_offset=self.stacked_plot_offset,
+                    disable_progress_bar=True  # Disable tqdm to prevent GUI hang
                 )
             
             worker = WorkerThread(run_task)

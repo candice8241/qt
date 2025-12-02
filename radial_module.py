@@ -63,12 +63,26 @@ class WorkerThread(QThread):
         self.kwargs = kwargs
 
     def run(self):
-        """Run the target function"""
+        """Run the target function with stdout/stderr redirection"""
+        import sys
+        from io import StringIO
+        
+        # Redirect stdout and stderr to prevent GUI blocking
+        old_stdout = sys.stdout
+        old_stderr = sys.stderr
+        sys.stdout = StringIO()
+        sys.stderr = StringIO()
+        
         try:
             result = self.target_func(*self.args, **self.kwargs)
             self.finished.emit(str(result) if result else "Task completed successfully")
         except Exception as e:
-            self.error.emit(f"Error: {str(e)}")
+            import traceback
+            self.error.emit(f"Error: {str(e)}\n{traceback.format_exc()}")
+        finally:
+            # Restore stdout and stderr
+            sys.stdout = old_stdout
+            sys.stderr = old_stderr
 
 
 class AzimuthalIntegrationModule(GUIBase):

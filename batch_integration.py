@@ -242,7 +242,7 @@ class BatchIntegrator:
     
     def batch_integrate(self, input_pattern, output_dir, npt=2000, unit="2th_deg",
                         dataset_path=None, formats=['xy'], create_stacked_plot=False,
-                        stacked_plot_offset='auto', **kwargs):
+                        stacked_plot_offset='auto', disable_progress_bar=False, **kwargs):
         """
         Batch integration for multiple HDF5 files
 
@@ -250,6 +250,7 @@ class BatchIntegrator:
             formats (list): Output formats ['xy', 'dat', 'chi', 'svg', 'png', 'fxye']
             create_stacked_plot (bool): Whether to create stacked plot
             stacked_plot_offset (str or float): Offset for stacked plot ('auto' or float value)
+            disable_progress_bar (bool): Disable tqdm progress bar (useful for GUI)
         """
         # Enhanced file search with multiple attempts
         h5_files = sorted(glob.glob(input_pattern, recursive=True))
@@ -279,7 +280,10 @@ class BatchIntegrator:
         success_count = 0
         failed_files = []
 
-        for h5_file in tqdm(h5_files, desc="Processing"):
+        # Use tqdm only if not disabled (disable for GUI to prevent hanging)
+        iterator = h5_files if disable_progress_bar else tqdm(h5_files, desc="Processing")
+        
+        for h5_file in iterator:
             basename = os.path.splitext(os.path.basename(h5_file))[0]
             output_base = os.path.join(output_dir, basename)
 
@@ -653,7 +657,8 @@ def run_batch_integration(
     unit='2th_deg',
     formats=['xy', 'dat', 'chi', 'svg', 'png', 'fxye'],
     create_stacked_plot=True,
-    stacked_plot_offset='auto'
+    stacked_plot_offset='auto',
+    disable_progress_bar=False
 ):
     """
     Run batch 1D integration using pyFAI
@@ -669,6 +674,7 @@ def run_batch_integration(
         formats (list): Output formats ['xy', 'dat', 'chi', 'svg', 'png', 'fxye']
         create_stacked_plot (bool): Whether to create stacked plot
         stacked_plot_offset (str or float): Offset for stacked plot
+        disable_progress_bar (bool): Disable tqdm progress bar (useful for GUI)
     """
 
     integration_kwargs = {
@@ -693,6 +699,7 @@ def run_batch_integration(
         formats=formats,
         create_stacked_plot=create_stacked_plot,
         stacked_plot_offset=stacked_plot_offset,
+        disable_progress_bar=disable_progress_bar,
         **integration_kwargs
     )
 def main():
