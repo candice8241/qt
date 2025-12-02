@@ -30,7 +30,7 @@ from PyQt6.QtWidgets import (QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushBut
                               QLineEdit, QTextEdit, QCheckBox, QComboBox, QGroupBox,
                               QFileDialog, QMessageBox, QFrame, QScrollArea, QRadioButton,
                               QButtonGroup)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
+from PyQt6.QtCore import Qt, QObject, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
 import threading
 import os
@@ -39,15 +39,20 @@ from theme_module import CuteSheepProgressBar, ModernButton
 from custom_widgets import SpinboxStyleButton, CustomSpinbox
 
 
-class WorkerThread(QThread):
-    """Worker thread for background processing"""
-    finished = pyqtSignal(str)  # Signal with result message
-    error = pyqtSignal(str)     # Signal with error message
-    progress = pyqtSignal(str)  # Signal with progress message
+class WorkerSignals(QObject):
+    """Signals for worker thread"""
+    finished = pyqtSignal(str)
+    error = pyqtSignal(str)
+    progress = pyqtSignal(str)
 
-    def __init__(self, target_func, *args, **kwargs):
-        super().__init__()
+
+class WorkerThread(threading.Thread):
+    """Worker thread for background processing using Python threading"""
+    
+    def __init__(self, target_func, signals, *args, **kwargs):
+        super().__init__(daemon=True)
         self.target_func = target_func
+        self.signals = signals
         self.args = args
         self.kwargs = kwargs
 
@@ -64,10 +69,10 @@ class WorkerThread(QThread):
         
         try:
             result = self.target_func(*self.args, **self.kwargs)
-            self.finished.emit(str(result) if result else "Task completed successfully")
+            self.signals.finished.emit(str(result) if result else "Task completed successfully")
         except Exception as e:
             import traceback
-            self.error.emit(f"Error: {str(e)}\n{traceback.format_exc()}")
+            self.signals.error.emit(f"Error: {str(e)}\n{traceback.format_exc()}")
         finally:
             # Restore stdout and stderr
             sys.stdout = old_stdout
@@ -1017,7 +1022,7 @@ class PowderXRDModule(GUIBase):
             # Import and run integration
             from batch_integration import run_batch_integration
             
-            # Create worker thread
+            # Create worker thread with signals
             def run_task():
                 run_batch_integration(
                     poni_file=self.poni_path,
@@ -1033,9 +1038,11 @@ class PowderXRDModule(GUIBase):
                     disable_progress_bar=True  # Disable tqdm to prevent GUI hang
                 )
             
-            worker = WorkerThread(run_task)
-            worker.finished.connect(self._on_integration_finished)
-            worker.error.connect(self._on_integration_error)
+            signals = WorkerSignals()
+            signals.finished.connect(self._on_integration_finished)
+            signals.error.connect(self._on_integration_error)
+            
+            worker = WorkerThread(run_task, signals)
             self.running_threads.append(worker)
             worker.start()
             
@@ -1100,7 +1107,7 @@ class PowderXRDModule(GUIBase):
             # Import and run phase analysis
             from batch_cal_volume import XRayDiffractionAnalyzer
             
-            # Create worker thread
+            # Create worker thread with signals
             def run_task():
                 analyzer = XRayDiffractionAnalyzer(
                     wavelength=self.phase_wavelength,
@@ -1128,9 +1135,11 @@ class PowderXRDModule(GUIBase):
                 
                 return results
             
-            worker = WorkerThread(run_task)
-            worker.finished.connect(self._on_phase_analysis_finished)
-            worker.error.connect(self._on_phase_analysis_error)
+            signals = WorkerSignals()
+            signals.finished.connect(self._on_phase_analysis_finished)
+            signals.error.connect(self._on_phase_analysis_error)
+            
+            worker = WorkerThread(run_task, signals)
             self.running_threads.append(worker)
             worker.start()
             

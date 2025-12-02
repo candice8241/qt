@@ -13,11 +13,12 @@ from PyQt6.QtWidgets import (QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushBut
                               QLineEdit, QTextEdit, QCheckBox, QComboBox, QGroupBox,
                               QFileDialog, QMessageBox, QFrame, QScrollArea, QRadioButton,
                               QButtonGroup)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
+from PyQt6.QtCore import Qt, QObject, pyqtSignal, QTimer
 # Import configuration dialogs
 from unified_config_dialog import UnifiedConfigDialog
 from h5_preview_dialog import H5PreviewDialog
 from PyQt6.QtGui import QFont
+import threading
 import os
 import glob
 import h5py
@@ -50,15 +51,20 @@ except ImportError:
     print("⚠ Warning: matplotlib not available. Plotting features will be disabled.")
 
 
-class WorkerThread(QThread):
-    """Worker thread for background processing"""
+class WorkerSignals(QObject):
+    """Signals for worker thread"""
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
     progress = pyqtSignal(str)
 
-    def __init__(self, target_func, *args, **kwargs):
-        super().__init__()
+
+class WorkerThread(threading.Thread):
+    """Worker thread for background processing using Python threading"""
+    
+    def __init__(self, target_func, signals, *args, **kwargs):
+        super().__init__(daemon=True)
         self.target_func = target_func
+        self.signals = signals
         self.args = args
         self.kwargs = kwargs
 
@@ -75,10 +81,10 @@ class WorkerThread(QThread):
         
         try:
             result = self.target_func(*self.args, **self.kwargs)
-            self.finished.emit(str(result) if result else "Task completed successfully")
+            self.signals.finished.emit(str(result) if result else "Task completed successfully")
         except Exception as e:
             import traceback
-            self.error.emit(f"Error: {str(e)}\n{traceback.format_exc()}")
+            self.signals.error.emit(f"Error: {str(e)}\n{traceback.format_exc()}")
         finally:
             # Restore stdout and stderr
             sys.stdout = old_stdout
@@ -964,9 +970,11 @@ class AzimuthalIntegrationModule(GUIBase):
             def integration_work():
                 return self._do_integration()
             
-            worker = WorkerThread(integration_work)
-            worker.finished.connect(lambda msg: self._on_integration_finished(msg))
-            worker.error.connect(lambda err: self._on_integration_error(err))
+            signals = WorkerSignals()
+            signals.finished.connect(lambda msg: self._on_integration_finished(msg))
+            signals.error.connect(lambda err: self._on_integration_error(err))
+            
+            worker = WorkerThread(integration_work, signals)
             self.running_threads.append(worker)
             worker.start()
             
