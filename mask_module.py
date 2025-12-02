@@ -54,10 +54,7 @@ class MaskModule(GUIBase):
         self.draw_current = None
         self.polygon_points = []
         self.temp_shape = None  # Temporary shape being drawn
-        
-        # Zoom state
-        self.zoom_scale = 1.0
-        self.zoom_center = None
+        self.preview_artists = []  # Store preview shapes for faster update
 
     def setup_ui(self):
         """Setup UI components"""
@@ -67,32 +64,28 @@ class MaskModule(GUIBase):
             layout = QVBoxLayout(self.parent)
             layout.setContentsMargins(0, 0, 0, 0)
         
-        # Create scroll area
+        # Create scroll area - No scrollbar, fit in one page
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setStyleSheet(f"background-color: {self.colors['bg']}; border: none;")
 
         # Content widget
         content_widget = QWidget()
         content_widget.setStyleSheet(f"background-color: {self.colors['bg']};")
         content_layout = QVBoxLayout(content_widget)
-        content_layout.setContentsMargins(20, 10, 20, 10)
-        content_layout.setSpacing(10)
+        content_layout.setContentsMargins(15, 8, 15, 8)
+        content_layout.setSpacing(6)
 
         # Title
         title = QLabel("🎭 Mask Creation & Management")
-        title.setFont(QFont('Arial', 16, QFont.Weight.Bold))
+        title.setFont(QFont('Arial', 14, QFont.Weight.Bold))
         title.setStyleSheet(f"color: {self.colors['primary']};")
         content_layout.addWidget(title)
 
-        # Description
-        desc = QLabel(
-            "Create, edit, and manage detector masks for diffraction data\n"
-            "• Circle/Rectangle: Click and drag • Polygon: Click points, right-click or Enter to finish\n"
-            "• Point: Click to mask/unmask • Threshold: Click to set value"
-        )
+        # Description - Compact
+        desc = QLabel("Create and manage detector masks • Circle/Rect: drag • Polygon: points+Enter • Point: click")
         desc.setWordWrap(True)
         desc.setStyleSheet(f"color: {self.colors['text_dark']}; font-size: 9pt;")
         content_layout.addWidget(desc)
@@ -101,27 +94,18 @@ class MaskModule(GUIBase):
         control_group = self.create_control_group()
         content_layout.addWidget(control_group)
 
-        # Drawing tools
-        tools_group = self.create_tools_group()
-        content_layout.addWidget(tools_group)
-
-        # Preview area
-        if MATPLOTLIB_AVAILABLE:
-            preview_group = self.create_preview_group()
-            content_layout.addWidget(preview_group, stretch=1)
-
-        # Action buttons
+        # Action buttons - Moved up
         button_layout = QHBoxLayout()
-        button_layout.addStretch()
+        button_layout.setSpacing(8)
 
         save_btn = QPushButton("💾 Save Mask")
-        save_btn.setFixedWidth(120)
+        save_btn.setFixedWidth(110)
         save_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: #4CAF50;
                 color: white;
                 border: none;
-                padding: 8px;
+                padding: 6px;
                 border-radius: 4px;
                 font-weight: bold;
             }}
@@ -133,13 +117,13 @@ class MaskModule(GUIBase):
         button_layout.addWidget(save_btn)
 
         clear_btn = QPushButton("🗑️ Clear All")
-        clear_btn.setFixedWidth(120)
+        clear_btn.setFixedWidth(110)
         clear_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: #FF5252;
                 color: white;
                 border: none;
-                padding: 8px;
+                padding: 6px;
                 border-radius: 4px;
                 font-weight: bold;
             }}
@@ -149,8 +133,19 @@ class MaskModule(GUIBase):
         """)
         clear_btn.clicked.connect(self.clear_mask)
         button_layout.addWidget(clear_btn)
+        
+        button_layout.addStretch()
 
         content_layout.addLayout(button_layout)
+
+        # Drawing tools
+        tools_group = self.create_tools_group()
+        content_layout.addWidget(tools_group)
+
+        # Preview area
+        if MATPLOTLIB_AVAILABLE:
+            preview_group = self.create_preview_group()
+            content_layout.addWidget(preview_group)
         
         # Add content widget to scroll area
         scroll.setWidget(content_widget)
@@ -460,11 +455,11 @@ class MaskModule(GUIBase):
         # Canvas and contrast slider layout
         canvas_layout = QHBoxLayout()
         
-        # Matplotlib canvas - Fixed size
-        self.figure = Figure(figsize=(8, 6))
+        # Matplotlib canvas - Compact size
+        self.figure = Figure(figsize=(7, 5))
         self.figure.subplots_adjust(left=0.10, right=0.98, top=0.96, bottom=0.12)
         self.canvas = FigureCanvas(self.figure)
-        self.canvas.setFixedSize(800, 600)  # Fixed size for consistent layout
+        self.canvas.setFixedSize(700, 500)  # Compact size to fit in one page
         canvas_layout.addWidget(self.canvas)
         
         # Vertical contrast slider
@@ -481,7 +476,7 @@ class MaskModule(GUIBase):
         self.contrast_slider.setMinimum(1)
         self.contrast_slider.setMaximum(100)
         self.contrast_slider.setValue(50)
-        self.contrast_slider.setFixedHeight(350)
+        self.contrast_slider.setFixedHeight(300)
         self.contrast_slider.setFixedWidth(30)
         self.contrast_slider.setStyleSheet("""
             QSlider::groove:vertical {
@@ -533,7 +528,6 @@ class MaskModule(GUIBase):
         self.canvas.mpl_connect('button_press_event', self.on_mouse_press)
         self.canvas.mpl_connect('button_release_event', self.on_mouse_release)
         self.canvas.mpl_connect('key_press_event', self.on_key_press)
-        self.canvas.mpl_connect('scroll_event', self.on_scroll)
 
         # Initial plot
         self.ax = self.figure.add_subplot(111)
@@ -747,7 +741,7 @@ class MaskModule(GUIBase):
             self.update_display()
 
     def update_display(self):
-        """Update image and mask display"""
+        """Update image and mask display - Full redraw"""
         if self.image_data is None:
             return
 
@@ -775,22 +769,7 @@ class MaskModule(GUIBase):
                                  0, self.image_data.shape[0]])
 
         # Draw temporary shape being drawn
-        if self.drawing and self.draw_start and self.draw_current:
-            if self.draw_mode == 'circle':
-                radius = np.sqrt((self.draw_current[0] - self.draw_start[0])**2 + 
-                               (self.draw_current[1] - self.draw_start[1])**2)
-                circle = Circle(self.draw_start, radius, fill=False, 
-                              edgecolor='yellow', linewidth=2, linestyle='--')
-                self.ax.add_patch(circle)
-            
-            elif self.draw_mode == 'rectangle':
-                x1, y1 = self.draw_start
-                x2, y2 = self.draw_current
-                width = x2 - x1
-                height = y2 - y1
-                rect = Rectangle((x1, y1), width, height, fill=False,
-                               edgecolor='yellow', linewidth=2, linestyle='--')
-                self.ax.add_patch(rect)
+        self._draw_preview_shapes()
         
         # Draw polygon points
         if self.draw_mode == 'polygon' and len(self.polygon_points) > 0:
@@ -808,6 +787,58 @@ class MaskModule(GUIBase):
         self.ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
 
         self.canvas.draw_idle()
+    
+    def _draw_preview_shapes(self):
+        """Draw temporary preview shapes"""
+        if self.drawing and self.draw_start and self.draw_current:
+            if self.draw_mode == 'circle':
+                radius = np.sqrt((self.draw_current[0] - self.draw_start[0])**2 + 
+                               (self.draw_current[1] - self.draw_start[1])**2)
+                circle = Circle(self.draw_start, radius, fill=False, 
+                              edgecolor='yellow', linewidth=2, linestyle='--')
+                self.ax.add_patch(circle)
+            
+            elif self.draw_mode == 'rectangle':
+                x1, y1 = self.draw_start
+                x2, y2 = self.draw_current
+                width = x2 - x1
+                height = y2 - y1
+                rect = Rectangle((x1, y1), width, height, fill=False,
+                               edgecolor='yellow', linewidth=2, linestyle='--')
+                self.ax.add_patch(rect)
+    
+    def update_preview_only(self):
+        """Fast preview update without full redraw - for mouse move"""
+        if self.image_data is None:
+            return
+        
+        # Remove old preview artists
+        for artist in self.preview_artists:
+            artist.remove()
+        self.preview_artists = []
+        
+        # Draw new preview shapes
+        if self.drawing and self.draw_start and self.draw_current:
+            if self.draw_mode == 'circle':
+                radius = np.sqrt((self.draw_current[0] - self.draw_start[0])**2 + 
+                               (self.draw_current[1] - self.draw_start[1])**2)
+                circle = Circle(self.draw_start, radius, fill=False, 
+                              edgecolor='yellow', linewidth=2, linestyle='--', animated=True)
+                self.ax.add_patch(circle)
+                self.preview_artists.append(circle)
+            
+            elif self.draw_mode == 'rectangle':
+                x1, y1 = self.draw_start
+                x2, y2 = self.draw_current
+                width = x2 - x1
+                height = y2 - y1
+                rect = Rectangle((x1, y1), width, height, fill=False,
+                               edgecolor='yellow', linewidth=2, linestyle='--', animated=True)
+                self.ax.add_patch(rect)
+                self.preview_artists.append(rect)
+        
+        # Use blit for fast update
+        self.canvas.draw_idle()
 
     def on_mouse_move(self, event):
         """Handle mouse move event"""
@@ -818,10 +849,10 @@ class MaskModule(GUIBase):
         x, y = int(event.xdata), int(event.ydata)
         self.position_label.setText(f"Position: ({x}, {y})")
         
-        # Update drawing preview
+        # Update drawing preview - optimized
         if self.drawing and self.draw_start is not None:
             self.draw_current = (x, y)
-            self.update_display()
+            self.update_preview_only()
 
     def on_mouse_press(self, event):
         """Handle mouse press event for drawing"""
@@ -1022,54 +1053,6 @@ class MaskModule(GUIBase):
                 # Cancel polygon
                 self.polygon_points = []
                 self.update_display()
-    
-    def on_scroll(self, event):
-        """Handle mouse wheel scroll for zooming"""
-        if event.inaxes != self.ax or self.image_data is None:
-            return
-        
-        # Get current axis limits
-        xlim = self.ax.get_xlim()
-        ylim = self.ax.get_ylim()
-        
-        # Get mouse position in data coordinates
-        xdata = event.xdata
-        ydata = event.ydata
-        
-        # Zoom factor
-        zoom_factor = 1.2 if event.button == 'up' else 0.8
-        
-        # Calculate new limits centered on mouse position
-        x_range = xlim[1] - xlim[0]
-        y_range = ylim[1] - ylim[0]
-        
-        new_x_range = x_range / zoom_factor
-        new_y_range = y_range / zoom_factor
-        
-        # Calculate new limits
-        x_center_ratio = (xdata - xlim[0]) / x_range
-        y_center_ratio = (ydata - ylim[0]) / y_range
-        
-        new_xlim = [
-            xdata - new_x_range * x_center_ratio,
-            xdata + new_x_range * (1 - x_center_ratio)
-        ]
-        new_ylim = [
-            ydata - new_y_range * y_center_ratio,
-            ydata + new_y_range * (1 - y_center_ratio)
-        ]
-        
-        # Constrain to image bounds
-        new_xlim[0] = max(0, new_xlim[0])
-        new_xlim[1] = min(self.image_data.shape[1], new_xlim[1])
-        new_ylim[0] = max(0, new_ylim[0])
-        new_ylim[1] = min(self.image_data.shape[0], new_ylim[1])
-        
-        # Apply new limits
-        self.ax.set_xlim(new_xlim)
-        self.ax.set_ylim(new_ylim)
-        
-        self.canvas.draw_idle()
 
 
 # Test code
