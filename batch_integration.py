@@ -566,13 +566,13 @@ class BatchIntegrator:
 
             # Add label between current baseline and next baseline
             x_pos = data[0, 0] + (data[-1, 0] - data[0, 0]) * 0.02
-            # Position in the middle between current and next baseline
+            # Position slightly above middle between current and next baseline
             if idx < len(data_list) - 1:
-                # Not the last curve: middle between two baselines
-                y_pos = y_offset + calc_offset / 2
+                # Not the last curve: 60% of the way to next baseline
+                y_pos = y_offset + calc_offset * 0.6
             else:
                 # Last curve: above its baseline
-                y_pos = y_offset + calc_offset * 0.3
+                y_pos = y_offset + calc_offset * 0.4
 
             plt.text(x_pos, y_pos, label,
                     fontsize=8, verticalalignment='bottom',
