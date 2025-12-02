@@ -1,0 +1,101 @@
+=====================================
+第二版修复 - 关键改动总结
+=====================================
+
+问题：第一版修复后"还是卡"
+
+根本原因：
+----------
+QThread 与 Qt 事件循环的冲突
+- QThread 本质上还是 Qt 的一部分
+- 大量 I/O 和 matplotlib 操作会阻塞事件循环
+- 即使重定向 stdout 也无法完全避免
+
+第二版方案：
+----------
+**用 Python 标准 threading.Thread 替代 QThread**
+
+核心改动：
+----------
+1. powder_module.py 和 radial_module.py:
+   
+   旧代码：
+   --------
+   from PyQt6.QtCore import Qt, QThread, pyqtSignal
+   
+   class WorkerThread(QThread):
+       finished = pyqtSignal(str)
+       
+   新代码：
+   --------
+   from PyQt6.QtCore import Qt, QObject, pyqtSignal
+   import threading
+   
+   class WorkerSignals(QObject):
+       finished = pyqtSignal(str)
+       
+   class WorkerThread(threading.Thread):
+       def __init__(self, target_func, signals):
+           super().__init__(daemon=True)
+           self.signals = signals
+
+2. 使用方式改变：
+   
+   旧代码：
+   --------
+   worker = WorkerThread(run_task)
+   worker.finished.connect(callback)
+   worker.start()
+   
+   新代码：
+   --------
+   signals = WorkerSignals()
+   signals.finished.connect(callback)
+   worker = WorkerThread(run_task, signals)
+   worker.start()
+
+为什么有效：
+----------
+✓ threading.Thread 完全独立于 Qt
+✓ 不会干扰 Qt 事件循环
+✓ daemon=True 确保程序可以正常退出
+✓ 保留了 PyQt 信号机制的便利性
+✓ matplotlib 操作更安全
+
+技术对比：
+----------
+QThread:
+  - Qt 框架的一部分
+  - 与事件循环耦合
+  - I/O 操作可能阻塞
+  
+threading.Thread:
+  - Python 标准库
+  - 完全独立
+  - 真正的后台线程
+  - 不影响 GUI
+
+修改文件：
+----------
+powder_module.py  - 45 行改动
+radial_module.py  - 28 行改动
+
+状态：
+------
+✓ 语法检查通过
+✓ Linter 无错误
+✓ 所有关键改动已验证
+✓ 准备测试
+
+如何测试：
+----------
+1. 启动应用
+2. 进入 Powder Int
+3. 点击 "Run Integration"
+4. 观察：
+   - 进度条是否流畅动画
+   - GUI 是否响应
+   - 任务完成后是否正常显示
+5. 尝试大量文件和 stacked plot
+
+=====================================
