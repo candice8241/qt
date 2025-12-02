@@ -2,16 +2,18 @@
 # -*- coding: utf-8 -*-
 """
 Mask Creation and Management Module
-Dialog for creating and managing diffraction masks
+Module for creating and managing diffraction masks
 """
 
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                               QPushButton, QGroupBox, QFileDialog, QMessageBox,
-                              QLineEdit, QCheckBox, QSlider, QComboBox, QSpinBox)
+                              QLineEdit, QCheckBox, QSlider, QComboBox, QSpinBox,
+                              QScrollArea, QFrame)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 import numpy as np
 import os
+from gui_base import GUIBase
 
 # Import matplotlib for image display
 try:
@@ -25,22 +27,20 @@ except ImportError:
     print("⚠ Warning: matplotlib not available. Mask preview will be disabled.")
 
 
-class MaskModule(QWidget):
+class MaskModule(GUIBase):
     """Mask Creation and Management Module"""
 
     def __init__(self, parent, root):
-        super().__init__(parent)
-        self.root = root
+        """
+        Initialize Mask module
         
-        # Color theme
-        self.colors = {
-            'primary': '#7C4DFF',
-            'background': '#F5F5F5',
-            'card_bg': '#FFFFFF',
-            'border': '#CCCCCC',
-            'text_dark': '#333333',
-            'secondary': '#9575CD'
-        }
+        Args:
+            parent: Parent widget to contain this module
+            root: Root window for dialogs
+        """
+        super().__init__()
+        self.parent = parent
+        self.root = root
 
         # Mask data
         self.current_mask = None
@@ -51,37 +51,51 @@ class MaskModule(QWidget):
         self.draw_mode = 'none'  # 'circle', 'rectangle', 'polygon', 'none'
         self.mask_shapes = []  # Store drawn shapes
 
-        self.setup_ui()
-
     def setup_ui(self):
         """Setup UI components"""
-        layout = QVBoxLayout(self)
-        layout.setSpacing(10)
-        layout.setContentsMargins(15, 15, 15, 15)
+        # Get or create layout for parent
+        layout = self.parent.layout()
+        if layout is None:
+            layout = QVBoxLayout(self.parent)
+            layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Create scroll area
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setStyleSheet(f"background-color: {self.colors['bg']}; border: none;")
+
+        # Content widget
+        content_widget = QWidget()
+        content_widget.setStyleSheet(f"background-color: {self.colors['bg']};")
+        content_layout = QVBoxLayout(content_widget)
+        content_layout.setContentsMargins(20, 10, 20, 10)
+        content_layout.setSpacing(10)
 
         # Title
         title = QLabel("🎭 Mask Creation & Management")
         title.setFont(QFont('Arial', 16, QFont.Weight.Bold))
         title.setStyleSheet(f"color: {self.colors['primary']};")
-        layout.addWidget(title)
+        content_layout.addWidget(title)
 
         # Description
         desc = QLabel("Create, edit, and manage detector masks for diffraction data")
         desc.setStyleSheet(f"color: {self.colors['text_dark']}; font-size: 10pt;")
-        layout.addWidget(desc)
+        content_layout.addWidget(desc)
 
         # Control area
         control_group = self.create_control_group()
-        layout.addWidget(control_group)
+        content_layout.addWidget(control_group)
 
         # Drawing tools
         tools_group = self.create_tools_group()
-        layout.addWidget(tools_group)
+        content_layout.addWidget(tools_group)
 
         # Preview area
         if MATPLOTLIB_AVAILABLE:
             preview_group = self.create_preview_group()
-            layout.addWidget(preview_group, stretch=1)
+            content_layout.addWidget(preview_group, stretch=1)
 
         # Action buttons
         button_layout = QHBoxLayout()
@@ -123,7 +137,11 @@ class MaskModule(QWidget):
         clear_btn.clicked.connect(self.clear_mask)
         button_layout.addWidget(clear_btn)
 
-        layout.addLayout(button_layout)
+        content_layout.addLayout(button_layout)
+        
+        # Add content widget to scroll area
+        scroll.setWidget(content_widget)
+        layout.addWidget(scroll)
 
     def create_control_group(self):
         """Create file control group"""
@@ -596,10 +614,9 @@ if __name__ == "__main__":
 
     # Create test widget
     widget = QWidget()
-    layout = QVBoxLayout(widget)
     
     mask_module = MaskModule(widget, widget)
-    layout.addWidget(mask_module)
+    mask_module.setup_ui()
     
     widget.setWindowTitle("Mask Module Test")
     widget.resize(1200, 900)

@@ -419,6 +419,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         mask_frame = self._ensure_frame("mask")
         if self.mask_module is None:
             self.mask_module = MaskModule(mask_frame, self)
+            self.mask_module.setup_ui()
         mask_frame.hide()  # Ensure hidden after prebuild
         
         # Only prebuild non-active modules in background
@@ -492,7 +493,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             target_frame = self._ensure_frame("mask")
             if self.mask_module is None:
                 self.mask_module = MaskModule(target_frame, self)
-                # MaskModule doesn't have setup_ui() - it's set up in __init__
+                self.mask_module.setup_ui()
         
         elif tab_name == "powder":
             target_frame = self._ensure_frame("powder")
