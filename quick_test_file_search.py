@@ -24,6 +24,8 @@ def test_file_search(input_pattern):
     # Method 1: Try the pattern as-is with recursive search
     print(f"\n📂 Method 1: Trying pattern as-is with recursive=True...")
     h5_files = sorted(glob.glob(input_pattern, recursive=True))
+    # Filter out the directory itself and only keep .h5 files
+    h5_files = [f for f in h5_files if f.endswith('.h5') and os.path.isfile(f)]
     print(f"   Result: Found {len(h5_files)} files")
     if h5_files:
         print(f"   ✓ Success! Sample files:")
