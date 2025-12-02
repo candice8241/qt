@@ -1026,8 +1026,9 @@ class PowderXRDModule(GUIBase):
             
             # Update info label
             params = self.sector_params
+            rad_max_str = f"{params['rad_max']:.1f}" if params['rad_max'] > 0 else 'auto'
             info_text = (f"✓ Sector selected: Azim [{params['azim_start']:.1f}° - {params['azim_end']:.1f}°], "
-                        f"Radial [{params['rad_min']:.1f} - {params['rad_max']:.1f if params['rad_max'] > 0 else 'auto'} px]")
+                        f"Radial [{params['rad_min']:.1f} - {rad_max_str} px]")
             self.sector_info_label.setText(info_text)
             self.sector_info_label.setStyleSheet(f"color: #4CAF50; background-color: {self.colors['card_bg']}; padding-left: 2px; font-weight: bold;")
             
