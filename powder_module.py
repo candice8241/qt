@@ -978,19 +978,7 @@ class PowderXRDModule(GUIBase):
                 self.show_error("Error", f"PONI file not found: {self.poni_path}")
                 return
             
-            self.log("="*60)
-            self.log("Starting Batch Integration...")
-            self.log(f"PONI: {self.poni_path}")
-            self.log(f"Mask: {self.mask_path if self.mask_path else 'None'}")
-            self.log(f"Input: {self.input_pattern}")
-            self.log(f"Output: {self.output_dir}")
-            self.log(f"NPT: {self.npt}")
-            self.log(f"Unit: {self.unit}")
-            
-            # Start progress animation
-            self.progress.start()
-            
-            # Collect output formats
+            # Collect output formats first
             formats = []
             if self.format_xy:
                 formats.append('xy')
@@ -1008,8 +996,6 @@ class PowderXRDModule(GUIBase):
             if not formats:
                 formats = ['xy']  # Default
             
-            self.log(f"Output formats: {', '.join(formats)}")
-            
             # Convert unit name to pyFAI format
             unit_map = {
                 '2θ (°)': '2th_deg',
@@ -1019,32 +1005,50 @@ class PowderXRDModule(GUIBase):
             }
             unit_pyFAI = unit_map.get(self.unit, '2th_deg')
             
-            # Import and run integration
-            from batch_integration import run_batch_integration
+            # Start UI updates
+            self.log("="*60)
+            self.log("Starting Batch Integration...")
+            self.log(f"PONI: {self.poni_path}")
+            self.log(f"Mask: {self.mask_path if self.mask_path else 'None'}")
+            self.log(f"Input: {self.input_pattern}")
+            self.log(f"Output: {self.output_dir}")
+            self.log(f"NPT: {self.npt}")
+            self.log(f"Unit: {self.unit}")
+            self.log(f"Output formats: {', '.join(formats)}")
             
-            # Create worker thread with signals
-            def run_task():
-                run_batch_integration(
-                    poni_file=self.poni_path,
-                    mask_file=self.mask_path if self.mask_path else None,
-                    input_pattern=self.input_pattern,
-                    output_dir=self.output_dir,
-                    dataset_path=self.dataset_path if self.dataset_path else None,
-                    npt=self.npt,
-                    unit=unit_pyFAI,
-                    formats=formats,
-                    create_stacked_plot=self.create_stacked_plot,
-                    stacked_plot_offset=self.stacked_plot_offset,
-                    disable_progress_bar=True  # Disable tqdm to prevent GUI hang
-                )
+            # Start progress animation
+            self.progress.start()
             
-            signals = WorkerSignals()
-            signals.finished.connect(self._on_integration_finished)
-            signals.error.connect(self._on_integration_error)
+            # Use QTimer to delay thread start - ensure GUI is responsive
+            def start_worker():
+                from batch_integration import run_batch_integration
+                
+                def run_task():
+                    run_batch_integration(
+                        poni_file=self.poni_path,
+                        mask_file=self.mask_path if self.mask_path else None,
+                        input_pattern=self.input_pattern,
+                        output_dir=self.output_dir,
+                        dataset_path=self.dataset_path if self.dataset_path else None,
+                        npt=self.npt,
+                        unit=unit_pyFAI,
+                        formats=formats,
+                        create_stacked_plot=self.create_stacked_plot,
+                        stacked_plot_offset=self.stacked_plot_offset,
+                        disable_progress_bar=True
+                    )
+                
+                signals = WorkerSignals()
+                signals.finished.connect(self._on_integration_finished)
+                signals.error.connect(self._on_integration_error)
+                
+                worker = WorkerThread(run_task, signals)
+                self.running_threads.append(worker)
+                worker.start()
+                self.log("✓ Background thread started successfully")
             
-            worker = WorkerThread(run_task, signals)
-            self.running_threads.append(worker)
-            worker.start()
+            # Delay worker start by 100ms to ensure GUI is ready
+            QTimer.singleShot(100, start_worker)
             
         except Exception as e:
             self.progress.stop()
