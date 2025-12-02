@@ -857,7 +857,16 @@ class AzimuthalIntegrationModule(GUIBase):
             "All Files (*.*)"
         )
         if filename:
-            entry.setText(filename)
+            # If it's an h5 file, set the pattern to process all h5 files in the same directory
+            if filename.lower().endswith('.h5'):
+                directory = os.path.dirname(filename)
+                # Set pattern to search all h5 files recursively in the directory
+                pattern = os.path.join(directory, '**', '*.h5')
+                entry.setText(pattern)
+                self.log(f"Selected h5 file: {os.path.basename(filename)}")
+                self.log(f"Will process all h5 files in: {directory}")
+            else:
+                entry.setText(filename)
 
     def browse_folder(self, entry):
         """Browse for a folder"""
