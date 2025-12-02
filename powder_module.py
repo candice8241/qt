@@ -129,6 +129,11 @@ class PowderXRDModule(GUIBase):
         self.create_stacked_plot = False
         self.stacked_plot_offset = 'auto'
 
+        # Bins and Sectors configuration (from radial_module)
+        self.bins = []  # List of bin dictionaries for single sectors
+        self.sectors = []  # List of sector dictionaries for multiple sectors
+        self.bin_mode_enabled = False
+
         # Phase analysis variables
         self.phase_peak_csv = ""
         self.phase_volume_csv = ""
@@ -292,6 +297,61 @@ class PowderXRDModule(GUIBase):
         right_layout = QVBoxLayout(right_panel)
         right_layout.setContentsMargins(0, 4, 0, 4)
         right_layout.setSpacing(12)
+
+        # Configure Bins button (from radial_module)
+        config_bins_card = self.create_card_frame(None)
+        config_bins_card.setStyleSheet(f"""
+            QFrame {{
+                background-color: {self.colors['card_bg']};
+                border: 2px solid #888888;
+                border-radius: 8px;
+            }}
+        """)
+        config_bins_layout = QVBoxLayout(config_bins_card)
+        config_bins_layout.setContentsMargins(15, 12, 15, 12)
+        config_bins_layout.setSpacing(8)
+
+        config_bins_title = QLabel("Azimuthal Sector Settings")
+        config_bins_title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
+        config_bins_title.setStyleSheet(f"color: black; background-color: {self.colors['card_bg']};border:none;")
+        config_bins_layout.addWidget(config_bins_title)
+
+        # Configure Bins Button
+        config_btn_row = QWidget()
+        config_btn_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
+        config_btn_layout = QHBoxLayout(config_btn_row)
+        config_btn_layout.setContentsMargins(10, 12, 10, 5)
+        config_btn_layout.setSpacing(10)
+
+        self.unified_config_btn = QPushButton("⚙ Configure Bins")
+        self.unified_config_btn.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        self.unified_config_btn.setFixedWidth(160)
+        self.unified_config_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: #45A049;
+            }}
+        """)
+        self.unified_config_btn.clicked.connect(self.open_unified_config)
+        config_btn_layout.addWidget(self.unified_config_btn)
+
+        self.config_status_label = QLabel("No sectors configured")
+        self.config_status_label.setFont(QFont('Arial', 9))
+        self.config_status_label.setStyleSheet("color: #999999;border: none;")
+        self.config_status_label.setMinimumWidth(150)
+        self.config_status_label.setWordWrap(True)
+        config_btn_layout.addWidget(self.config_status_label)
+        config_btn_layout.addStretch()
+
+        config_bins_layout.addWidget(config_btn_row)
+        right_layout.addWidget(config_bins_card)
 
         output_card = self.create_card_frame(None)
         output_card.setStyleSheet(f"""
@@ -957,6 +1017,47 @@ class PowderXRDModule(GUIBase):
         if folder:
             entry.setText(folder)
 
+    def open_unified_config(self):
+        """Open unified configuration dialog for bins and sectors (from radial_module)"""
+        from unified_config_dialog import UnifiedConfigDialog
+
+        # Use root window as parent (stored during __init__)
+        parent_widget = self.root if hasattr(self, 'root') else None
+        dialog = UnifiedConfigDialog(parent_widget)
+
+        # Set existing bins and sectors if any
+        if self.bins:
+            dialog.bins = self.bins.copy()
+            dialog.update_bins_table()
+
+        if self.sectors:
+            dialog.sectors = self.sectors.copy()
+            dialog.update_sectors_table()
+
+        def on_config_completed(bins, sectors):
+            self.bins = bins.copy()
+            self.sectors = sectors.copy()
+            self.bin_mode_enabled = len(bins) > 0
+
+            # Update status label
+            status_parts = []
+            if bins:
+                status_parts.append(f"{len(bins)} single sector(s)")
+            if sectors:
+                status_parts.append(f"{len(sectors)} multiple sector(s)")
+
+            if status_parts:
+                status_text = "✓ " + " & ".join(status_parts) + " configured"
+                self.config_status_label.setText(status_text)
+                self.config_status_label.setStyleSheet("color: #4CAF50; font-weight: bold;border: none;")
+                self.log(f"Configuration completed: {' & '.join(status_parts)}")
+            else:
+                self.config_status_label.setText("No sectors configured")
+                self.config_status_label.setStyleSheet("color: #999999;border: none;")
+
+        dialog.config_completed.connect(on_config_completed)
+        dialog.exec()
+
     def log(self, message):
         """Add message to log"""
         self.log_text.append(message)
@@ -971,7 +1072,7 @@ class PowderXRDModule(GUIBase):
 
     # Functionality methods
     def run_integration(self):
-        """Run batch integration using subprocess (isolated process)"""
+        """Run batch integration (with bins/sectors support from radial_module)"""
         try:
             # Validate inputs
             if not self.poni_path:
@@ -983,10 +1084,19 @@ class PowderXRDModule(GUIBase):
             if not self.output_dir:
                 self.show_error("Error", "Please select output directory")
                 return
-            
+
             # Check if files exist
             if not os.path.exists(self.poni_path):
                 self.show_error("Error", f"PONI file not found: {self.poni_path}")
+                return
+
+            # Check if bins/sectors are configured
+            use_bin_mode = len(self.bins) > 0
+            use_multiple_sectors = len(self.sectors) > 0
+
+            # If bins or sectors are configured, use direct integration (like radial_module)
+            if use_bin_mode or use_multiple_sectors:
+                self._run_integration_with_bins_sectors()
                 return
             
             # Collect output formats
@@ -1262,6 +1372,261 @@ except Exception as e:
         self.log(f"❌ Error: {error_msg}")
         self.log("="*60)
         self.show_error("Error", f"Phase analysis failed:\n{error_msg}")
+
+    def _run_integration_with_bins_sectors(self):
+        """Run integration with bins/sectors configuration (from radial_module)"""
+        try:
+            # Import BatchIntegrator from batch_integration
+            from batch_integration import BatchIntegrator
+            import glob
+            import numpy as np
+
+            # Collect output formats
+            formats = []
+            if self.format_xy:
+                formats.append('xy')
+            if self.format_dat:
+                formats.append('dat')
+            if self.format_chi:
+                formats.append('chi')
+            if self.format_fxye:
+                formats.append('fxye')
+            if self.format_svg:
+                formats.append('svg')
+            if self.format_png:
+                formats.append('png')
+
+            if not formats:
+                formats = ['xy']  # Default
+
+            # Convert unit name to pyFAI format
+            unit_map = {
+                '2θ (°)': '2th_deg',
+                'q (nm⁻¹)': 'q_nm^-1',
+                'q (A⁻¹)': 'q_A^-1',
+                'r (mm)': 'r_mm'
+            }
+            pyfai_unit = unit_map.get(self.unit, '2th_deg')
+
+            # Log start
+            self.log("="*60)
+            self.log("Starting Batch Integration with Bins/Sectors...")
+            self.log(f"PONI: {self.poni_path}")
+            self.log(f"Mask: {self.mask_path if self.mask_path else 'None'}")
+            self.log(f"Input: {self.input_pattern}")
+            self.log(f"Output: {self.output_dir}")
+            self.log(f"NPT: {self.npt}")
+            self.log(f"Unit: {self.unit}")
+
+            # Start progress animation
+            self.progress.start()
+
+            # Create integration worker
+            def integration_work():
+                return self._do_integration_with_bins_sectors(formats, pyfai_unit)
+
+            signals = WorkerSignals()
+            signals.finished.connect(lambda msg: self._on_integration_finished(msg))
+            signals.error.connect(lambda err: self._on_integration_error(err))
+
+            worker = WorkerThread(integration_work, signals)
+            self.running_threads.append(worker)
+            worker.start()
+
+        except Exception as e:
+            self.progress.stop()
+            self.log(f"❌ Error: {str(e)}")
+            self.show_error("Error", f"Failed to start integration:\n{str(e)}")
+
+    def _do_integration_with_bins_sectors(self, formats, pyfai_unit):
+        """Perform integration with bins/sectors (from radial_module)"""
+        try:
+            from batch_integration import BatchIntegrator
+            import glob
+            import numpy as np
+
+            # Initialize integrator
+            integrator = BatchIntegrator(
+                self.poni_path,
+                self.mask_path if self.mask_path else None
+            )
+
+            # Find input files with intelligent fallback mechanism
+            input_files = []
+
+            self.log(f"🔍 Searching for input files: {self.input_pattern}")
+
+            # Method 1: Try the pattern as-is with recursive search
+            input_files = sorted(glob.glob(self.input_pattern, recursive=True))
+            # Filter out directories and only keep .h5 files
+            input_files = [f for f in input_files if f.endswith('.h5') and os.path.isfile(f)]
+            if input_files:
+                self.log(f"✓ Method 1: Found {len(input_files)} files")
+
+            # Method 2: If no files and it's a directory path, search for **/*.h5 recursively
+            if not input_files and os.path.isdir(self.input_pattern):
+                pattern = os.path.join(self.input_pattern, '**', '*.h5')
+                self.log(f"📂 Method 2: Searching recursively in directory...")
+                input_files = sorted(glob.glob(pattern, recursive=True))
+                if input_files:
+                    self.log(f"✓ Method 2: Found {len(input_files)} files")
+
+            # Method 3: If pattern contains *.h5 but no **, try recursive search
+            if not input_files and '*.h5' in self.input_pattern and '**' not in self.input_pattern:
+                if self.input_pattern.endswith('*.h5'):
+                    base_dir = self.input_pattern[:-len('*.h5')].rstrip('/\\')
+                    if not base_dir:
+                        base_dir = '.'
+                    recursive_pattern = os.path.join(base_dir, '**', '*.h5')
+                else:
+                    recursive_pattern = self.input_pattern.replace('*.h5', '**/*.h5')
+                self.log(f"📂 Method 3: Converting to recursive pattern...")
+                input_files = sorted(glob.glob(recursive_pattern, recursive=True))
+                if input_files:
+                    self.log(f"✓ Method 3: Found {len(input_files)} files")
+
+            if not input_files:
+                raise ValueError(f"No .h5 files found matching pattern: {self.input_pattern}")
+
+            self.log(f"✓ Total found: {len(input_files)} files to process")
+
+            # Create output directory if needed
+            os.makedirs(self.output_dir, exist_ok=True)
+
+            # Determine integration mode
+            use_bin_mode = len(self.bins) > 0
+            use_multiple_sectors = len(self.sectors) > 0
+
+            if use_bin_mode and use_multiple_sectors:
+                self.log("⚠ Warning: Cannot use both Single Sector and Multiple Sectors simultaneously")
+                self.log("Using Single Sector mode only")
+                use_multiple_sectors = False
+
+            if use_bin_mode:
+                self.log(f"✓ Single Sector Mode enabled: {len(self.bins)} sectors configured")
+            elif use_multiple_sectors:
+                self.log(f"✓ Multiple Sectors Mode enabled: {len(self.sectors)} sectors configured")
+
+            # Process each file
+            all_patterns = []
+            for i, h5_file in enumerate(input_files, 1):
+                basename = os.path.splitext(os.path.basename(h5_file))[0]
+
+                try:
+                    if use_bin_mode:
+                        # Single Sector mode: Process each sector separately
+                        self.log(f"Processing ({i}/{len(input_files)}): {basename} - {len(self.bins)} single sectors")
+                        for j, bin_data in enumerate(self.bins, 1):
+                            bin_name = bin_data['name']
+                            azim_start = bin_data['start']
+                            azim_end = bin_data['end']
+                            rad_min = bin_data.get('rad_min', 0.0)
+                            rad_max = bin_data.get('rad_max', 0.0)
+
+                            output_base = os.path.join(self.output_dir, f"{basename}_{bin_name}_{azim_start:.1f}-{azim_end:.1f}")
+
+                            self.log(f"  [{j}/{len(self.bins)}] Sector: {bin_name} ({azim_start}° - {azim_end}°)")
+
+                            # Build kwargs for integration
+                            integration_kwargs = {
+                                'azimuth_range': (azim_start, azim_end)
+                            }
+                            if rad_max > 0:
+                                integration_kwargs['radial_range'] = (rad_min, rad_max)
+
+                            success, error = integrator.integrate_single(
+                                h5_file,
+                                output_base,
+                                npt=self.npt,
+                                unit=pyfai_unit,
+                                dataset_path=self.dataset_path if self.dataset_path else None,
+                                formats=formats,
+                                **integration_kwargs
+                            )
+
+                            if success:
+                                all_patterns.append(f"{basename}_{bin_name}")
+                            else:
+                                self.log(f"    ⚠ Failed: {error}")
+
+                        self.log(f"  ✓ Completed all single sectors for {basename}")
+
+                    elif use_multiple_sectors:
+                        # Multiple sectors: Process each sector separately
+                        self.log(f"Processing ({i}/{len(input_files)}): {basename} - {len(self.sectors)} sectors")
+                        for j, sector in enumerate(self.sectors, 1):
+                            sector_name = sector['name']
+                            azim_start = sector['azim_start']
+                            azim_end = sector['azim_end']
+                            rad_min = sector['rad_min']
+                            rad_max = sector['rad_max'] if sector['rad_max'] > 0 else None
+
+                            output_base = os.path.join(self.output_dir, f"{basename}_{sector_name}")
+
+                            self.log(f"  [{j}/{len(self.sectors)}] Sector: {sector_name} ({azim_start}° - {azim_end}°)")
+
+                            # Build kwargs for integration
+                            integration_kwargs = {
+                                'azimuth_range': (azim_start, azim_end)
+                            }
+                            if rad_max:
+                                integration_kwargs['radial_range'] = (rad_min, rad_max)
+
+                            success, error = integrator.integrate_single(
+                                h5_file,
+                                output_base,
+                                npt=self.npt,
+                                unit=pyfai_unit,
+                                dataset_path=self.dataset_path if self.dataset_path else None,
+                                formats=formats,
+                                **integration_kwargs
+                            )
+
+                            if success:
+                                all_patterns.append(f"{basename}_{sector_name}")
+                            else:
+                                self.log(f"    ⚠ Failed: {error}")
+
+                        self.log(f"  ✓ Completed all sectors for {basename}")
+
+                except Exception as e:
+                    self.log(f"  ⚠ Warning: Failed to process {basename}: {str(e)}")
+                    continue
+
+            if not all_patterns:
+                raise ValueError("No files were successfully processed")
+
+            self.log(f"✓ Successfully processed {len(all_patterns)} files")
+
+            # Create stacked plot if requested
+            if self.create_stacked_plot:
+                self.log("Generating stacked plot...")
+                try:
+                    # Get offset value from GUI
+                    offset_value = self.stacked_plot_offset if hasattr(self, 'stacked_plot_offset') else 'auto'
+                    if offset_value and offset_value != 'auto':
+                        try:
+                            offset_value = float(offset_value)
+                            self.log(f"Using custom offset: {offset_value}")
+                        except ValueError:
+                            self.log("⚠ Invalid offset value, using 'auto'")
+                            offset_value = 'auto'
+                    else:
+                        offset_value = 'auto'
+
+                    integrator.create_stacked_plot(
+                        self.output_dir,
+                        offset=offset_value,
+                        output_name='stacked_plot.png'
+                    )
+                    self.log("✓ Stacked plot generated")
+                except Exception as e:
+                    self.log(f"⚠ Warning: Failed to create stacked plot: {str(e)}")
+
+            return f"Integration completed: {len(all_patterns)} files processed"
+
+        except Exception as e:
+            raise Exception(f"Integration failed: {str(e)}")
 
     def run_birch_murnaghan(self):
         """TODO: Implement Birch-Murnaghan fitting"""
