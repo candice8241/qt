@@ -539,16 +539,16 @@ class BatchIntegrator:
             range_avg = self._extract_range_average(f)
             pressure_groups[pressure].append((f, range_avg))
 
-        # Check if any pressure group contains more than 2 files
-        has_multi_file_groups = any(len(files) > 2 for files in pressure_groups.values())
+        # Check if any pressure group contains more than 1 file (i.e., multiple bins at same pressure)
+        has_multi_file_groups = any(len(files) > 1 for files in pressure_groups.values())
 
         if has_multi_file_groups:
             # Mode 1: Generate separate stacked plot for each pressure group with multiple files
             print(f"Detected multiple data files at same pressure, generating separate stacked plot for each pressure point")
 
             for pressure, file_list in sorted(pressure_groups.items()):
-                if len(file_list) <= 2:
-                    print(f"  Pressure {pressure:.2f} GPa has only {len(file_list)} files, skipping")
+                if len(file_list) <= 1:
+                    print(f"  Pressure {pressure:.2f} GPa has only {len(file_list)} file, skipping")
                     continue
 
                 print(f"  Generating stacked plot for pressure {pressure:.2f} GPa ({len(file_list)} files)...")
