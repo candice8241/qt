@@ -385,7 +385,7 @@ class MaskModule(GUIBase):
         panel.setFixedHeight(620)  # Fixed height to match canvas (reduced)
         
         layout = QVBoxLayout(panel)
-        layout.setSpacing(8)
+        layout.setSpacing(10)
         layout.setContentsMargins(10, 15, 10, 10)
         
         # ===== ACTION SECTION (moved to top) =====
@@ -415,7 +415,7 @@ class MaskModule(GUIBase):
         self.action_group.addButton(self.mask_radio)
         self.action_group.addButton(self.unmask_radio)
         
-        layout.addSpacing(5)
+        layout.addStretch()
         
         # Separator line
         separator0 = QFrame()
@@ -470,7 +470,7 @@ class MaskModule(GUIBase):
         tools_grid.addWidget(self.point_radio, 1, 1)
         
         layout.addWidget(tools_widget)
-        layout.addSpacing(5)
+        layout.addStretch()
         
         # Separator line
         separator1 = QFrame()
@@ -482,10 +482,6 @@ class MaskModule(GUIBase):
         threshold_title = QLabel("📊 Threshold")
         threshold_title.setStyleSheet("font-size: 10pt; font-weight: bold; color: #333333;")
         layout.addWidget(threshold_title)
-        
-        threshold_mode_label = QLabel("Mode:")
-        threshold_mode_label.setStyleSheet("font-weight: bold; color: #555555; font-size: 9pt;")
-        layout.addWidget(threshold_mode_label)
         
         # Threshold mode selection (Below / Above) in same row
         threshold_mode_row = QHBoxLayout()
@@ -557,7 +553,7 @@ class MaskModule(GUIBase):
         apply_threshold_btn.clicked.connect(self.apply_threshold_mask)
         layout.addWidget(apply_threshold_btn)
         
-        layout.addSpacing(5)
+        layout.addStretch()
         
         # Separator line
         separator2 = QFrame()
@@ -666,38 +662,7 @@ class MaskModule(GUIBase):
         fill_btn.clicked.connect(self.fill_holes)
         layout.addWidget(fill_btn)
         
-        layout.addSpacing(5)
-        
-        # Separator line
-        separator3 = QFrame()
-        separator3.setFrameShape(QFrame.Shape.HLine)
-        separator3.setStyleSheet("background-color: #CCCCCC;")
-        layout.addWidget(separator3)
-        
-        # ===== STATISTICS SECTION =====
-        stats_title = QLabel("📊 Statistics")
-        stats_title.setStyleSheet("font-size: 10pt; font-weight: bold; color: #333333;")
-        layout.addWidget(stats_title)
-        
-        self.mask_stats_label = QLabel("No mask data")
-        self.mask_stats_label.setStyleSheet("""
-            color: #555555; 
-            font-size: 8pt; 
-            padding: 5px;
-            background-color: #F5F5F5;
-            border-radius: 3px;
-        """)
-        self.mask_stats_label.setWordWrap(True)
-        self.mask_stats_label.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        layout.addWidget(self.mask_stats_label)
-        
-        # Help text
         layout.addStretch()
-        help_text = QLabel("💡 Scroll to zoom\n🖱️ Drag to draw")
-        help_text.setStyleSheet("color: #888888; font-size: 8pt; font-style: italic;")
-        help_text.setWordWrap(True)
-        help_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(help_text)
         
         return panel
 
@@ -877,23 +842,13 @@ class MaskModule(GUIBase):
     def update_mask_statistics(self):
         """Update mask statistics display"""
         if self.current_mask is None or self.image_data is None:
-            self.mask_stats_label.setText("No mask data")
             self.total_pixels_label.setText("Total: --")
             return
         
         total_pixels = self.current_mask.size
-        masked_pixels = np.sum(self.current_mask)
-        masked_percent = (masked_pixels / total_pixels) * 100
         
         # Update total pixels in info row
         self.total_pixels_label.setText(f"Total: {total_pixels:,} px")
-        
-        # Update statistics with remaining info
-        stats_text = f"""Masked: {masked_pixels:,} px
-Percentage: {masked_percent:.2f}%
-Unmasked: {total_pixels - masked_pixels:,} px"""
-        
-        self.mask_stats_label.setText(stats_text)
     
     def invert_mask(self):
         """Invert the mask"""
