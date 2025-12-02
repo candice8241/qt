@@ -252,54 +252,107 @@ class BatchIntegrator:
             stacked_plot_offset (str or float): Offset for stacked plot ('auto' or float value)
             disable_progress_bar (bool): Disable tqdm progress bar (useful for GUI)
         """
-        # Enhanced file search with multiple attempts
+        # Enhanced file search with multiple attempts and detailed debugging
         h5_files = []
         
-        # Method 1: Try the pattern as-is
+        print(f"🔍 Starting file search with input: {input_pattern}")
+        print(f"   Input type: {type(input_pattern)}")
+        print(f"   Is directory: {os.path.isdir(input_pattern)}")
+        print(f"   Exists: {os.path.exists(input_pattern)}")
+        
+        # Method 1: Try the pattern as-is with recursive search
+        print(f"📂 Method 1: Trying pattern as-is with recursive=True...")
         h5_files = sorted(glob.glob(input_pattern, recursive=True))
+        print(f"   Result: Found {len(h5_files)} files")
+        if h5_files:
+            print(f"   ✓ Success! Sample files: {h5_files[:3]}")
         
-        # Method 2: If no files and it's a directory path, search for *.h5 in it
+        # Method 2: If no files and it's a directory path, search for **/*.h5 recursively
         if not h5_files and os.path.isdir(input_pattern):
-            # It's a directory, search for all .h5 files recursively
+            print(f"📂 Method 2: Directory detected, searching recursively for **/*.h5...")
             pattern = os.path.join(input_pattern, '**', '*.h5')
+            print(f"   Pattern: {pattern}")
             h5_files = sorted(glob.glob(pattern, recursive=True))
+            print(f"   Result: Found {len(h5_files)} files")
             if h5_files:
-                print(f"ℹ Found {len(h5_files)} .h5 files in directory: {input_pattern}")
+                print(f"   ✓ Success! Found {len(h5_files)} .h5 files in directory: {input_pattern}")
+                print(f"   Sample files: {h5_files[:3]}")
         
-        # Method 3: If no files and pattern doesn't use **, try recursive search
-        if not h5_files and '**' not in input_pattern:
+        # Method 3: If pattern contains *.h5 but no **, try recursive search
+        if not h5_files and '*.h5' in input_pattern and '**' not in input_pattern:
+            print(f"📂 Method 3: Converting *.h5 pattern to recursive **/*.h5...")
+            # Extract directory part
             if input_pattern.endswith('*.h5'):
-                # Replace *.h5 with **/*.h5 for recursive search
+                base_dir = input_pattern[:-len('*.h5')].rstrip('/\\')
+                if not base_dir:
+                    base_dir = '.'
+                recursive_pattern = os.path.join(base_dir, '**', '*.h5')
+            else:
                 recursive_pattern = input_pattern.replace('*.h5', '**/*.h5')
-                h5_files = sorted(glob.glob(recursive_pattern, recursive=True))
-                if h5_files:
-                    print(f"ℹ Using recursive search pattern: {recursive_pattern}")
-            elif input_pattern.endswith('.h5'):
-                # It's a single file pattern, try directory + **/*.h5
-                dir_path = os.path.dirname(input_pattern)
-                if dir_path:
-                    recursive_pattern = os.path.join(dir_path, '**', '*.h5')
-                    h5_files = sorted(glob.glob(recursive_pattern, recursive=True))
-                    if h5_files:
-                        print(f"ℹ Using recursive search in directory: {dir_path}")
+            print(f"   Pattern: {recursive_pattern}")
+            h5_files = sorted(glob.glob(recursive_pattern, recursive=True))
+            print(f"   Result: Found {len(h5_files)} files")
+            if h5_files:
+                print(f"   ✓ Success! Using recursive pattern")
+                print(f"   Sample files: {h5_files[:3]}")
         
-        # Method 4: Try adding *.h5 if it looks like a directory path
-        if not h5_files and not input_pattern.endswith('.h5'):
-            if os.path.sep in input_pattern or '/' in input_pattern:
-                # Looks like a directory path
-                test_pattern = os.path.join(input_pattern, '*.h5')
-                h5_files = sorted(glob.glob(test_pattern, recursive=False))
+        # Method 4: Try as directory with recursive **/*.h5
+        if not h5_files:
+            print(f"📂 Method 4: Trying to interpret as directory with recursive search...")
+            # Strip trailing wildcards if any
+            clean_path = input_pattern.rstrip('/*')
+            if os.path.isdir(clean_path):
+                recursive_pattern = os.path.join(clean_path, '**', '*.h5')
+                print(f"   Pattern: {recursive_pattern}")
+                h5_files = sorted(glob.glob(recursive_pattern, recursive=True))
+                print(f"   Result: Found {len(h5_files)} files")
                 if h5_files:
-                    print(f"ℹ Found files using pattern: {test_pattern}")
+                    print(f"   ✓ Success! Found files in cleaned directory path")
+                    print(f"   Sample files: {h5_files[:3]}")
+        
+        # Method 5: Try parent directory if path looks like it might be incomplete
+        if not h5_files and os.path.sep in input_pattern:
+            print(f"📂 Method 5: Trying parent directory...")
+            parent_dir = os.path.dirname(input_pattern)
+            if parent_dir and os.path.isdir(parent_dir):
+                recursive_pattern = os.path.join(parent_dir, '**', '*.h5')
+                print(f"   Pattern: {recursive_pattern}")
+                h5_files = sorted(glob.glob(recursive_pattern, recursive=True))
+                print(f"   Result: Found {len(h5_files)} files")
+                if h5_files:
+                    print(f"   ✓ Success! Found files in parent directory: {parent_dir}")
+                    print(f"   Sample files: {h5_files[:3]}")
 
         if not h5_files:
-            print(f"⚠ No matching .h5 files found!")
+            print(f"\n⚠ ERROR: No matching .h5 files found!")
             print(f"  Input pattern: {input_pattern}")
-            print(f"  Tips:")
-            print(f"    - For all files in a directory: /path/to/dir/*.h5")
+            print(f"  Absolute path: {os.path.abspath(input_pattern)}")
+            print(f"  Current directory: {os.getcwd()}")
+            print(f"\n  💡 Tips:")
+            print(f"    - For all files in a directory (recursive): /path/to/dir")
+            print(f"    - For files matching pattern: /path/to/dir/*.h5")
             print(f"    - For recursive search: /path/to/dir/**/*.h5")
-            print(f"    - Or just provide the directory path: /path/to/dir")
+            print(f"    - Check if the path exists and contains .h5 files")
+            
+            # List what's actually in the directory if it exists
+            if os.path.isdir(input_pattern):
+                print(f"\n  📋 Directory contents:")
+                try:
+                    for root, dirs, files in os.walk(input_pattern):
+                        h5_in_dir = [f for f in files if f.endswith('.h5')]
+                        if h5_in_dir:
+                            print(f"    {root}: {len(h5_in_dir)} .h5 files")
+                except Exception as e:
+                    print(f"    Error listing directory: {e}")
+            
             return
+        
+        print(f"\n✓ Final result: Found {len(h5_files)} HDF5 files to process")
+        if len(h5_files) > 5:
+            print(f"  First 5 files: {h5_files[:5]}")
+            print(f"  Last file: {h5_files[-1]}")
+        else:
+            print(f"  Files: {h5_files}")
 
         print(f"\nFound {len(h5_files)} HDF5 files to process")
         print(f"Output directory: {output_dir}")
