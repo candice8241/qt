@@ -62,6 +62,7 @@ class MaskModule(GUIBase):
         self.cached_vmin = None
         self.cached_vmax = None
         self.last_preview_update = 0  # Throttle preview updates
+        self.display_downsample = 1  # Downsample factor for display
 
     def setup_ui(self):
         """Setup UI components"""
@@ -82,20 +83,8 @@ class MaskModule(GUIBase):
         content_widget = QWidget()
         content_widget.setStyleSheet(f"background-color: {self.colors['bg']};")
         content_layout = QVBoxLayout(content_widget)
-        content_layout.setContentsMargins(20, 8, 20, 8)
-        content_layout.setSpacing(6)
-
-        # Title
-        title = QLabel("🎭 Mask Creation & Management")
-        title.setFont(QFont('Arial', 14, QFont.Weight.Bold))
-        title.setStyleSheet(f"color: {self.colors['primary']};")
-        content_layout.addWidget(title)
-
-        # Description - Compact
-        desc = QLabel("Create and manage detector masks • Circle/Rect: drag • Polygon: points+Enter • Point: click")
-        desc.setWordWrap(True)
-        desc.setStyleSheet(f"color: {self.colors['text_dark']}; font-size: 9pt;")
-        content_layout.addWidget(desc)
+        content_layout.setContentsMargins(10, 5, 10, 5)
+        content_layout.setSpacing(4)
 
         # Control area (includes Save/Clear buttons now)
         control_group = self.create_control_group()
@@ -457,14 +446,15 @@ class MaskModule(GUIBase):
         info_row.addStretch()
         layout.addLayout(info_row)
 
-        # Canvas and contrast slider layout
+        # Canvas and contrast slider layout - Centered
         canvas_layout = QHBoxLayout()
+        canvas_layout.addStretch(1)  # Left spacer for centering
         
-        # Matplotlib canvas - Compact size to fit in one page
-        self.figure = Figure(figsize=(8, 5.5))
-        self.figure.subplots_adjust(left=0.08, right=0.98, top=0.96, bottom=0.08)
+        # Matplotlib canvas - Wider and more compact
+        self.figure = Figure(figsize=(10, 4.8))
+        self.figure.subplots_adjust(left=0.06, right=0.98, top=0.96, bottom=0.08)
         self.canvas = FigureCanvas(self.figure)
-        self.canvas.setFixedSize(800, 550)  # Fixed size to ensure fit in one page
+        self.canvas.setFixedSize(1000, 480)  # Wider, shorter canvas
         canvas_layout.addWidget(self.canvas)
         
         # Vertical contrast slider
@@ -481,7 +471,7 @@ class MaskModule(GUIBase):
         self.contrast_slider.setMinimum(1)
         self.contrast_slider.setMaximum(100)
         self.contrast_slider.setValue(50)
-        self.contrast_slider.setFixedHeight(350)
+        self.contrast_slider.setFixedHeight(300)
         self.contrast_slider.setFixedWidth(30)
         self.contrast_slider.setStyleSheet("""
             QSlider::groove:vertical {
@@ -526,6 +516,8 @@ class MaskModule(GUIBase):
         slider_layout.addStretch()
         canvas_layout.addLayout(slider_layout)
         
+        canvas_layout.addStretch(1)  # Right spacer for centering
+        
         layout.addLayout(canvas_layout)
 
         # Connect mouse events
@@ -547,7 +539,7 @@ class MaskModule(GUIBase):
         return group
 
     def load_image(self):
-        """Load diffraction image for mask creation"""
+        """Load diffraction image for mask creation - Optimized for h5"""
         file_path, _ = QFileDialog.getOpenFileName(
             self.root,
             "Select Diffraction Image",
@@ -559,49 +551,64 @@ class MaskModule(GUIBase):
             return
 
         try:
+            from PyQt6.QtWidgets import QApplication
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+            QApplication.processEvents()
+            
             # Load image based on file type
             ext = os.path.splitext(file_path)[1].lower()
             
             if ext in ['.h5', '.hdf5']:
                 import h5py
+                # Optimized h5 loading - use direct array access without copying
                 with h5py.File(file_path, 'r') as f:
                     # Try common dataset paths
                     for path in ['entry/data/data', 'data', 'image']:
                         if path in f:
                             data = f[path]
                             if len(data.shape) == 3:
-                                self.image_data = np.array(data[0, :, :])
+                                # Use slicing to reduce memory copy
+                                self.image_data = data[0, :, :].astype(np.float32)
                             else:
-                                self.image_data = np.array(data[:, :])
+                                self.image_data = data[:, :].astype(np.float32)
                             break
             else:
                 # Try fabio for other formats
                 try:
                     import fabio
                     img = fabio.open(file_path)
-                    self.image_data = img.data
+                    self.image_data = img.data.astype(np.float32)
                 except:
                     # Fallback to pillow
                     from PIL import Image
                     img = Image.open(file_path)
-                    self.image_data = np.array(img)
+                    self.image_data = np.array(img, dtype=np.float32)
 
             if self.image_data is None:
                 QMessageBox.warning(self.root, "Error", "Could not load image data")
+                QApplication.restoreOverrideCursor()
                 return
 
             # Initialize mask if not exists
-            if self.current_mask is None:
+            if self.current_mask is None or self.current_mask.shape != self.image_data.shape:
                 self.current_mask = np.zeros(self.image_data.shape, dtype=bool)
+
+            # Clear cache on new image
+            self.cached_image = None
+            self.cached_contrast = None
 
             # Update info
             self.file_info_label.setText(
                 f"Image: {os.path.basename(file_path)} | Shape: {self.image_data.shape}"
             )
 
-            self.update_display()
+            # Display with caching
+            self.update_display(force_recalc=True)
+            
+            QApplication.restoreOverrideCursor()
 
         except Exception as e:
+            QApplication.restoreOverrideCursor()
             QMessageBox.critical(self.root, "Error", f"Failed to load image:\n{str(e)}")
 
     def load_mask(self):
@@ -800,7 +807,7 @@ class MaskModule(GUIBase):
         self.canvas.draw_idle()
 
     def update_display(self, force_recalc=False):
-        """Update image and mask display - Full redraw with caching"""
+        """Update image and mask display - Full redraw with caching and optimization"""
         if self.image_data is None:
             return
 
@@ -814,23 +821,43 @@ class MaskModule(GUIBase):
             img_display = self.cached_image
             vmin, vmax = self.cached_vmin, self.cached_vmax
         else:
+            # Determine if downsampling is needed for performance
+            max_size = 2048
+            h, w = self.image_data.shape
+            downsample = max(1, max(h // max_size, w // max_size))
+            
+            if downsample > 1:
+                # Downsample for faster display
+                img_data = self.image_data[::downsample, ::downsample]
+            else:
+                img_data = self.image_data
+            
             # Apply log scale and contrast
-            img_display = np.log10(self.image_data + 1)
+            img_display = np.log10(img_data + 1)
             contrast_factor = current_contrast / 100.0
             low_percentile = contrast_factor * 20
             high_percentile = 100 - (1 - contrast_factor) * 5
-            vmin = np.percentile(img_display, low_percentile)
-            vmax = np.percentile(img_display, high_percentile)
+            
+            # Use faster percentile calculation for large images
+            if img_display.size > 1000000:
+                # Sample for percentile calculation
+                sample = img_display.flat[::max(1, img_display.size // 100000)]
+                vmin = np.percentile(sample, low_percentile)
+                vmax = np.percentile(sample, high_percentile)
+            else:
+                vmin = np.percentile(img_display, low_percentile)
+                vmax = np.percentile(img_display, high_percentile)
             
             # Cache the result
             self.cached_image = img_display
             self.cached_contrast = current_contrast
             self.cached_vmin = vmin
             self.cached_vmax = vmax
+            self.display_downsample = downsample
         
-        # Display image
+        # Display image with interpolation for smooth viewing
         self.ax.imshow(img_display, cmap='viridis', origin='lower',
-                      interpolation='nearest', vmin=vmin, vmax=vmax,
+                      interpolation='bilinear', vmin=vmin, vmax=vmax,
                       extent=[0, self.image_data.shape[1],
                              0, self.image_data.shape[0]])
 
