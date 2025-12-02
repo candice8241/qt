@@ -575,7 +575,7 @@ class BatchIntegrator:
                 y_pos = y_offset + calc_offset * 0.3
 
             plt.text(x_pos, y_pos, label,
-                    fontsize=8, verticalalignment='center',
+                    fontsize=8, verticalalignment='bottom',
                     color='black', fontname='Arial')
 
         plt.xlabel('2θ (degrees)', fontsize=12)
@@ -686,7 +686,7 @@ class BatchIntegrator:
                 y_pos = y_offset + calc_offset * 0.3
 
             plt.text(x_pos, y_pos, label,
-                    fontsize=8, verticalalignment='center',
+                    fontsize=8, verticalalignment='bottom',
                     color='black', fontname='Arial')
 
         plt.xlabel('2θ (degrees)', fontsize=12)
