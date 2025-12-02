@@ -564,14 +564,14 @@ class BatchIntegrator:
             plt.plot(data[:, 0], data[:, 1] + y_offset,
                     color=color, linewidth=1.2, label=label)
 
-            # Add label at the baseline of the curve
+            # Add label above the curve
             x_pos = data[0, 0] + (data[-1, 0] - data[0, 0]) * 0.02
-            # Position label at the baseline (y_offset)
-            y_pos = y_offset
+            # Position label at the top of the curve
+            y_pos = y_offset + np.max(data[:, 1])
 
             plt.text(x_pos, y_pos, label,
-                    fontsize=10, verticalalignment='bottom',
-                    color=color, fontweight='bold')
+                    fontsize=9, verticalalignment='bottom',
+                    color='black')
 
         plt.xlabel('2θ (degrees)', fontsize=12)
         plt.ylabel('Intensity (offset)', fontsize=12)
@@ -670,14 +670,14 @@ class BatchIntegrator:
             plt.plot(data[:, 0], data[:, 1] + y_offset,
                     color=colors[color_idx], linewidth=1.2, label=label)
 
-            # Add pressure label at the baseline of the curve
+            # Add pressure label above the curve
             x_pos = data[0, 0] + (data[-1, 0] - data[0, 0]) * 0.02
-            # Position label at the baseline (y_offset)
-            y_pos = y_offset
+            # Position label at the top of the curve
+            y_pos = y_offset + np.max(data[:, 1])
 
             plt.text(x_pos, y_pos, label,
-                    fontsize=10, verticalalignment='bottom',
-                    color=colors[color_idx], fontweight='bold')
+                    fontsize=9, verticalalignment='bottom',
+                    color='black')
 
         plt.xlabel('2θ (degrees)', fontsize=12)
         plt.ylabel('Intensity (offset)', fontsize=12)
