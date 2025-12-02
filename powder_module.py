@@ -40,7 +40,7 @@ from gui_base import GUIBase
 from theme_module import CuteSheepProgressBar, ModernButton
 from custom_widgets import SpinboxStyleButton, CustomSpinbox
 from h5_preview_dialog import H5PreviewDialog
-from bin_config_dialog import BinConfigDialog
+from unified_config_dialog import UnifiedConfigDialog
 
 
 class WorkerSignals(QObject):
@@ -130,12 +130,13 @@ class PowderXRDModule(GUIBase):
         # Stacked plot options
         self.create_stacked_plot = False
         self.stacked_plot_offset = 'auto'
-        
+
         # Sector integration parameters from H5 preview
         self.sector_params = None
-        
-        # Bin configuration for azimuthal binning
-        self.bin_config = None
+
+        # Bin configuration for azimuthal binning (unified config dialog)
+        self.bin_config = None  # Single sectors (bins)
+        self.sector_config = None  # Multiple sectors
 
         # Phase analysis variables
         self.phase_peak_csv = ""
@@ -588,6 +589,7 @@ class PowderXRDModule(GUIBase):
         stacked_layout.addWidget(stacked_options_label)
 
         self.stacked_plot_cb = QCheckBox("Create Stacked Plot")
+        self.stacked_plot_cb.setChecked(False)  # Default unchecked, will be auto-checked when bins configured
         self.stacked_plot_cb.setFont(QFont('Arial', 9))
         self.stacked_plot_cb.setStyleSheet(f"""
             QCheckBox {{
@@ -1086,35 +1088,65 @@ class PowderXRDModule(GUIBase):
             self.log(f"Sector parameters selected from H5 preview: {info_text}")
 
     def open_bin_config(self):
-        """Open bin configuration dialog"""
-        # Create and show bin config dialog
-        dialog = BinConfigDialog(parent=self.root)
-        result = dialog.exec()
-        
-        if result == dialog.DialogCode.Accepted:
-            # Get bin configuration
-            self.bin_config = dialog.get_bins()
-            
+        """Open unified configuration dialog (bins and sectors)"""
+        # Create and show unified config dialog
+        dialog = UnifiedConfigDialog(parent=self.root)
+
+        # Set existing bins and sectors if any
+        if self.bin_config:
+            dialog.bins = self.bin_config.copy()
+            dialog.update_bins_table()
+
+        if self.sector_config:
+            dialog.sectors = self.sector_config.copy()
+            dialog.update_sectors_table()
+
+        # Connect signal to handle configuration
+        def on_config_completed(bins, sectors):
+            self.bin_config = bins.copy()
+            self.sector_config = sectors.copy()
+
             # Update info label
-            num_bins = len(self.bin_config)
-            if num_bins > 0:
-                info_text = f"✓ {num_bins} bins configured"
-                if num_bins <= 5:
-                    # Show details for small number of bins
-                    bin_ranges = [f"{b['name']}: {b['start']:.1f}°-{b['end']:.1f}°" for b in self.bin_config[:3]]
-                    info_text += f" ({', '.join(bin_ranges)}"
-                    if num_bins > 3:
-                        info_text += f", +{num_bins-3} more"
-                    info_text += ")"
-                
+            status_parts = []
+            if bins:
+                status_parts.append(f"{len(bins)} single sector(s)")
+            if sectors:
+                status_parts.append(f"{len(sectors)} multiple sector(s)")
+
+            if status_parts:
+                info_text = "✓ " + " & ".join(status_parts) + " configured"
                 self.bin_info_label.setText(info_text)
                 self.bin_info_label.setStyleSheet(f"color: #FF6F00; background-color: {self.colors['card_bg']}; padding-left: 2px; font-weight: bold;")
-                
-                self.log(f"Bin configuration set: {num_bins} bins configured")
-                for bin_data in self.bin_config[:5]:
-                    self.log(f"  - {bin_data['name']}: {bin_data['start']:.2f}° - {bin_data['end']:.2f}°")
-                if num_bins > 5:
-                    self.log(f"  ... and {num_bins-5} more bins")
+
+                self.log(f"Configuration completed: {' & '.join(status_parts)}")
+
+                # Log single sectors (bins)
+                if bins:
+                    self.log(f"  Single sectors ({len(bins)} total):")
+                    for bin_data in bins[:5]:
+                        self.log(f"    - {bin_data['name']}: {bin_data['start']:.2f}° - {bin_data['end']:.2f}°")
+                    if len(bins) > 5:
+                        self.log(f"    ... and {len(bins)-5} more sectors")
+
+                # Log multiple sectors
+                if sectors:
+                    self.log(f"  Multiple sectors ({len(sectors)} total):")
+                    for sector in sectors[:5]:
+                        self.log(f"    - {sector['name']}: {sector['azim_start']:.2f}° - {sector['azim_end']:.2f}° (bin size: {sector.get('bin_size', 10.0)}°)")
+                    if len(sectors) > 5:
+                        self.log(f"    ... and {len(sectors)-5} more sectors")
+
+                # Auto-enable stacked plot when bins/sectors are configured
+                if not self.stacked_plot_cb.isChecked():
+                    self.stacked_plot_cb.setChecked(True)
+                    self.log("✓ Auto-enabled 'Create Stacked Plot' for visualization")
+                    self.log("  (Stacked plots help visualize multiple azimuthal bins together)")
+            else:
+                self.bin_info_label.setText("No sectors configured")
+                self.bin_info_label.setStyleSheet(f"color: #666666; background-color: {self.colors['card_bg']}; padding-left: 2px;")
+
+        dialog.config_completed.connect(on_config_completed)
+        dialog.exec()
 
     def log(self, message):
         """Add message to log"""
@@ -1189,21 +1221,76 @@ class PowderXRDModule(GUIBase):
             # Start progress animation
             self.progress.start()
             
-            # Prepare sector parameters if available (only if bins are not configured)
+            # Prepare sector parameters if available
             sector_kwargs = {}
             bins_param = None
-            
+
+            # Priority: bin_config (Single Sector) > sector_config (Multiple Sectors) > sector_params (H5 Preview)
             if self.bin_config:
-                # Bin mode takes priority over sector mode
-                bins_param = self.bin_config
-                self.log(f"Using bin mode: {len(bins_param)} bins configured")
+                # Single Sector mode (from unified config dialog)
+                # Add angle average to bin names for stacked plot visualization
+                bins_param = []
+                for bin_data in self.bin_config:
+                    bin_start = bin_data['start']
+                    bin_end = bin_data['end']
+                    angle_avg = (bin_start + bin_end) / 2.0
+
+                    # Create new bin name with angle range for stacked plot identification
+                    original_name = bin_data['name']
+                    new_name = f"{original_name}_{bin_start:.1f}-{bin_end:.1f}"
+
+                    bins_param.append({
+                        'name': new_name,
+                        'start': bin_start,
+                        'end': bin_end,
+                        'rad_min': bin_data.get('rad_min', 0.0),
+                        'rad_max': bin_data.get('rad_max', 0.0)
+                    })
+
+                self.log(f"Using Single Sector mode: {len(bins_param)} bins configured")
+            elif self.sector_config:
+                # Multiple Sectors mode (from unified config dialog)
+                # Expand sectors into bins based on bin_size
+                bins_param = []
+                self.log(f"Using Multiple Sectors mode: {len(self.sector_config)} sectors configured")
+                for sector in self.sector_config:
+                    sector_name = sector['name']
+                    azim_start = sector['azim_start']
+                    azim_end = sector['azim_end']
+                    bin_size = sector.get('bin_size', 10.0)
+                    rad_min = sector.get('rad_min', 0.0)
+                    rad_max = sector.get('rad_max', 0.0)
+
+                    # Calculate number of bins in this sector
+                    num_bins = int((azim_end - azim_start) / bin_size)
+                    self.log(f"  Sector '{sector_name}': {azim_start:.1f}° - {azim_end:.1f}° → {num_bins} bins ({bin_size}° each)")
+
+                    # Generate bins for this sector
+                    for i in range(num_bins):
+                        bin_start = azim_start + i * bin_size
+                        bin_end = min(azim_start + (i + 1) * bin_size, azim_end)
+                        angle_avg = (bin_start + bin_end) / 2.0
+
+                        # Include angle range in bin name for stacked plot visualization
+                        bin_name = f"{sector_name}_Bin{i+1:03d}_{bin_start:.1f}-{bin_end:.1f}"
+
+                        bins_param.append({
+                            'name': bin_name,
+                            'start': bin_start,
+                            'end': bin_end,
+                            'rad_min': rad_min,
+                            'rad_max': rad_max
+                        })
+
+                self.log(f"  Total bins generated: {len(bins_param)}")
             elif self.sector_params:
+                # H5 Preview sector parameters
                 # Convert azimuthal angles from degrees to radians for pyFAI
                 import math
                 azim_start_rad = math.radians(self.sector_params['azim_start'])
                 azim_end_rad = math.radians(self.sector_params['azim_end'])
                 sector_kwargs['azimuth_range'] = (azim_start_rad, azim_end_rad)
-                self.log(f"Using sector integration: Azimuth {self.sector_params['azim_start']:.1f}° - {self.sector_params['azim_end']:.1f}°")
+                self.log(f"Using H5 Preview sector: Azimuth {self.sector_params['azim_start']:.1f}° - {self.sector_params['azim_end']:.1f}°")
             
             # Create integration script for subprocess
             script = self._create_integration_script(
@@ -1231,11 +1318,13 @@ class PowderXRDModule(GUIBase):
             )
             
             self.log("✓ Subprocess started successfully")
-            
-            # Start checking subprocess status
-            if hasattr(self, 'check_timer'):
+
+            # Stop any existing timer first
+            if hasattr(self, 'check_timer') and self.check_timer:
                 self.check_timer.stop()
-            
+                self.check_timer.deleteLater()
+
+            # Create new timer for checking subprocess status
             self.check_timer = QTimer()
             self.check_timer.timeout.connect(self._check_integration_status)
             self.check_timer.start(500)  # Check every 500ms
@@ -1300,19 +1389,27 @@ except Exception as e:
     
     def _check_integration_status(self):
         """Check subprocess status periodically"""
-        if hasattr(self, 'integration_process'):
+        try:
+            if not hasattr(self, 'integration_process'):
+                # No process to check, stop timer
+                if hasattr(self, 'check_timer') and self.check_timer:
+                    self.check_timer.stop()
+                    self.progress.stop()
+                return
+
             retcode = self.integration_process.poll()
-            
+
             if retcode is not None:
-                # Process has finished
-                self.check_timer.stop()
+                # Process has finished - stop timer and progress bar immediately
+                if hasattr(self, 'check_timer') and self.check_timer:
+                    self.check_timer.stop()
                 self.progress.stop()
-                
+
                 try:
                     stdout, stderr = self.integration_process.communicate(timeout=1)
                 except:
                     stdout, stderr = "", ""
-                
+
                 # Output complete stdout to console so users can see file search logs
                 if stdout:
                     self.log("="*60)
@@ -1322,7 +1419,7 @@ except Exception as e:
                         if line.strip():  # Skip empty lines
                             self.log(line)
                     self.log("="*60)
-                
+
                 if "INTEGRATION_SUCCESS" in stdout:
                     self.log("✓ Integration completed successfully!")
                     self.show_success("Success", "Batch integration completed!")
@@ -1335,10 +1432,19 @@ except Exception as e:
                         if len(stderr) > 1000:
                             self.log("... (error message truncated)")
                     self.show_error("Error", "Integration failed. Check log for details.")
-                
+
                 self.log("="*60)
-                
+
                 # Cleanup
+                del self.integration_process
+
+        except Exception as e:
+            # Error during status check - stop everything
+            self.log(f"⚠ Error checking integration status: {str(e)}")
+            if hasattr(self, 'check_timer') and self.check_timer:
+                self.check_timer.stop()
+            self.progress.stop()
+            if hasattr(self, 'integration_process'):
                 del self.integration_process
     
     def _on_integration_finished(self, message):
