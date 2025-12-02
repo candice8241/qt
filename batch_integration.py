@@ -478,12 +478,14 @@ class BatchIntegrator:
             plt.plot(data[:, 0], data[:, 1] + y_offset,
                     color=color, linewidth=1.2, label=label)
 
-            # Add label anchored to the offset-adjusted curve
+            # Add label - position relative to the baseline + offset
             x_pos = data[0, 0] + (data[-1, 0] - data[0, 0]) * 0.02
-            y_pos = y_offset + np.max(data[:, 1]) * 0.3
+            peak_height = np.max(data[:, 1])
+            # Position label at 50% of peak height above the baseline (y_offset)
+            y_pos = y_offset + peak_height * 0.5
 
             plt.text(x_pos, y_pos, label,
-                    fontsize=9, verticalalignment='bottom',
+                    fontsize=9, verticalalignment='center',  # Center alignment for better positioning
                     bbox=dict(boxstyle='round,pad=0.3', facecolor=color, alpha=0.3))
 
         plt.xlabel('2θ (degrees)', fontsize=12)
@@ -583,13 +585,15 @@ class BatchIntegrator:
             plt.plot(data[:, 0], data[:, 1] + y_offset,
                     color=colors[color_idx], linewidth=1.2, label=label)
 
-            # Add pressure label on the left side
-            # Position it above the baseline of current curve
+            # Add pressure label - position it at the baseline + some height
+            # This ensures label moves with offset and stays at a consistent relative position
             x_pos = data[0, 0] + (data[-1, 0] - data[0, 0]) * 0.02
-            y_pos = y_offset + np.max(data[:, 1]) * 0.3
+            # Label position: baseline (y_offset) + a fixed proportion of peak height
+            peak_height = np.max(data[:, 1])
+            y_pos = y_offset + peak_height * 0.5  # Position at 50% of peak height above baseline
 
             plt.text(x_pos, y_pos, label,
-                    fontsize=9, verticalalignment='bottom',
+                    fontsize=9, verticalalignment='center',  # Changed to center for better alignment
                     bbox=dict(boxstyle='round,pad=0.3', facecolor=colors[color_idx], alpha=0.3))
 
         plt.xlabel('2θ (degrees)', fontsize=12)
