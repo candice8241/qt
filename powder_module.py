@@ -271,7 +271,7 @@ class PowderXRDModule(GUIBase):
         sector_bin_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         sector_bin_row_layout = QHBoxLayout(sector_bin_row)
         sector_bin_row_layout.setContentsMargins(0, 0, 0, 8)
-        sector_bin_row_layout.setSpacing(15)
+        sector_bin_row_layout.setSpacing(40)
 
         # Sector Integration section (left side of row)
         h5_sector_container = QWidget()
