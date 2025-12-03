@@ -245,13 +245,15 @@ class MaskModule(GUIBase):
         canvas_container.setFixedSize(1050, 620)  # Fixed container size (reduced height)
         canvas_layout = QHBoxLayout(canvas_container)
         canvas_layout.setSpacing(5)
-        canvas_layout.setContentsMargins(0, 0, 0, 0)
+        canvas_layout.setContentsMargins(0, -20, 0, 0)
         
         # Matplotlib canvas - Fixed size for better display
         self.figure = Figure(figsize=(10, 6))
-        self.figure.subplots_adjust(left=0.07, right=0.98, top=0.97, bottom=0.07)
+        self.figure.subplots_adjust(left=0.07, right=0.98, top=0.99, bottom=0.05)
         self.canvas = FigureCanvas(self.figure)
         self.canvas.setFixedSize(1000, 600)  # Fixed canvas size (reduced height)
+        # Use negative spacing to move canvas up
+        canvas_layout.addSpacing(-10)
         canvas_layout.addWidget(self.canvas)
         
         # Vertical contrast slider
