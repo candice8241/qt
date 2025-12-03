@@ -613,8 +613,10 @@ class InteractiveFittingGUI(QWidget):
         
         # Background fitting
         self.bg_points = []  # Background anchor points
+        self.bg_points_original = []  # Original background points before subtraction
         self.background = None  # Fitted background array
         self.bg_selection_mode = False
+        self.background_subtracted = False  # Track if background has been subtracted
         
         # File navigation
         self.file_list = []
@@ -1287,7 +1289,9 @@ class InteractiveFittingGUI(QWidget):
             self.peaks = []
             self.peak_params = []
             self.bg_points = []
+            self.bg_points_original = []
             self.background = None
+            self.background_subtracted = False
             self.update_peak_table()
             
             # Plot data
@@ -2451,7 +2455,14 @@ class InteractiveFittingGUI(QWidget):
             QMessageBox.warning(self, "Warning", "Please select at least 2 background points first!")
             return
         
+        if self.background_subtracted:
+            QMessageBox.warning(self, "Warning", "Background already subtracted! Clear background first to re-subtract.")
+            return
+        
         try:
+            # Save original background points before subtraction
+            self.bg_points_original = self.bg_points.copy()
+            
             # Extract bg points coordinates
             bg_x = np.array([p[0] for p in self.bg_points])
             bg_y = np.array([p[1] for p in self.bg_points])
@@ -2464,22 +2475,42 @@ class InteractiveFittingGUI(QWidget):
             self.y_data = self.y_data - background
             self.y_data = np.maximum(self.y_data, 0)  # Ensure non-negative
             
+            # Update background points y-coordinates to reflect the subtraction
+            # After background subtraction, the background line should be at y=0 (baseline)
+            updated_bg_points = []
+            for bx, by in self.bg_points:
+                # New y coordinate should be 0 (baseline after subtraction)
+                updated_bg_points.append((bx, 0.0))
+            
+            self.bg_points = updated_bg_points
+            self.background_subtracted = True
+            
             self.plot_data()
-            self.status_label.setText(f"Background subtracted using {len(self.bg_points)} points")
+            self.status_label.setText(f"Background subtracted ({len(self.bg_points_original)} points) - baseline now at y=0")
             
         except Exception as e:
             QMessageBox.critical(self, "Error", f"Failed to subtract background:\n{str(e)}")
 
     def clear_background(self):
         """Clear background points and reset data"""
-        self.bg_points = []
-        self.background = None
-        
-        if self.y_data_original is not None:
+        # Restore original data if background was subtracted
+        if self.background_subtracted and self.y_data_original is not None:
             self.y_data = self.y_data_original.copy()
+            # Restore original background points
+            if self.bg_points_original:
+                self.bg_points = self.bg_points_original.copy()
+                self.bg_points_original = []
+            else:
+                self.bg_points = []
+            self.background_subtracted = False
+            self.status_label.setText("Background cleared - data restored to original")
+        else:
+            # Just clear the points if no subtraction was done
+            self.bg_points = []
+            self.status_label.setText("Background points cleared")
         
+        self.background = None
         self.plot_data()
-        self.status_label.setText("Background cleared")
 
     def auto_select_background(self):
         """Automatically select background points"""
@@ -2573,7 +2604,9 @@ class InteractiveFittingGUI(QWidget):
             self.peaks = []
             self.peak_params = []
             self.bg_points = []
+            self.bg_points_original = []
             self.background = None
+            self.background_subtracted = False
             self.update_peak_table()
             
             # Plot data
