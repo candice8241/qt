@@ -288,12 +288,12 @@ class AutoFittingModule(QWidget):
                 border-radius: 3px;
                 padding: 3px;
                 font-weight: bold;
-                font-size: 7.5pt;
+                font-size: 8.5pt;
                 min-width: 85px;
                 min-height: 17px;
             }
             QPushButton:hover { background-color: #9370DB; }
-            QPushButton:disabled { background-color: #CCCCCC; color: #666666; }
+            QPushButton:disabled { background-color: #F4F6FB; color: #999999; border: 1px solid #E0E0E0; }
         """
         
         # Load File button (lines 699-702)
@@ -1133,6 +1133,10 @@ class AutoFittingModule(QWidget):
         
         if self.x is not None:
             self.canvas.draw()
+            
+            # Update verification dialog if active
+            if hasattr(self, '_update_verification_msg') and self._update_verification_msg:
+                self._update_verification_msg()
     
     # ==================== Smoothing Operations (lines 1444-1514) ====================
     
@@ -2095,31 +2099,23 @@ class AutoFittingModule(QWidget):
             return False
     
     def _show_verification_dialog(self):
-        """Show verification dialog for manual review before fitting (lines 2489-2622)"""
+        """Show verification dialog for manual review before fitting (non-modal for interaction)"""
         dialog = QDialog(self)
         dialog.setWindowTitle("Manual Verification - Review Peaks and Background")
         dialog.setMinimumSize(420, 320)
         dialog.setStyleSheet("QDialog { background-color: #E6F3FF; }")
         
+        # Set non-modal to allow interaction with plot area
+        dialog.setModal(False)
+        dialog.setWindowFlags(dialog.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        
         layout = QVBoxLayout(dialog)
         layout.setContentsMargins(18, 12, 18, 12)
         layout.setSpacing(8)
         
-        # Message
-        msg_text = (
-            f"File: {self.filename}\n\n"
-            f"Auto-detected:\n"
-            f"  • {len(self.selected_peaks)} peak(s)\n"
-            f"  • {len(self.bg_points)} background point(s)\n\n"
-            "Please review and adjust if needed:\n"
-            "  • Click on plot to add/remove peaks\n"
-            "  • Use 'Select BG Points' to add background points\n"
-            "  • Use 'Clear BG' to reset background\n\n"
-            "Shortcuts: Enter=Continue | Space=Skip"
-        )
-        
-        msg = QLabel(msg_text)
-        msg.setStyleSheet("""
+        # Message label with dynamic update capability
+        self._verification_msg_label = QLabel()
+        self._verification_msg_label.setStyleSheet("""
             QLabel {
                 background-color: #E6F3FF;
                 color: #2C5282;
@@ -2128,8 +2124,30 @@ class AutoFittingModule(QWidget):
                 padding: 5px;
             }
         """)
-        msg.setWordWrap(True)
-        layout.addWidget(msg)
+        self._verification_msg_label.setWordWrap(True)
+        layout.addWidget(self._verification_msg_label)
+        
+        # Function to update message dynamically
+        def update_message():
+            msg_text = (
+                f"File: {self.filename}\n\n"
+                f"Current state:\n"
+                f"  • {len(self.selected_peaks)} peak(s)\n"
+                f"  • {len(self.bg_points)} background point(s)\n\n"
+                "You can interact with the plot:\n"
+                "  • Click on plot to add/remove peaks\n"
+                "  • Use 'Select BG Points' to add background points\n"
+                "  • Use 'Clear BG' to reset background\n"
+                "  • Use 'Undo' to revert last action\n\n"
+                "Shortcuts: Enter=Continue | Space=Skip | Esc=Stop"
+            )
+            self._verification_msg_label.setText(msg_text)
+        
+        # Set initial message
+        update_message()
+        
+        # Store update function for external calls
+        self._update_verification_msg = update_message
         
         # User action storage
         user_action = {"action": "continue"}
@@ -2204,7 +2222,20 @@ class AutoFittingModule(QWidget):
         btn_skip.setShortcut(Qt.Key.Key_Space)
         btn_stop.setShortcut(Qt.Key.Key_Escape)
         
-        dialog.exec()
+        # Store dialog reference for potential updates
+        self._verification_dialog = dialog
+        
+        # Show non-modal dialog to allow plot interaction
+        dialog.show()
+        
+        # Wait for user action using event loop
+        from PyQt6.QtCore import QEventLoop
+        loop = QEventLoop()
+        dialog.finished.connect(loop.quit)
+        loop.exec()
+        
+        # Clean up
+        self._verification_dialog = None
         
         return user_action["action"]
     
