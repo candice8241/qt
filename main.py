@@ -71,7 +71,8 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         # Tool windows (embedded in right panel)
         self.interactive_fitting_window = None
         self.interactive_eos_window = None
-        self.current_view = "powder"  # Track current view (module name or "curvefit", "EOSfit")
+        self.batch_window = None
+        self.current_view = "powder"  # Track current view (module name or "curvefit", "EOSfit", "batch")
 
         # Create central widget
         central_widget = QWidget()
@@ -156,6 +157,10 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         self.auto_fitting_btn = self.create_sidebar_button("🔍  Auto Fit", lambda: self.switch_tab("auto_fitting"), is_active=False)
         sidebar_layout.addWidget(self.auto_fitting_btn)
 
+        # Batch Fitting button (standalone)
+        self.batch_btn = self.create_sidebar_button("📊  Batch", self.open_batch, is_active=False)
+        sidebar_layout.addWidget(self.batch_btn)
+
         # Curve Fitting button
         self.curvefit_btn = self.create_sidebar_button("📈  curvefit", self.open_curvefit, is_active=False)
         sidebar_layout.addWidget(self.curvefit_btn)
@@ -226,6 +231,13 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
                 except:
                     pass
             
+            if hasattr(self, 'batch_window') and self.batch_window is not None:
+                try:
+                    self.batch_window.close()
+                    self.batch_window.deleteLater()
+                except:
+                    pass
+            
             # Clean up module frames (not the modules themselves, as they may not be QObjects)
             for frame_name, frame in self.module_frames.items():
                 if frame is not None:
@@ -284,6 +296,32 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         button.clicked.connect(callback)
         return button
 
+    def open_batch(self):
+        """Open batch processing window"""
+        # Hide all module frames
+        for frame in self.module_frames.values():
+            if frame is not None:
+                frame.hide()
+        
+        # Hide other tool windows
+        if self.interactive_fitting_window is not None:
+            self.interactive_fitting_window.hide()
+        if self.interactive_eos_window is not None:
+            self.interactive_eos_window.hide()
+        
+        # Show batch window
+        if self.batch_window is None:
+            from batch_fitting_dialog import BatchFittingDialog
+            self.batch_window = BatchFittingDialog(self.scrollable_widget)
+            self.batch_window.hide()
+            self.scrollable_layout.addWidget(self.batch_window)
+        
+        self.batch_window.show()
+        self.current_view = "batch"
+        
+        # Update sidebar to show batch is active
+        self.update_sidebar_buttons("batch")
+
     def open_curvefit(self):
         """Open curve fitting (Interactive Fitting) window"""
         # Hide all module frames
@@ -291,9 +329,11 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             if frame is not None:
                 frame.hide()
         
-        # Hide EOS fitting if visible
+        # Hide other tool windows
         if self.interactive_eos_window is not None:
             self.interactive_eos_window.hide()
+        if self.batch_window is not None:
+            self.batch_window.hide()
         
         # Show interactive fitting window (should already exist from prebuild)
         if self.interactive_fitting_window is None:
@@ -317,9 +357,11 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             if frame is not None:
                 frame.hide()
         
-        # Hide curve fitting if visible
+        # Hide other tool windows
         if self.interactive_fitting_window is not None:
             self.interactive_fitting_window.hide()
+        if self.batch_window is not None:
+            self.batch_window.hide()
         
         # Show EOS fitting window (should already exist from prebuild)
         if self.interactive_eos_window is None:
@@ -353,6 +395,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             "bcdi_cal": self.bcdi_cal_btn,
             "dioptas": self.dioptas_btn,
             "auto_fitting": self.auto_fitting_btn,
+            "batch": self.batch_btn,
             "curvefit": self.curvefit_btn,
             "eosfit": self.EOSfit_btn
         }
@@ -492,6 +535,8 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             self.interactive_fitting_window.hide()
         if self.interactive_eos_window is not None:
             self.interactive_eos_window.hide()
+        if self.batch_window is not None:
+            self.batch_window.hide()
         
         # Update sidebar button styles
         self.update_sidebar_buttons(tab_name)
