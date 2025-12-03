@@ -454,18 +454,19 @@ class AzimuthalIntegrationModule(GUIBase):
         preview_btn_row = QWidget()
         preview_btn_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         preview_btn_layout = QHBoxLayout(preview_btn_row)
-        preview_btn_layout.setContentsMargins(10, 5, 10, 5)
-        preview_btn_layout.setSpacing(10)
+        preview_btn_layout.setContentsMargins(10, 3, 10, 3)
+        preview_btn_layout.setSpacing(8)
         
         self.h5_preview_btn = QPushButton("📷 Preview H5 Image")
         self.h5_preview_btn.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        self.h5_preview_btn.setFixedWidth(160)  # Set fixed width
+        self.h5_preview_btn.setFixedWidth(150)
+        self.h5_preview_btn.setFixedHeight(30)
         self.h5_preview_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: #4CAF50;
                 color: white;
                 border: none;
-                padding: 6px 12px;
+                padding: 5px 10px;
                 border-radius: 4px;
                 font-weight: bold;
             }}
@@ -488,18 +489,19 @@ class AzimuthalIntegrationModule(GUIBase):
         config_btn_row = QWidget()
         config_btn_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         config_btn_layout = QHBoxLayout(config_btn_row)
-        config_btn_layout.setContentsMargins(10, 12, 10, 5)  # Increased top margin from 5 to 12
-        config_btn_layout.setSpacing(10)
+        config_btn_layout.setContentsMargins(10, 3, 10, 3)
+        config_btn_layout.setSpacing(8)
         
         self.unified_config_btn = QPushButton("⚙ Configure Bins")
         self.unified_config_btn.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        self.unified_config_btn.setFixedWidth(160)  # Match Preview button width
+        self.unified_config_btn.setFixedWidth(150)
+        self.unified_config_btn.setFixedHeight(30)
         self.unified_config_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: #4CAF50;
                 color: white;
                 border: none;
-                padding: 6px 12px;
+                padding: 5px 10px;
                 border-radius: 4px;
                 font-weight: bold;
             }}
@@ -511,10 +513,10 @@ class AzimuthalIntegrationModule(GUIBase):
         config_btn_layout.addWidget(self.unified_config_btn)
         
         self.config_status_label = QLabel("No sectors configured")
-        self.config_status_label.setFont(QFont('Arial', 9))
+        self.config_status_label.setFont(QFont('Arial', 8))
         self.config_status_label.setStyleSheet("color: #999999;border: none;")
-        self.config_status_label.setMinimumWidth(150)  # Fixed minimum width to prevent container changes
-        self.config_status_label.setWordWrap(True)  # Allow word wrap
+        self.config_status_label.setMinimumWidth(150)
+        self.config_status_label.setWordWrap(True)
         config_btn_layout.addWidget(self.config_status_label)
         config_btn_layout.addStretch()
         

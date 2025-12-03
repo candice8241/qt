@@ -43,12 +43,12 @@ class BinConfigDialog(QDialog):
     def setup_ui(self):
         """Setup UI components"""
         layout = QVBoxLayout(self)
-        layout.setSpacing(15)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(10)
+        layout.setContentsMargins(15, 15, 15, 15)
         
         # Title
         title = QLabel("Azimuthal Bin Configuration")
-        title.setFont(QFont('Arial', 14, QFont.Weight.Bold))
+        title.setFont(QFont('Arial', 13, QFont.Weight.Bold))
         title.setStyleSheet(f"color: {self.colors['primary']};")
         layout.addWidget(title)
         
@@ -66,18 +66,21 @@ class BinConfigDialog(QDialog):
         
         # Bottom buttons
         button_layout = QHBoxLayout()
+        button_layout.setSpacing(8)
         button_layout.addStretch()
         
         clear_btn = QPushButton("Clear All")
         clear_btn.setFixedWidth(100)
+        clear_btn.setFixedHeight(32)
         clear_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: #FF5252;
                 color: white;
                 border: none;
-                padding: 8px;
+                padding: 6px;
                 border-radius: 4px;
                 font-weight: bold;
+                font-size: 9pt;
             }}
             QPushButton:hover {{
                 background-color: #FF1744;
@@ -88,14 +91,16 @@ class BinConfigDialog(QDialog):
         
         cancel_btn = QPushButton("Cancel")
         cancel_btn.setFixedWidth(100)
+        cancel_btn.setFixedHeight(32)
         cancel_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: #BDBDBD;
                 color: white;
                 border: none;
-                padding: 8px;
+                padding: 6px;
                 border-radius: 4px;
                 font-weight: bold;
+                font-size: 9pt;
             }}
             QPushButton:hover {{
                 background-color: #9E9E9E;
@@ -106,14 +111,16 @@ class BinConfigDialog(QDialog):
         
         ok_btn = QPushButton("OK")
         ok_btn.setFixedWidth(100)
+        ok_btn.setFixedHeight(32)
         ok_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['primary']};
                 color: white;
                 border: none;
-                padding: 8px;
+                padding: 6px;
                 border-radius: 4px;
                 font-weight: bold;
+                font-size: 9pt;
             }}
             QPushButton:hover {{
                 background-color: #6A1B9A;
@@ -130,10 +137,10 @@ class BinConfigDialog(QDialog):
         group.setStyleSheet(f"""
             QGroupBox {{
                 border: 2px solid {self.colors['border']};
-                border-radius: 6px;
-                margin-top: 10px;
+                border-radius: 4px;
+                margin-top: 8px;
                 font-weight: bold;
-                padding-top: 10px;
+                padding-top: 8px;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
@@ -143,41 +150,56 @@ class BinConfigDialog(QDialog):
         """)
         
         layout = QVBoxLayout(group)
+        layout.setSpacing(5)
+        layout.setContentsMargins(10, 8, 10, 8)
         
         # Parameter row
         param_layout = QHBoxLayout()
+        param_layout.setSpacing(8)
         
         # Start angle
-        param_layout.addWidget(QLabel("Start:"))
+        start_label = QLabel("Start:")
+        start_label.setFont(QFont('Arial', 9))
+        param_layout.addWidget(start_label)
         self.quick_start = QLineEdit("0")
-        self.quick_start.setFixedWidth(80)
+        self.quick_start.setFixedWidth(70)
+        self.quick_start.setFixedHeight(26)
         self.quick_start.setAlignment(Qt.AlignmentFlag.AlignCenter)
         param_layout.addWidget(self.quick_start)
         
         # End angle
-        param_layout.addWidget(QLabel("End:"))
+        end_label = QLabel("End:")
+        end_label.setFont(QFont('Arial', 9))
+        param_layout.addWidget(end_label)
         self.quick_end = QLineEdit("360")
-        self.quick_end.setFixedWidth(80)
+        self.quick_end.setFixedWidth(70)
+        self.quick_end.setFixedHeight(26)
         self.quick_end.setAlignment(Qt.AlignmentFlag.AlignCenter)
         param_layout.addWidget(self.quick_end)
         
         # Number of bins
-        param_layout.addWidget(QLabel("Bins:"))
+        bins_label = QLabel("Bins:")
+        bins_label.setFont(QFont('Arial', 9))
+        param_layout.addWidget(bins_label)
         self.quick_num_bins = QSpinBox()
         self.quick_num_bins.setRange(1, 360)
         self.quick_num_bins.setValue(36)
-        self.quick_num_bins.setFixedWidth(80)
+        self.quick_num_bins.setFixedWidth(70)
+        self.quick_num_bins.setFixedHeight(26)
         param_layout.addWidget(self.quick_num_bins)
         
         # Generate button
         gen_btn = QPushButton("Generate")
+        gen_btn.setFixedHeight(26)
         gen_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['primary']};
                 color: white;
                 border: none;
-                padding: 5px 15px;
+                padding: 4px 15px;
                 border-radius: 4px;
+                font-weight: bold;
+                font-size: 9pt;
             }}
             QPushButton:hover {{
                 background-color: #6A1B9A;
@@ -198,10 +220,10 @@ class BinConfigDialog(QDialog):
         group.setStyleSheet(f"""
             QGroupBox {{
                 border: 2px solid {self.colors['border']};
-                border-radius: 6px;
-                margin-top: 10px;
+                border-radius: 4px;
+                margin-top: 8px;
                 font-weight: bold;
-                padding-top: 10px;
+                padding-top: 8px;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
@@ -211,6 +233,8 @@ class BinConfigDialog(QDialog):
         """)
         
         layout = QVBoxLayout(group)
+        layout.setSpacing(5)
+        layout.setContentsMargins(10, 8, 10, 8)
         
         # Table
         self.bin_table = QTableWidget()
@@ -223,7 +247,7 @@ class BinConfigDialog(QDialog):
         self.bin_table.setColumnWidth(1, 100)
         self.bin_table.setColumnWidth(2, 100)
         self.bin_table.setColumnWidth(3, 80)
-        self.bin_table.setMinimumHeight(200)
+        self.bin_table.setMinimumHeight(180)
         
         layout.addWidget(self.bin_table)
         
@@ -235,10 +259,10 @@ class BinConfigDialog(QDialog):
         group.setStyleSheet(f"""
             QGroupBox {{
                 border: 2px solid {self.colors['border']};
-                border-radius: 6px;
-                margin-top: 10px;
+                border-radius: 4px;
+                margin-top: 8px;
                 font-weight: bold;
-                padding-top: 10px;
+                padding-top: 8px;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
@@ -248,37 +272,51 @@ class BinConfigDialog(QDialog):
         """)
         
         layout = QHBoxLayout(group)
+        layout.setSpacing(8)
+        layout.setContentsMargins(10, 8, 10, 8)
         
         # Name
-        layout.addWidget(QLabel("Name:"))
+        name_label = QLabel("Name:")
+        name_label.setFont(QFont('Arial', 9))
+        layout.addWidget(name_label)
         self.manual_name = QLineEdit()
         self.manual_name.setPlaceholderText("e.g., Bin01")
         self.manual_name.setFixedWidth(100)
+        self.manual_name.setFixedHeight(26)
         layout.addWidget(self.manual_name)
         
         # Start
-        layout.addWidget(QLabel("Start:"))
+        start_label = QLabel("Start:")
+        start_label.setFont(QFont('Arial', 9))
+        layout.addWidget(start_label)
         self.manual_start = QLineEdit("0")
-        self.manual_start.setFixedWidth(80)
+        self.manual_start.setFixedWidth(70)
+        self.manual_start.setFixedHeight(26)
         self.manual_start.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.manual_start)
         
         # End
-        layout.addWidget(QLabel("End:"))
+        end_label = QLabel("End:")
+        end_label.setFont(QFont('Arial', 9))
+        layout.addWidget(end_label)
         self.manual_end = QLineEdit("10")
-        self.manual_end.setFixedWidth(80)
+        self.manual_end.setFixedWidth(70)
+        self.manual_end.setFixedHeight(26)
         self.manual_end.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.manual_end)
         
         # Add button
         add_btn = QPushButton("Add")
+        add_btn.setFixedHeight(26)
         add_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: #4CAF50;
                 color: white;
                 border: none;
-                padding: 5px 15px;
+                padding: 4px 15px;
                 border-radius: 4px;
+                font-weight: bold;
+                font-size: 9pt;
             }}
             QPushButton:hover {{
                 background-color: #45A049;
