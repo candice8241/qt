@@ -1,10 +1,11 @@
 # Batch Peak Fitting Module
 
 ## Overview
-The Batch Peak Fitting Module provides a standalone interface for batch processing multiple XRD data files (.xy format) with interactive peak and background adjustment capabilities.
+The Batch Peak Fitting Module provides an integrated interface for batch processing multiple XRD data files (.xy format) with interactive peak and background adjustment capabilities. The module is now directly embedded in the main application's right panel.
 
 ## Features
-- **Standalone Operation**: Can be run independently without launching the full curvefit interface
+- **Integrated Operation**: Embedded directly in the main application, no separate windows
+- **Standalone Option**: Can also be run as a standalone application
 - **Batch Processing**: Process multiple .xy files in one session
 - **Interactive Adjustment**: Manually add/remove peaks and background points
 - **Auto-Fitting**: Automatic peak detection and fitting
@@ -14,21 +15,21 @@ The Batch Peak Fitting Module provides a standalone interface for batch processi
 
 ## Usage
 
-### Method 1: Standalone Launch
+### Method 1: From Main Application (Recommended)
+Launch from the main application sidebar - the interface appears directly in the right panel:
+
+1. Start the main application: `python main.py`
+2. Click the "📊 Batch" button in the left sidebar
+3. The batch processing interface will appear in the right panel (fully integrated)
+
+### Method 2: Standalone Launch
 Run the batch module directly as a standalone application:
 
 ```bash
 python batch_module.py
 ```
 
-This will open the Batch Peak Fitting interface directly without the main GUI.
-
-### Method 2: From Main Application
-Launch from the main application sidebar:
-
-1. Start the main application: `python main.py`
-2. Click the "📊 Batch" button in the left sidebar
-3. The batch processing interface will open
+This will open the Batch Peak Fitting interface in a separate window.
 
 ### Method 3: From Curvefit (Legacy)
 The batch module can still be accessed from within the curvefit interface:
@@ -101,8 +102,11 @@ Output format:
 
 ### File Structure
 - `batch_module.py`: Standalone launcher for the batch module
-- `batch_fitting_dialog.py`: Core batch fitting functionality
+- `batch_fitting_dialog.py`: Core batch fitting functionality (now inherits from QWidget instead of QDialog)
 - Main integration in `main.py` via the sidebar "Batch" button
+  - Batch module is treated as a regular module like powder, mask, etc.
+  - Embedded directly in the scrollable right panel
+  - Uses the same module frame system as other modules
 
 ### Dependencies
 - PyQt6
@@ -120,7 +124,11 @@ The module uses sophisticated peak fitting algorithms:
 
 ## Notes
 
-- The batch module is now independent from the curvefit interface
+- **Integration**: The batch module is now fully integrated into the main application
+  - Appears directly in the right panel when clicked (no separate window/dialog)
+  - Same UX as other modules (powder, mask, bcdi_cal, etc.)
+- The batch module is independent from the curvefit interface
 - All fitting functionality from curvefit is preserved in the batch module
 - Files must be in .xy format with two columns (2θ and Intensity)
 - Auto-fitting pauses if fit quality (R²) drops below threshold (default: 0.92)
+- The module can still be launched standalone using `python batch_module.py`

@@ -47,12 +47,13 @@ class MplCanvas(FigureCanvasQTAgg):
         self.setParent(parent)
 
 
-class BatchFittingDialog(QDialog):
-    """Interactive batch fitting dialog"""
+class BatchFittingDialog(QWidget):
+    """Interactive batch fitting widget (can be used as dialog or embedded widget)"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Batch Peak Fitting (Interactive)")
+        # Don't set window title when used as embedded widget
+        # self.setWindowTitle("Batch Peak Fitting (Interactive)")
         self.setMinimumWidth(1400)
         self.setMinimumHeight(800)
         
@@ -1663,8 +1664,18 @@ class BatchFittingDialog(QDialog):
 
 
 if __name__ == "__main__":
-    from PyQt6.QtWidgets import QApplication
+    from PyQt6.QtWidgets import QApplication, QMainWindow
     app = QApplication(sys.argv)
-    dialog = BatchFittingDialog()
-    dialog.show()
+    
+    # Create a main window to hold the batch widget
+    main_window = QMainWindow()
+    main_window.setWindowTitle("Batch Peak Fitting")
+    main_window.setMinimumWidth(1600)
+    main_window.setMinimumHeight(900)
+    
+    # Create batch widget
+    batch_widget = BatchFittingDialog()
+    main_window.setCentralWidget(batch_widget)
+    
+    main_window.show()
     sys.exit(app.exec())

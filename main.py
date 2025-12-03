@@ -56,6 +56,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         self.bcdi_cal_module = None
         self.dioptas_module = None
         self.auto_fitting_module = None
+        self.batch_module = None
 
         # Containers for each module (prebuilt and stacked to avoid flicker)
         self.module_frames = {
@@ -65,14 +66,14 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             "radial": None,
             "bcdi_cal": None,
             "dioptas": None,
-            "auto_fitting": None
+            "auto_fitting": None,
+            "batch": None
         }
         
         # Tool windows (embedded in right panel)
         self.interactive_fitting_window = None
         self.interactive_eos_window = None
-        self.batch_window = None
-        self.current_view = "powder"  # Track current view (module name or "curvefit", "EOSfit", "batch")
+        self.current_view = "powder"  # Track current view (module name or "curvefit", "EOSfit")
 
         # Create central widget
         central_widget = QWidget()
@@ -231,13 +232,6 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
                 except:
                     pass
             
-            if hasattr(self, 'batch_window') and self.batch_window is not None:
-                try:
-                    self.batch_window.close()
-                    self.batch_window.deleteLater()
-                except:
-                    pass
-            
             # Clean up module frames (not the modules themselves, as they may not be QObjects)
             for frame_name, frame in self.module_frames.items():
                 if frame is not None:
@@ -297,30 +291,8 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         return button
 
     def open_batch(self):
-        """Open batch processing window"""
-        # Hide all module frames
-        for frame in self.module_frames.values():
-            if frame is not None:
-                frame.hide()
-        
-        # Hide other tool windows
-        if self.interactive_fitting_window is not None:
-            self.interactive_fitting_window.hide()
-        if self.interactive_eos_window is not None:
-            self.interactive_eos_window.hide()
-        
-        # Show batch window
-        if self.batch_window is None:
-            from batch_fitting_dialog import BatchFittingDialog
-            self.batch_window = BatchFittingDialog(self.scrollable_widget)
-            self.batch_window.hide()
-            self.scrollable_layout.addWidget(self.batch_window)
-        
-        self.batch_window.show()
-        self.current_view = "batch"
-        
-        # Update sidebar to show batch is active
-        self.update_sidebar_buttons("batch")
+        """Open batch processing module (same as switch_tab)"""
+        self.switch_tab("batch")
 
     def open_curvefit(self):
         """Open curve fitting (Interactive Fitting) window"""
@@ -332,8 +304,6 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         # Hide other tool windows
         if self.interactive_eos_window is not None:
             self.interactive_eos_window.hide()
-        if self.batch_window is not None:
-            self.batch_window.hide()
         
         # Show interactive fitting window (should already exist from prebuild)
         if self.interactive_fitting_window is None:
@@ -360,8 +330,6 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         # Hide other tool windows
         if self.interactive_fitting_window is not None:
             self.interactive_fitting_window.hide()
-        if self.batch_window is not None:
-            self.batch_window.hide()
         
         # Show EOS fitting window (should already exist from prebuild)
         if self.interactive_eos_window is None:
@@ -503,6 +471,13 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             self.auto_fitting_module = AutoFittingModule()
             auto_fitting_frame.layout().addWidget(self.auto_fitting_module)
         auto_fitting_frame.hide()  # Ensure hidden after prebuild
+        
+        batch_frame = self._ensure_frame("batch")
+        if self.batch_module is None:
+            from batch_fitting_dialog import BatchFittingDialog
+            self.batch_module = BatchFittingDialog(batch_frame)
+            batch_frame.layout().addWidget(self.batch_module)
+        batch_frame.hide()  # Ensure hidden after prebuild
     
     def prebuild_interactive_windows(self):
         """Prebuild interactive tool windows in background to avoid flash on first open"""
@@ -535,8 +510,6 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             self.interactive_fitting_window.hide()
         if self.interactive_eos_window is not None:
             self.interactive_eos_window.hide()
-        if self.batch_window is not None:
-            self.batch_window.hide()
         
         # Update sidebar button styles
         self.update_sidebar_buttons(tab_name)
@@ -593,6 +566,13 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             if self.auto_fitting_module is None:
                 self.auto_fitting_module = AutoFittingModule()
                 target_frame.layout().addWidget(self.auto_fitting_module)
+
+        elif tab_name == "batch":
+            target_frame = self._ensure_frame("batch")
+            if self.batch_module is None:
+                from batch_fitting_dialog import BatchFittingDialog
+                self.batch_module = BatchFittingDialog(target_frame)
+                target_frame.layout().addWidget(self.batch_module)
 
         if target_frame is not None:
             target_frame.show()
