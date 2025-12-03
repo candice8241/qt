@@ -199,7 +199,7 @@ class AutoFittingModule(QWidget):
         """Create control buttons panel"""
         control_frame = QFrame()
         control_frame.setStyleSheet("QFrame { background-color: #E6D5F5; border-radius: 5px; }")
-        control_frame.setMaximumHeight(120)
+        control_frame.setMaximumHeight(70)
         control_layout = QVBoxLayout(control_frame)
         control_layout.setContentsMargins(10, 10, 10, 10)
         control_layout.setSpacing(5)
@@ -246,17 +246,23 @@ class AutoFittingModule(QWidget):
         self.btn_next.setEnabled(False)
         row1.addWidget(self.btn_next)
         
-        self.btn_auto_find = QPushButton("Auto Find")
-        self.btn_auto_find.setStyleSheet(btn_style)
-        self.btn_auto_find.clicked.connect(self.auto_find_peaks)
-        self.btn_auto_find.setEnabled(False)
-        row1.addWidget(self.btn_auto_find)
-        
         self.btn_fit = QPushButton("Fit Peaks")
         self.btn_fit.setStyleSheet(btn_style.replace('#B19CD9', '#CE93D8'))
         self.btn_fit.clicked.connect(self.fit_peaks)
         self.btn_fit.setEnabled(False)
         row1.addWidget(self.btn_fit)
+        
+        self.btn_reset = QPushButton("Reset")
+        self.btn_reset.setStyleSheet(btn_style.replace('#B19CD9', '#FFB6C1'))
+        self.btn_reset.clicked.connect(self.reset_peaks)
+        self.btn_reset.setEnabled(False)
+        row1.addWidget(self.btn_reset)
+        
+        self.btn_save = QPushButton("Save Results")
+        self.btn_save.setStyleSheet(btn_style.replace('#B19CD9', '#98FB98'))
+        self.btn_save.clicked.connect(self.save_results)
+        self.btn_save.setEnabled(False)
+        row1.addWidget(self.btn_save)
         
         self.btn_clear_fit = QPushButton("Clear Fit")
         self.btn_clear_fit.setStyleSheet(btn_style.replace('#B19CD9', '#FFA07A'))
@@ -270,17 +276,11 @@ class AutoFittingModule(QWidget):
         self.btn_undo.setEnabled(False)
         row1.addWidget(self.btn_undo)
         
-        self.btn_reset = QPushButton("Reset")
-        self.btn_reset.setStyleSheet(btn_style.replace('#B19CD9', '#FFB6C1'))
-        self.btn_reset.clicked.connect(self.reset_peaks)
-        self.btn_reset.setEnabled(False)
-        row1.addWidget(self.btn_reset)
-        
-        self.btn_save = QPushButton("Save")
-        self.btn_save.setStyleSheet(btn_style.replace('#B19CD9', '#98FB98'))
-        self.btn_save.clicked.connect(self.save_results)
-        self.btn_save.setEnabled(False)
-        row1.addWidget(self.btn_save)
+        self.btn_auto_find = QPushButton("Auto Find")
+        self.btn_auto_find.setStyleSheet(btn_style)
+        self.btn_auto_find.clicked.connect(self.auto_find_peaks)
+        self.btn_auto_find.setEnabled(False)
+        row1.addWidget(self.btn_auto_find)
         
         self.btn_overlap = QPushButton("Overlap")
         self.btn_overlap.setStyleSheet(btn_style.replace('#B19CD9', '#D8BFD8'))
@@ -297,34 +297,18 @@ class AutoFittingModule(QWidget):
         self.btn_batch_settings = QPushButton("⚙")
         self.btn_batch_settings.setStyleSheet(btn_style.replace('min-width: 100px', 'min-width: 40px').replace('#B19CD9', '#B0C4DE'))
         self.btn_batch_settings.clicked.connect(self.show_batch_settings)
+        self.btn_batch_settings.setEnabled(True)  # This button is always enabled!
         row1.addWidget(self.btn_batch_settings)
         
         row1.addStretch()
         control_layout.addLayout(row1)
         
-        # Second row - settings
-        row2 = QHBoxLayout()
+        self.status_label = QLabel("Please load a file to start")
+        self.status_label.setStyleSheet("color: #9370DB; font-weight: bold; padding: 5px; font-size: 11pt;")
+        self.status_label.setMinimumWidth(350)
+        row1.addWidget(self.status_label)
         
-        row2.addWidget(QLabel("Fit Method:"))
-        self.combo_fit_method = QComboBox()
-        self.combo_fit_method.addItems(["pseudo_voigt", "voigt"])
-        self.combo_fit_method.currentTextChanged.connect(self.on_fit_method_changed)
-        row2.addWidget(self.combo_fit_method)
-        
-        row2.addWidget(QLabel("   "))
-        
-        self.btn_bg_mode = QPushButton("BG Selection Mode: OFF")
-        self.btn_bg_mode.setStyleSheet(btn_style.replace('#B19CD9', '#29B6F6'))
-        self.btn_bg_mode.clicked.connect(self.toggle_bg_selection)
-        self.btn_bg_mode.setEnabled(False)
-        row2.addWidget(self.btn_bg_mode)
-        
-        self.status_label = QLabel("Load a file to begin")
-        self.status_label.setStyleSheet("color: #9370DB; font-weight: bold; padding: 5px;")
-        row2.addWidget(self.status_label)
-        
-        row2.addStretch()
-        control_layout.addLayout(row2)
+        row1.addStretch()
         
         parent_layout.addWidget(control_frame)
     
@@ -380,22 +364,40 @@ class AutoFittingModule(QWidget):
         bg_layout.addWidget(self.btn_auto_bg)
         
         # Overlap threshold
-        bg_layout.addWidget(QLabel("Overlap FWHM×:"))
+        # Fit Method in background panel
+        fit_method_label = QLabel("Fit Method:")
+        fit_method_label.setStyleSheet("color: #9370DB; font-weight: bold; margin-left: 20px;")
+        bg_layout.addWidget(fit_method_label)
+        
+        self.combo_fit_method = QComboBox()
+        self.combo_fit_method.addItems(["pseudo_voigt", "voigt"])
+        self.combo_fit_method.currentTextChanged.connect(self.on_fit_method_changed)
+        self.combo_fit_method.setMaximumWidth(120)
+        bg_layout.addWidget(self.combo_fit_method)
+        
+        # Overlap FWHM
+        overlap_label = QLabel("Overlap FWHM×:")
+        overlap_label.setStyleSheet("color: #9370DB; font-weight: bold; margin-left: 20px;")
+        bg_layout.addWidget(overlap_label)
+        
         self.overlap_threshold_input = QLineEdit(str(self.overlap_threshold))
-        self.overlap_threshold_input.setMaximumWidth(60)
+        self.overlap_threshold_input.setMaximumWidth(50)
         self.overlap_threshold_input.setStyleSheet("padding: 4px; font-weight: bold;")
         bg_layout.addWidget(self.overlap_threshold_input)
         
         # Fitting window
-        bg_layout.addWidget(QLabel("Fit Window×:"))
+        window_label = QLabel("Fit Window×:")
+        window_label.setStyleSheet("color: #9370DB; font-weight: bold; margin-left: 20px;")
+        bg_layout.addWidget(window_label)
+        
         self.fitting_window_input = QLineEdit(str(self.fitting_window_multiplier))
-        self.fitting_window_input.setMaximumWidth(60)
+        self.fitting_window_input.setMaximumWidth(50)
         self.fitting_window_input.setStyleSheet("padding: 4px; font-weight: bold;")
         bg_layout.addWidget(self.fitting_window_input)
         
-        # Coordinate label
+        # Coordinate label (on the right)
         self.coord_label = QLabel("")
-        self.coord_label.setStyleSheet("color: #9370DB; font-weight: bold;")
+        self.coord_label.setStyleSheet("color: #9370DB; font-weight: bold; margin-left: auto;")
         bg_layout.addWidget(self.coord_label)
         
         bg_layout.addStretch()
@@ -1034,12 +1036,38 @@ class AutoFittingModule(QWidget):
         """Toggle background selection mode"""
         self.selecting_bg = not self.selecting_bg
         if self.selecting_bg:
-            self.btn_bg_mode.setText("BG Selection Mode: ON")
-            self.btn_bg_mode.setStyleSheet(self.btn_bg_mode.styleSheet().replace('#29B6F6', '#FFA07A'))
-            self.status_label.setText("Click to select background points")
+            # Change button appearance to show active selection mode
+            btn_bg_style = """
+                QPushButton {
+                    background-color: #FFA07A;
+                    color: black;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 6px 10px;
+                    font-weight: bold;
+                    min-width: 120px;
+                }
+                QPushButton:hover { background-color: #FF8C69; }
+            """
+            self.btn_select_bg.setStyleSheet(btn_bg_style)
+            self.btn_select_bg.setText("Stop Selection")
+            self.status_label.setText("Selecting background points...")
         else:
-            self.btn_bg_mode.setText("BG Selection Mode: OFF")
-            self.btn_bg_mode.setStyleSheet(self.btn_bg_mode.styleSheet().replace('#FFA07A', '#29B6F6'))
+            btn_bg_style = """
+                QPushButton {
+                    background-color: #B19CD9;
+                    color: black;
+                    border: none;
+                    border-radius: 4px;
+                    padding: 6px 10px;
+                    font-weight: bold;
+                    min-width: 120px;
+                }
+                QPushButton:hover { background-color: #9370DB; }
+                QPushButton:disabled { background-color: #CCCCCC; color: #666666; }
+            """
+            self.btn_select_bg.setStyleSheet(btn_bg_style)
+            self.btn_select_bg.setText("Select BG Points")
             self.status_label.setText(f"{len(self.bg_points)} BG points selected")
     
     def on_fit_method_changed(self, method):
@@ -1073,15 +1101,19 @@ class AutoFittingModule(QWidget):
     
     def prev_file(self):
         """Load previous file in folder"""
-        if self.current_file_index > 0:
-            self.current_file_index -= 1
-            self.load_file_by_path(self.file_list[self.current_file_index])
+        if len(self.file_list) == 0:
+            return
+        self.current_file_index = (self.current_file_index - 1) % len(self.file_list)
+        filepath = self.file_list[self.current_file_index]
+        self.load_file_by_path(filepath)
     
     def next_file(self):
         """Load next file in folder"""
-        if self.current_file_index < len(self.file_list) - 1:
-            self.current_file_index += 1
-            self.load_file_by_path(self.file_list[self.current_file_index])
+        if len(self.file_list) == 0:
+            return
+        self.current_file_index = (self.current_file_index + 1) % len(self.file_list)
+        filepath = self.file_list[self.current_file_index]
+        self.load_file_by_path(filepath)
     
     def load_file_by_path(self, filepath):
         """Load file from specific path"""
@@ -1099,20 +1131,33 @@ class AutoFittingModule(QWidget):
             self.filename = os.path.splitext(os.path.basename(filepath))[0]
             
             self.reset_peaks()
+            self.clear_background()
+            self.fitted = False
+            self.undo_stack = []
+            self.btn_undo.setEnabled(False)
+            
             self.plot_data()
             
-            self.btn_auto_find.setEnabled(True)
-            self.btn_bg_mode.setEnabled(True)
-            self.btn_select_bg.setEnabled(True)
-            self.btn_auto_bg.setEnabled(True)
-            self.btn_clear_bg.setEnabled(True)
-            self.btn_apply_smooth.setEnabled(True)
+            # Enable buttons after loading file (matching original order)
+            self.btn_fit.setEnabled(True)
             self.btn_reset.setEnabled(True)
+            self.btn_select_bg.setEnabled(True)
+            self.btn_clear_bg.setEnabled(True)
+            self.btn_auto_bg.setEnabled(True)
+            self.btn_auto_find.setEnabled(True)
             self.btn_overlap.setEnabled(True)
+            self.btn_apply_smooth.setEnabled(True)
+            self.btn_reset_smooth.setEnabled(True)
+            
+            # Enable navigation if there are multiple files
             if len(self.file_list) > 1:
+                self.btn_prev.setEnabled(True)
+                self.btn_next.setEnabled(True)
                 self.btn_batch_auto.setEnabled(True)
-            self.status_label.setText(f"Loaded: {self.filename} ({self.current_file_index+1}/{len(self.file_list)})")
-            self.update_info(f"Loaded: {self.filename}")
+            
+            file_info = f"File {self.current_file_index + 1}/{len(self.file_list)}: {self.filename}"
+            self.status_label.setText(file_info)
+            self.update_info(f"File loaded: {self.filename}\nData points: {len(self.x)}\n")
             
         except Exception as e:
             QMessageBox.critical(self, "Load Error", f"Failed to load file:\n{str(e)}")
