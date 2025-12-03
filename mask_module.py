@@ -14,6 +14,7 @@ from PyQt6.QtGui import QFont
 import numpy as np
 import os
 from gui_base import GUIBase
+from collections import deque
 
 # Import matplotlib for image display
 try:
@@ -46,6 +47,10 @@ class MaskModule(GUIBase):
         self.current_mask = None
         self.mask_file_path = None
         self.image_data = None
+        
+        # Undo/Redo functionality (from Dioptas)
+        self._undo_deque = deque(maxlen=50)
+        self._redo_deque = deque(maxlen=50)
         
         # Drawing mode and state
         self.draw_mode = 'circle'  # 'circle', 'rectangle', 'polygon', 'point'
@@ -437,7 +442,7 @@ class MaskModule(GUIBase):
         self.tool_group = QButtonGroup(panel)
         
         # Row 0, Col 0 - Circle
-        self.circle_radio = QRadioButton("🔵 Circle")
+        self.circle_radio = QRadioButton("Circle")
         self.circle_radio.setChecked(True)
         self.circle_radio.setToolTip("Draw circular mask regions")
         self.circle_radio.setStyleSheet("font-size: 9pt;")
@@ -446,7 +451,7 @@ class MaskModule(GUIBase):
         tools_grid.addWidget(self.circle_radio, 0, 0)
         
         # Row 0, Col 1 - Rectangle
-        self.rect_radio = QRadioButton("▭ Rectangle")
+        self.rect_radio = QRadioButton("Rectangle")
         self.rect_radio.setToolTip("Draw rectangular mask regions")
         self.rect_radio.setStyleSheet("font-size: 9pt;")
         self.rect_radio.toggled.connect(lambda: self.on_tool_changed("rectangle"))
@@ -454,7 +459,7 @@ class MaskModule(GUIBase):
         tools_grid.addWidget(self.rect_radio, 0, 1)
         
         # Row 1, Col 0 - Polygon
-        self.polygon_radio = QRadioButton("⬡ Polygon")
+        self.polygon_radio = QRadioButton("Polygon")
         self.polygon_radio.setToolTip("Draw polygon mask (right-click or Enter to finish)")
         self.polygon_radio.setStyleSheet("font-size: 9pt;")
         self.polygon_radio.toggled.connect(lambda: self.on_tool_changed("polygon"))
@@ -462,7 +467,7 @@ class MaskModule(GUIBase):
         tools_grid.addWidget(self.polygon_radio, 1, 0)
         
         # Row 1, Col 1 - Point
-        self.point_radio = QRadioButton("⊙ Point")
+        self.point_radio = QRadioButton("Point")
         self.point_radio.setToolTip("Click to mask/unmask individual points")
         self.point_radio.setStyleSheet("font-size: 9pt;")
         self.point_radio.toggled.connect(lambda: self.on_tool_changed("point"))
@@ -638,11 +643,11 @@ class MaskModule(GUIBase):
         shrink_btn.clicked.connect(self.shrink_mask)
         layout.addWidget(shrink_btn)
         
-        # Fill holes button
-        fill_btn = QPushButton("🔧 Fill Holes")
-        fill_btn.setFixedHeight(32)
-        fill_btn.setToolTip("Fill enclosed holes in masked regions")
-        fill_btn.setStyleSheet(f"""
+        # Undo button (replaced Fill Holes)
+        undo_btn = QPushButton("↶ Undo")
+        undo_btn.setFixedHeight(32)
+        undo_btn.setToolTip("Undo last mask operation")
+        undo_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: #2196F3;
                 color: white;
@@ -659,12 +664,43 @@ class MaskModule(GUIBase):
                 background-color: #1976D2;
             }}
         """)
-        fill_btn.clicked.connect(self.fill_holes)
-        layout.addWidget(fill_btn)
+        undo_btn.clicked.connect(self.undo_mask)
+        layout.addWidget(undo_btn)
         
         layout.addStretch()
         
         return panel
+
+    def update_deque(self):
+        """
+        Saves the current mask data into a deque for undo/redo functionality
+        (From Dioptas implementation)
+        """
+        if self.current_mask is not None:
+            self._undo_deque.append(np.copy(self.current_mask))
+            self._redo_deque.clear()
+
+    def undo_mask(self):
+        """Undo last mask operation (from Dioptas)"""
+        try:
+            old_data = self._undo_deque.pop()
+            self._redo_deque.append(np.copy(self.current_mask))
+            self.current_mask = old_data
+            self.update_display()
+            self.update_mask_statistics()
+        except IndexError:
+            QMessageBox.information(self.root, "Info", "No more undo steps available")
+
+    def redo_mask(self):
+        """Redo last undone mask operation (from Dioptas)"""
+        try:
+            new_data = self._redo_deque.pop()
+            self._undo_deque.append(np.copy(self.current_mask))
+            self.current_mask = new_data
+            self.update_display()
+            self.update_mask_statistics()
+        except IndexError:
+            QMessageBox.information(self.root, "Info", "No more redo steps available")
 
     def load_image(self):
         """Load diffraction image for mask creation - Optimized for h5"""
@@ -720,6 +756,9 @@ class MaskModule(GUIBase):
             # Initialize mask if not exists
             if self.current_mask is None or self.current_mask.shape != self.image_data.shape:
                 self.current_mask = np.zeros(self.image_data.shape, dtype=bool)
+                # Reset undo/redo deques on new image
+                self._undo_deque.clear()
+                self._redo_deque.clear()
 
             # Clear cache on new image
             self.cached_image = None
@@ -770,6 +809,10 @@ class MaskModule(GUIBase):
                 import fabio
                 mask_img = fabio.open(file_path)
                 self.current_mask = mask_img.data.astype(bool)
+
+            # Reset undo/redo on mask load
+            self._undo_deque.clear()
+            self._redo_deque.clear()
 
             self.mask_file_path = file_path
             self.mask_status_label.setText(f"🟢 Mask: {os.path.basename(file_path)}")
@@ -822,6 +865,7 @@ class MaskModule(GUIBase):
         
         if reply == QMessageBox.StandardButton.Yes:
             if self.image_data is not None:
+                self.update_deque()
                 self.current_mask = np.zeros(self.image_data.shape, dtype=bool)
                 self.update_display()
                 self.update_mask_statistics()
@@ -856,12 +900,13 @@ class MaskModule(GUIBase):
             QMessageBox.warning(self.root, "Warning", "No mask to invert")
             return
         
+        self.update_deque()
         self.current_mask = ~self.current_mask
         self.update_display()
         self.update_mask_statistics()
     
     def grow_mask(self):
-        """Grow (dilate) the mask"""
+        """Grow (dilate) the mask - Dioptas implementation"""
         if self.current_mask is None:
             QMessageBox.warning(self.root, "Warning", "No mask to grow")
             return
@@ -870,20 +915,22 @@ class MaskModule(GUIBase):
             QMessageBox.warning(self.root, "Warning", "Mask is empty. Nothing to grow.")
             return
         
-        try:
-            from scipy import ndimage
-            old_count = np.sum(self.current_mask)
-            self.current_mask = ndimage.binary_dilation(self.current_mask, iterations=1)
-            new_count = np.sum(self.current_mask)
-            self.update_display()
-            self.update_mask_statistics()
-            print(f"Mask grown: {old_count} → {new_count} pixels (+{new_count - old_count})")
-        except ImportError:
-            QMessageBox.warning(self.root, "Warning", 
-                              "scipy not available for mask operations.\nPlease install: pip install scipy")
+        self.update_deque()
+        old_count = np.sum(self.current_mask)
+        
+        # Dioptas grow algorithm - expand in 4 directions
+        self.current_mask[1:, :] = np.logical_or(self.current_mask[1:, :], self.current_mask[:-1, :])
+        self.current_mask[:-1, :] = np.logical_or(self.current_mask[:-1, :], self.current_mask[1:, :])
+        self.current_mask[:, 1:] = np.logical_or(self.current_mask[:, 1:], self.current_mask[:, :-1])
+        self.current_mask[:, :-1] = np.logical_or(self.current_mask[:, :-1], self.current_mask[:, 1:])
+        
+        new_count = np.sum(self.current_mask)
+        self.update_display()
+        self.update_mask_statistics()
+        print(f"Mask grown: {old_count} → {new_count} pixels (+{new_count - old_count})")
     
     def shrink_mask(self):
-        """Shrink (erode) the mask"""
+        """Shrink (erode) the mask - Dioptas implementation"""
         if self.current_mask is None:
             QMessageBox.warning(self.root, "Warning", "No mask to shrink")
             return
@@ -892,42 +939,19 @@ class MaskModule(GUIBase):
             QMessageBox.warning(self.root, "Warning", "Mask is empty. Nothing to shrink.")
             return
         
-        try:
-            from scipy import ndimage
-            old_count = np.sum(self.current_mask)
-            self.current_mask = ndimage.binary_erosion(self.current_mask, iterations=1)
-            new_count = np.sum(self.current_mask)
-            self.update_display()
-            self.update_mask_statistics()
-            print(f"Mask shrunk: {old_count} → {new_count} pixels (-{old_count - new_count})")
-        except ImportError:
-            QMessageBox.warning(self.root, "Warning", 
-                              "scipy not available for mask operations.\nPlease install: pip install scipy")
-    
-    def fill_holes(self):
-        """Fill holes in the mask"""
-        if self.current_mask is None:
-            QMessageBox.warning(self.root, "Warning", "No mask to fill")
-            return
+        self.update_deque()
+        old_count = np.sum(self.current_mask)
         
-        if not np.any(self.current_mask):
-            QMessageBox.warning(self.root, "Warning", "Mask is empty. Nothing to fill.")
-            return
+        # Dioptas shrink algorithm - shrink in 4 directions
+        self.current_mask[1:, :] = np.logical_and(self.current_mask[1:, :], self.current_mask[:-1, :])
+        self.current_mask[:-1, :] = np.logical_and(self.current_mask[:-1, :], self.current_mask[1:, :])
+        self.current_mask[:, 1:] = np.logical_and(self.current_mask[:, 1:], self.current_mask[:, :-1])
+        self.current_mask[:, :-1] = np.logical_and(self.current_mask[:, :-1], self.current_mask[:, 1:])
         
-        try:
-            from scipy import ndimage
-            old_count = np.sum(self.current_mask)
-            self.current_mask = ndimage.binary_fill_holes(self.current_mask)
-            new_count = np.sum(self.current_mask)
-            self.update_display()
-            self.update_mask_statistics()
-            if new_count > old_count:
-                print(f"Holes filled: {old_count} → {new_count} pixels (+{new_count - old_count})")
-            else:
-                print("No holes found to fill")
-        except ImportError:
-            QMessageBox.warning(self.root, "Warning", 
-                              "scipy not available for mask operations.\nPlease install: pip install scipy")
+        new_count = np.sum(self.current_mask)
+        self.update_display()
+        self.update_mask_statistics()
+        print(f"Mask shrunk: {old_count} → {new_count} pixels (-{old_count - new_count})")
 
     def on_contrast_changed(self, value):
         """Handle contrast slider change - with forced recalc"""
@@ -1076,8 +1100,8 @@ class MaskModule(GUIBase):
 
         self.ax.set_xlim(0, self.image_data.shape[1])
         self.ax.set_ylim(0, self.image_data.shape[0])
-        self.ax.set_xlabel('X (pixels)', fontsize=10)
-        self.ax.set_ylabel('Y (pixels)', fontsize=10)
+        self.ax.set_xlabel('X (pixels)', fontsize=8)
+        self.ax.set_ylabel('Y (pixels)', fontsize=8)
         self.ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
 
         self.canvas.draw_idle()
@@ -1250,6 +1274,8 @@ class MaskModule(GUIBase):
         if self.current_mask is None:
             return
         
+        self.update_deque()
+        
         # Optimized: only check region around point
         y_min = max(0, int(y - radius - 1))
         y_max = min(self.current_mask.shape[0], int(y + radius + 2))
@@ -1276,6 +1302,8 @@ class MaskModule(GUIBase):
         if self.current_mask is None:
             return
         
+        self.update_deque()
+        
         cx, cy = start
         radius = np.sqrt((end[0] - start[0])**2 + (end[1] - start[1])**2)
         
@@ -1293,6 +1321,8 @@ class MaskModule(GUIBase):
         """Apply rectangular mask"""
         if self.current_mask is None:
             return
+        
+        self.update_deque()
         
         x1, y1 = start
         x2, y2 = end
@@ -1317,6 +1347,8 @@ class MaskModule(GUIBase):
         """Apply polygon mask"""
         if self.current_mask is None or len(self.polygon_points) < 3:
             return
+        
+        self.update_deque()
         
         from matplotlib.path import Path
         
@@ -1358,6 +1390,8 @@ class MaskModule(GUIBase):
             QMessageBox.warning(self.root, "Warning", 
                               f"Threshold must be between 0 and {self.image_data.max():.1f}")
             return
+        
+        self.update_deque()
         
         # Determine threshold mode (below or above)
         is_below_mode = self.threshold_below_radio.isChecked()
