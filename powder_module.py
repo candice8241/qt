@@ -409,7 +409,7 @@ class PowderXRDModule(GUIBase):
         npt_row = QWidget()
         npt_row.setStyleSheet(f"background-color: transparent; border: none;")
         npt_layout = QHBoxLayout(npt_row)
-        npt_layout.setContentsMargins(0, 0, 0, 8)
+        npt_layout.setContentsMargins(0, 90, 0, 8)
         npt_layout.setSpacing(10)
 
         npt_label = QLabel("Number of Points")
