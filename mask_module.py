@@ -218,14 +218,14 @@ class MaskModule(GUIBase):
                 border-radius: 4px;
                 margin-top: 2px;
                 font-weight: bold;
-                padding-top: 18px;
+                padding-top: 5px;
                 padding-bottom: 0px;
                 background-color: transparent;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
                 subcontrol-position: top left;
-                top: 5px;
+                top: 0px;
                 left: 10px;
                 padding: 0 3px;
                 color: {self.colors['primary']};
@@ -234,7 +234,7 @@ class MaskModule(GUIBase):
 
         layout = QVBoxLayout(group)
         layout.setSpacing(0)
-        layout.setContentsMargins(10, -55, 10, 0)
+        layout.setContentsMargins(10, -10, 10, 0)
 
         # Main canvas layout - Image on left, Operations on right
         main_canvas_layout = QHBoxLayout()
@@ -247,7 +247,7 @@ class MaskModule(GUIBase):
         canvas_container.setFixedSize(1050, 620)  # Fixed container size (reduced height)
         canvas_layout = QHBoxLayout(canvas_container)
         canvas_layout.setSpacing(5)
-        canvas_layout.setContentsMargins(0, -50, 0, 0)
+        canvas_layout.setContentsMargins(0, 0, 0, 0)
         
         # Matplotlib canvas - Fixed size for better display
         self.figure = Figure(figsize=(10, 6))
