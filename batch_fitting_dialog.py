@@ -127,32 +127,37 @@ class BatchFittingDialog(QWidget):
             super().keyPressEvent(event)
         
     def paintEvent(self, event):
-        """Custom paint event to draw thin border manually with explicit right line"""
+        """Custom paint event to draw border with explicit right and bottom lines"""
         super().paintEvent(event)
         
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        # Set pen for border (2px thin purple)
-        pen = QPen(QColor("#7E57C2"), 2)
+        rect = self.rect()
+        border_width = 2
+        
+        # Draw main border with enough inset
+        pen = QPen(QColor("#7E57C2"), border_width)
         pen.setStyle(Qt.PenStyle.SolidLine)
         painter.setPen(pen)
         
-        # Draw main rectangle border
-        rect = self.rect()
+        # Draw rounded rectangle with proper insets
         painter.drawRoundedRect(
-            rect.adjusted(1, 1, -3, -1),
+            rect.adjusted(1, 1, -8, -8),  # Larger inset on right and bottom
             6, 6
         )
         
-        # Draw explicit right border line to ensure visibility
-        pen_right = QPen(QColor("#7E57C2"), 3)  # Slightly thicker for visibility
-        pen_right.setStyle(Qt.PenStyle.SolidLine)
-        painter.setPen(pen_right)
+        # Draw EXPLICIT right border line (guaranteed visible)
+        pen_thick = QPen(QColor("#7E57C2"), 3)
+        painter.setPen(pen_thick)
         
-        # Draw vertical line on the right edge
-        right_x = rect.width() - 5  # 5px from right edge
-        painter.drawLine(right_x, 10, right_x, rect.height() - 10)
+        # Right vertical line
+        right_x = rect.width() - 6  # 6px from right edge
+        painter.drawLine(right_x, 5, right_x, rect.height() - 5)
+        
+        # Bottom horizontal line on the right side
+        bottom_y = rect.height() - 6  # 6px from bottom edge
+        painter.drawLine(rect.width() - 100, bottom_y, right_x, bottom_y)
         
         painter.end()
     
@@ -162,13 +167,15 @@ class BatchFittingDialog(QWidget):
         self.setStyleSheet("""
             BatchFittingDialog {
                 background-color: #E8E8E8;
+                min-width: 1400px;
+                min-height: 800px;
             }
         """)
         
         # Main layout with margins for manual border
-        # Smaller left margin to shift content left, larger right for border visibility
+        # Extra margins on right and bottom for border visibility
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(3, 3, 10, 3)  # Left:3px Right:10px for visibility
+        main_layout.setContentsMargins(3, 3, 12, 12)  # Right:12px Bottom:12px for visibility
         main_layout.setSpacing(0)
         
         # Create content container
@@ -180,11 +187,14 @@ class BatchFittingDialog(QWidget):
             }
         """)
         
+        # Force container to not expand beyond available space
+        container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        
         main_layout.addWidget(container)
         
         # Inner layout for actual content
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(8, 8, 8, 8)  # Reduced padding
+        layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(5)
         
         # Title and controls (no border)
