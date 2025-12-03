@@ -284,11 +284,11 @@ class AutoFittingModule(QWidget):
                 color: black;
                 border: none;
                 border-radius: 4px;
-                padding: 8px;
+                padding: 6px;
                 font-weight: bold;
-                font-size: 10pt;
-                min-width: 100px;
-                min-height: 40px;
+                font-size: 9pt;
+                min-width: 85px;
+                min-height: 35px;
             }
             QPushButton:hover { background-color: #9370DB; }
             QPushButton:disabled { background-color: #CCCCCC; color: #666666; }
@@ -301,7 +301,7 @@ class AutoFittingModule(QWidget):
         control_layout.addWidget(self.btn_load)
         
         # File navigation buttons (lines 704-717)
-        nav_btn_style = btn_style.replace('min-width: 100px', 'min-width: 30px')
+        nav_btn_style = btn_style.replace('min-width: 85px', 'min-width: 28px')
         
         self.btn_prev_file = QPushButton("◀")
         self.btn_prev_file.setStyleSheet(nav_btn_style)
@@ -374,7 +374,7 @@ class AutoFittingModule(QWidget):
         
         # Batch Settings button (lines 760-766)
         self.btn_batch_settings = QPushButton("⚙")
-        self.btn_batch_settings.setStyleSheet(btn_style.replace('min-width: 100px', 'min-width: 30px').replace('#B19CD9', '#B0C4DE'))
+        self.btn_batch_settings.setStyleSheet(btn_style.replace('min-width: 85px', 'min-width: 28px').replace('#B19CD9', '#B0C4DE'))
         self.btn_batch_settings.clicked.connect(self.show_batch_settings)
         self.btn_batch_settings.setEnabled(True)  # state=tk.NORMAL
         control_layout.addWidget(self.btn_batch_settings)
@@ -385,12 +385,12 @@ class AutoFittingModule(QWidget):
             QLabel {
                 color: #9370DB;
                 font-weight: bold;
-                font-size: 11pt;
+                font-size: 10pt;
                 background-color: #E6D5F5;
                 padding: 5px;
             }
         """)
-        self.status_label.setMinimumWidth(350)
+        self.status_label.setMinimumWidth(300)
         control_layout.addWidget(self.status_label)
         
         control_layout.addStretch()
@@ -408,7 +408,7 @@ class AutoFittingModule(QWidget):
         
         # Background label (lines 780-783)
         bg_label = QLabel("Background:")
-        bg_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 10pt;")
+        bg_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 9pt;")
         bg_layout.addWidget(bg_label)
         
         # Button style (lines 785-791)
@@ -420,8 +420,8 @@ class AutoFittingModule(QWidget):
                 border-radius: 4px;
                 padding: 6px 10px;
                 font-weight: bold;
-                font-size: 9pt;
-                min-width: 120px;
+                font-size: 8pt;
+                min-width: 100px;
             }
             QPushButton:hover { background-color: #9370DB; }
             QPushButton:disabled { background-color: #CCCCCC; color: #666666; }
@@ -457,39 +457,40 @@ class AutoFittingModule(QWidget):
         
         # Fit Method (lines 817-825)
         fit_method_label = QLabel("Fit Method:")
-        fit_method_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 9pt; margin-left: 20px;")
+        fit_method_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 8pt; margin-left: 20px;")
         bg_layout.addWidget(fit_method_label)
         
         self.fit_method_combo = QComboBox()
         self.fit_method_combo.addItems(["pseudo_voigt", "voigt"])
         self.fit_method_combo.setCurrentIndex(0)
         self.fit_method_combo.currentTextChanged.connect(self.on_fit_method_changed)
-        self.fit_method_combo.setMaximumWidth(120)
+        self.fit_method_combo.setMaximumWidth(110)
+        self.fit_method_combo.setStyleSheet("font-size: 8pt;")
         bg_layout.addWidget(self.fit_method_combo)
         
         # Overlap threshold (lines 827-834)
         overlap_label = QLabel("Overlap FWHM×:")
-        overlap_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 9pt; margin-left: 20px;")
+        overlap_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 8pt; margin-left: 20px;")
         bg_layout.addWidget(overlap_label)
         
         self.overlap_threshold_entry = QLineEdit(str(self.overlap_threshold))
-        self.overlap_threshold_entry.setMaximumWidth(50)
-        self.overlap_threshold_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 9pt;")
+        self.overlap_threshold_entry.setMaximumWidth(45)
+        self.overlap_threshold_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 8pt;")
         bg_layout.addWidget(self.overlap_threshold_entry)
         
         # Fitting window (lines 836-843)
         window_label = QLabel("Fit Window×:")
-        window_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 9pt; margin-left: 20px;")
+        window_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 8pt; margin-left: 20px;")
         bg_layout.addWidget(window_label)
         
         self.fitting_window_entry = QLineEdit(str(self.fitting_window_multiplier))
-        self.fitting_window_entry.setMaximumWidth(50)
-        self.fitting_window_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 9pt;")
+        self.fitting_window_entry.setMaximumWidth(45)
+        self.fitting_window_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 8pt;")
         bg_layout.addWidget(self.fitting_window_entry)
         
         # Coordinate label (lines 845-848)
         self.coord_label = QLabel("")
-        self.coord_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 9pt;")
+        self.coord_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 8pt;")
         bg_layout.addWidget(self.coord_label)
         
         bg_layout.addStretch()
@@ -507,44 +508,45 @@ class AutoFittingModule(QWidget):
         
         # Smoothing label (lines 856-859)
         smooth_label = QLabel("Smoothing:")
-        smooth_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 10pt;")
+        smooth_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 9pt;")
         smooth_layout.addWidget(smooth_label)
         
         # Enable checkbox (lines 861-865)
         self.chk_smooth = QCheckBox("Enable")
-        self.chk_smooth.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 9pt;")
+        self.chk_smooth.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 8pt;")
         self.chk_smooth.setChecked(self.smoothing_enabled)
         smooth_layout.addWidget(self.chk_smooth)
         
         # Method (lines 867-874)
         method_label = QLabel("Method:")
-        method_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 9pt; margin-left: 10px;")
+        method_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 8pt; margin-left: 10px;")
         smooth_layout.addWidget(method_label)
         
         self.smooth_method_combo = QComboBox()
         self.smooth_method_combo.addItems(["gaussian", "savgol"])
         self.smooth_method_combo.setCurrentText(self.smoothing_method)
-        self.smooth_method_combo.setMaximumWidth(100)
+        self.smooth_method_combo.setMaximumWidth(90)
+        self.smooth_method_combo.setStyleSheet("font-size: 8pt;")
         smooth_layout.addWidget(self.smooth_method_combo)
         
         # Sigma (lines 876-882)
         sigma_label = QLabel("Sigma:")
-        sigma_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 9pt; margin-left: 10px;")
+        sigma_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 8pt; margin-left: 10px;")
         smooth_layout.addWidget(sigma_label)
         
         self.smooth_sigma_entry = QLineEdit(str(self.smoothing_sigma))
-        self.smooth_sigma_entry.setMaximumWidth(50)
-        self.smooth_sigma_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 9pt;")
+        self.smooth_sigma_entry.setMaximumWidth(45)
+        self.smooth_sigma_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 8pt;")
         smooth_layout.addWidget(self.smooth_sigma_entry)
         
         # Window (lines 884-890)
         window_label = QLabel("Window:")
-        window_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 9pt; margin-left: 10px;")
+        window_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 8pt; margin-left: 10px;")
         smooth_layout.addWidget(window_label)
         
         self.smooth_window_entry = QLineEdit(str(self.smoothing_window))
-        self.smooth_window_entry.setMaximumWidth(50)
-        self.smooth_window_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 9pt;")
+        self.smooth_window_entry.setMaximumWidth(45)
+        self.smooth_window_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 8pt;")
         smooth_layout.addWidget(self.smooth_window_entry)
         
         # Buttons style (lines 892-898, 900-906)
@@ -556,8 +558,8 @@ class AutoFittingModule(QWidget):
                 border-radius: 4px;
                 padding: 6px 10px;
                 font-weight: bold;
-                font-size: 9pt;
-                min-width: 80px;
+                font-size: 8pt;
+                min-width: 70px;
             }
             QPushButton:hover { background-color: #7FD77F; }
             QPushButton:disabled { background-color: #CCCCCC; color: #666666; }
@@ -589,7 +591,7 @@ class AutoFittingModule(QWidget):
                 border-radius: 5px;
                 margin-top: 10px;
                 font-weight: bold;
-                font-size: 10pt;
+                font-size: 9pt;
                 color: #FF6B9D;
             }
             QGroupBox::title {
@@ -620,14 +622,14 @@ class AutoFittingModule(QWidget):
                 background-color: #FFFBF0;
                 gridline-color: #E0E0E0;
                 font-weight: bold;
-                font-size: 9pt;
+                font-size: 8pt;
             }
             QHeaderView::section {
                 background-color: #FFE4E1;
                 padding: 4px;
                 border: 1px solid #E0E0E0;
                 font-weight: bold;
-                font-size: 9pt;
+                font-size: 8pt;
             }
         """)
         
@@ -664,14 +666,7 @@ class AutoFittingModule(QWidget):
         self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         plot_layout.addWidget(self.canvas)
         
-        # Add toolbar (lines 960-964)
-        toolbar_frame = QFrame()
-        toolbar_frame.setStyleSheet("QFrame { background-color: #F5E6FA; }")
-        toolbar_layout = QHBoxLayout(toolbar_frame)
-        toolbar_layout.setContentsMargins(0, 0, 0, 0)
-        self.toolbar = NavigationToolbar(self.canvas, toolbar_frame)
-        toolbar_layout.addWidget(self.toolbar)
-        plot_layout.addWidget(toolbar_frame)
+        # Toolbar removed as per user request
         
         # Connect events (lines 966-969)
         self.canvas.mpl_connect('button_press_event', self.on_click)
@@ -696,7 +691,7 @@ class AutoFittingModule(QWidget):
             QTextEdit {
                 background-color: #FAF0FF;
                 color: #4B0082;
-                font-size: 10pt;
+                font-size: 9pt;
                 border: 2px inset #E0E0E0;
             }
         """)
@@ -749,8 +744,7 @@ class AutoFittingModule(QWidget):
         if event.inaxes != self.ax or self.x is None:
             return
         
-        if self.toolbar.mode != '':
-            return
+        # Toolbar removed, no mode check needed
         
         x_click = event.xdata
         idx = np.argmin(np.abs(self.x - x_click))
@@ -1821,42 +1815,42 @@ class AutoFittingModule(QWidget):
         delay_frame = QFrame()
         delay_layout = QHBoxLayout(delay_frame)
         delay_label = QLabel("Display delay per file (seconds):")
-        delay_label.setStyleSheet("color: #4B0082; font-weight: bold; font-size: 10pt;")
+        delay_label.setStyleSheet("color: #4B0082; font-weight: bold; font-size: 9pt;")
         delay_layout.addWidget(delay_label)
         
         delay_spinbox = QDoubleSpinBox()
         delay_spinbox.setRange(0.01, 10.0)
         delay_spinbox.setSingleStep(0.01)
         delay_spinbox.setValue(self.batch_delay)
-        delay_spinbox.setStyleSheet("font-weight: bold; font-size: 10pt;")
+        delay_spinbox.setStyleSheet("font-weight: bold; font-size: 9pt;")
         delay_layout.addWidget(delay_spinbox)
         layout.addWidget(delay_frame)
         
         # Auto-save setting
         autosave_check = QCheckBox("Auto-save results for each file")
         autosave_check.setChecked(self.batch_auto_save)
-        autosave_check.setStyleSheet("color: #4B0082; font-weight: bold; font-size: 10pt;")
+        autosave_check.setStyleSheet("color: #4B0082; font-weight: bold; font-size: 9pt;")
         layout.addWidget(autosave_check)
         
         # Failure handling
         failure_group = QGroupBox("When auto-fitting fails:")
-        failure_group.setStyleSheet("QGroupBox { color: #4B0082; font-weight: bold; font-size: 10pt; }")
+        failure_group.setStyleSheet("QGroupBox { color: #4B0082; font-weight: bold; font-size: 9pt; }")
         failure_layout = QVBoxLayout(failure_group)
         
         failure_buttons = QButtonGroup(dialog)
         
         pause_radio = QRadioButton("Pause and allow manual adjustment")
-        pause_radio.setStyleSheet("color: #4B0082; font-weight: bold; font-size: 9pt;")
+        pause_radio.setStyleSheet("color: #4B0082; font-weight: bold; font-size: 8pt;")
         failure_layout.addWidget(pause_radio)
         failure_buttons.addButton(pause_radio, 0)
         
         skip_radio = QRadioButton("Skip to next file")
-        skip_radio.setStyleSheet("color: #4B0082; font-weight: bold; font-size: 9pt;")
+        skip_radio.setStyleSheet("color: #4B0082; font-weight: bold; font-size: 8pt;")
         failure_layout.addWidget(skip_radio)
         failure_buttons.addButton(skip_radio, 1)
         
         stop_radio = QRadioButton("Stop batch processing")
-        stop_radio.setStyleSheet("color: #4B0082; font-weight: bold; font-size: 9pt;")
+        stop_radio.setStyleSheet("color: #4B0082; font-weight: bold; font-size: 8pt;")
         failure_layout.addWidget(stop_radio)
         failure_buttons.addButton(stop_radio, 2)
         
@@ -1883,7 +1877,7 @@ class AutoFittingModule(QWidget):
                 background-color: #FAF0FF;
                 color: #4B0082;
                 font-weight: bold;
-                font-size: 9pt;
+                font-size: 8pt;
                 border: 2px inset;
                 padding: 10px;
             }
@@ -1897,9 +1891,9 @@ class AutoFittingModule(QWidget):
                 background-color: #B19CD9;
                 color: black;
                 font-weight: bold;
-                font-size: 11pt;
+                font-size: 10pt;
                 padding: 10px;
-                min-width: 150px;
+                min-width: 140px;
             }
             QPushButton:hover { background-color: #9370DB; }
         """)
@@ -1973,9 +1967,31 @@ class AutoFittingModule(QWidget):
                 success = self._process_single_file_auto(filepath)
                 
                 if not success:
+                    # Check if user deliberately skipped in verification dialog
+                    if self.batch_skip_current:
+                        self.update_info("Skipping to next file...\n")
+                        self.batch_skip_current = False
+                        continue
+                    
+                    # Handle actual failure according to settings
                     if self.batch_on_failure == "stop":
                         self.update_info("Batch processing stopped due to failure.\n")
                         break
+                    elif self.batch_on_failure == "pause":
+                        self.update_info("Auto-fitting failed. Pausing for manual adjustment...\n")
+                        self.batch_paused = True
+                        self._show_manual_adjustment_dialog()
+                        
+                        # Wait for user to continue or skip
+                        while self.batch_paused and self.batch_running:
+                            QApplication.processEvents()
+                            import time
+                            time.sleep(0.1)
+                        
+                        if self.batch_skip_current:
+                            self.update_info("Skipping current file...\n")
+                            self.batch_skip_current = False
+                            continue
                     elif self.batch_on_failure == "skip":
                         self.update_info("Auto-fitting failed. Skipping to next file...\n")
                         continue
@@ -2006,49 +2022,285 @@ class AutoFittingModule(QWidget):
                                       f"Processed {len(self.batch_csv_paths)} files successfully!")
     
     def _process_single_file_auto(self, filepath):
-        """Process a single file automatically (simplified version)"""
+        """Process a single file automatically with verification dialog (lines 2290-2397)"""
         try:
-            # Load file
+            # Step 1: Load file
+            self.update_info("  Step 1: Loading file...\n")
             self.load_file_by_path(filepath)
             QApplication.processEvents()
+            self.update_info("  ✓ File loaded successfully\n")
             
-            # Auto-find peaks
+            # Step 2: Auto-find peaks
+            self.update_info("  Step 2: Auto-detecting peaks...\n")
             self.auto_find_peaks()
             QApplication.processEvents()
             
             if len(self.selected_peaks) == 0:
-                self.update_info("No peaks detected.\n")
+                self.update_info("  ❌ No peaks detected!\n")
                 return False
             
+            self.update_info(f"  ✓ Detected {len(self.selected_peaks)} peaks\n")
+            
             # Auto-select background
+            self.update_info("  Auto-selecting background...\n")
             self.auto_select_background()
             QApplication.processEvents()
+            self.update_info(f"  ✓ Selected {len(self.bg_points)} background points\n")
             
-            # Subtract background
-            if len(self.bg_points) >= 2:
-                self.subtract_background()
-                QApplication.processEvents()
+            # Manual verification step - allow user to review and adjust
+            self.update_info("  Waiting for manual verification...\n")
+            user_action = self._show_verification_dialog()
             
-            # Fit peaks
+            if user_action == "skip":
+                self.update_info("  User chose to skip this file\n")
+                self.batch_skip_current = True
+                return False
+            elif user_action == "stop":
+                self.update_info("  User chose to stop batch processing\n")
+                self.batch_running = False
+                self.batch_stopped_by_user = True
+                return False
+            
+            self.update_info("  ✓ Manual verification completed\n")
+            
+            # Step 3: Fit peaks
+            self.update_info("  Step 3: Fitting peaks...\n")
             self.fit_peaks()
             QApplication.processEvents()
             
-            if not self.fitted:
-                self.update_info("Fitting failed.\n")
+            if not self.fitted or self.fit_results is None:
+                self.update_info("  ❌ Peak fitting failed!\n")
                 return False
             
-            # Save if enabled
+            self.update_info(f"  ✓ Successfully fitted {len(self.fit_results)} peaks\n")
+            
+            # Step 4: Save results (if enabled)
             if self.batch_auto_save and self.filepath:
+                self.update_info("  Step 4: Saving results...\n")
                 save_dir = os.path.dirname(self.filepath)
                 csv_path, _ = self._save_results_to_dir(save_dir)
                 self.batch_csv_paths.append(csv_path)
-                self.update_info(f"Results saved.\n")
+                self.update_info(f"  ✓ Results saved to {save_dir}\n")
             
+            self.update_info("  ✅ File processed successfully!\n")
             return True
             
         except Exception as e:
-            self.update_info(f"Error processing file: {str(e)}\n")
+            import traceback
+            self.update_info(f"  ❌ Error: {str(e)}\n")
+            self.update_info(f"  {traceback.format_exc()}\n")
             return False
+    
+    def _show_verification_dialog(self):
+        """Show verification dialog for manual review before fitting (lines 2489-2622)"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Manual Verification - Review Peaks and Background")
+        dialog.setMinimumSize(420, 320)
+        dialog.setStyleSheet("QDialog { background-color: #E6F3FF; }")
+        
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(18, 12, 18, 12)
+        layout.setSpacing(8)
+        
+        # Message
+        msg_text = (
+            f"File: {self.filename}\n\n"
+            f"Auto-detected:\n"
+            f"  • {len(self.selected_peaks)} peak(s)\n"
+            f"  • {len(self.bg_points)} background point(s)\n\n"
+            "Please review and adjust if needed:\n"
+            "  • Click on plot to add/remove peaks\n"
+            "  • Use 'Select BG Points' to add background points\n"
+            "  • Use 'Clear BG' to reset background\n\n"
+            "Shortcuts: Enter=Continue | Space=Skip"
+        )
+        
+        msg = QLabel(msg_text)
+        msg.setStyleSheet("""
+            QLabel {
+                background-color: #E6F3FF;
+                color: #2C5282;
+                font-weight: bold;
+                font-size: 9pt;
+                padding: 5px;
+            }
+        """)
+        msg.setWordWrap(True)
+        layout.addWidget(msg)
+        
+        # User action storage
+        user_action = {"action": "continue"}
+        
+        # Buttons
+        btn_frame = QFrame()
+        btn_frame.setStyleSheet("QFrame { background-color: #E6F3FF; }")
+        btn_layout = QVBoxLayout(btn_frame)
+        btn_layout.setSpacing(5)
+        
+        def continue_fitting():
+            user_action["action"] = "continue"
+            dialog.accept()
+        
+        def skip_file():
+            user_action["action"] = "skip"
+            dialog.accept()
+        
+        def stop_batch():
+            user_action["action"] = "stop"
+            dialog.accept()
+        
+        btn_continue = QPushButton("✓ Continue to Fit")
+        btn_continue.setStyleSheet("""
+            QPushButton {
+                background-color: #10B981;
+                color: white;
+                font-weight: bold;
+                font-size: 9pt;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #059669; }
+        """)
+        btn_continue.clicked.connect(continue_fitting)
+        btn_layout.addWidget(btn_continue)
+        
+        btn_skip = QPushButton("⏭ Skip This File")
+        btn_skip.setStyleSheet("""
+            QPushButton {
+                background-color: #F59E0B;
+                color: white;
+                font-weight: bold;
+                font-size: 9pt;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #D97706; }
+        """)
+        btn_skip.clicked.connect(skip_file)
+        btn_layout.addWidget(btn_skip)
+        
+        btn_stop = QPushButton("⏹ Stop Batch")
+        btn_stop.setStyleSheet("""
+            QPushButton {
+                background-color: #EF4444;
+                color: white;
+                font-weight: bold;
+                font-size: 9pt;
+                padding: 8px;
+                border-radius: 4px;
+            }
+            QPushButton:hover { background-color: #DC2626; }
+        """)
+        btn_stop.clicked.connect(stop_batch)
+        btn_layout.addWidget(btn_stop)
+        
+        layout.addWidget(btn_frame)
+        
+        # Keyboard shortcuts
+        btn_continue.setShortcut(Qt.Key.Key_Return)
+        btn_skip.setShortcut(Qt.Key.Key_Space)
+        btn_stop.setShortcut(Qt.Key.Key_Escape)
+        
+        dialog.exec()
+        
+        return user_action["action"]
+    
+    def _show_manual_adjustment_dialog(self):
+        """Show dialog for manual adjustment during batch processing (lines 2399-2466)"""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Manual Adjustment Needed")
+        dialog.setMinimumSize(400, 250)
+        dialog.setStyleSheet("QDialog { background-color: #FFF8DC; }")
+        
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setSpacing(10)
+        
+        # Message
+        msg = QLabel(
+            "Auto-fitting failed for current file.\n\n"
+            "You can now manually:\n"
+            "• Click on peak positions\n"
+            "• Adjust background points\n"
+            "• Click 'Fit Peaks' button\n\n"
+            "When ready, choose an action below:"
+        )
+        msg.setStyleSheet("""
+            QLabel {
+                background-color: #FFF8DC;
+                color: #8B4513;
+                font-weight: bold;
+                font-size: 9pt;
+            }
+        """)
+        layout.addWidget(msg)
+        
+        # Buttons
+        btn_frame = QFrame()
+        btn_frame.setStyleSheet("QFrame { background-color: #FFF8DC; }")
+        btn_layout = QVBoxLayout(btn_frame)
+        btn_layout.setSpacing(5)
+        
+        def continue_batch():
+            self.batch_paused = False
+            dialog.accept()
+        
+        def skip_current():
+            self.batch_skip_current = True
+            self.batch_paused = False
+            dialog.accept()
+        
+        def stop_batch():
+            self.batch_running = False
+            self.batch_paused = False
+            self.batch_stopped_by_user = True
+            dialog.accept()
+        
+        btn_continue = QPushButton("Continue After Manual Fix")
+        btn_continue.setStyleSheet("""
+            QPushButton {
+                background-color: #90EE90;
+                color: #006400;
+                font-weight: bold;
+                font-size: 9pt;
+                padding: 8px;
+            }
+            QPushButton:hover { background-color: #7FD77F; }
+        """)
+        btn_continue.clicked.connect(continue_batch)
+        btn_layout.addWidget(btn_continue)
+        
+        btn_skip = QPushButton("Skip This File")
+        btn_skip.setStyleSheet("""
+            QPushButton {
+                background-color: #FFD700;
+                color: #8B4513;
+                font-weight: bold;
+                font-size: 9pt;
+                padding: 8px;
+            }
+            QPushButton:hover { background-color: #FFC700; }
+        """)
+        btn_skip.clicked.connect(skip_current)
+        btn_layout.addWidget(btn_skip)
+        
+        btn_stop = QPushButton("Stop Batch Processing")
+        btn_stop.setStyleSheet("""
+            QPushButton {
+                background-color: #FF6347;
+                color: black;
+                font-weight: bold;
+                font-size: 9pt;
+                padding: 8px;
+            }
+            QPushButton:hover { background-color: #FF4500; }
+        """)
+        btn_stop.clicked.connect(stop_batch)
+        btn_layout.addWidget(btn_stop)
+        
+        layout.addWidget(btn_frame)
+        
+        dialog.exec()
 
 
 # For standalone testing
