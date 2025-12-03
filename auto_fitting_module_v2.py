@@ -264,8 +264,7 @@ class AutoFittingModule(QWidget):
         # Main plot area (line 680)
         self._create_plot_area(main_layout)
         
-        # Info panel (line 683)
-        self._create_info_panel(main_layout)
+        # Info panel removed as per user request
     
     def _create_control_panel(self, parent_layout):
         """Create top control panel (lines 685-773)"""
@@ -676,34 +675,11 @@ class AutoFittingModule(QWidget):
         parent_layout.addWidget(plot_frame, stretch=1)
     
     def _create_info_panel(self, parent_layout):
-        """Create info panel (lines 971-984)"""
-        # Create frame (line 973)
-        info_frame = QFrame()
-        info_frame.setStyleSheet("QFrame { background-color: #F0E6FA; border-radius: 5px; }")
-        info_frame.setFixedHeight(80)
-        info_layout = QVBoxLayout(info_frame)
-        info_layout.setContentsMargins(10, 5, 10, 5)
-        
-        # Create text widget (lines 977-984)
+        """Create info panel - REMOVED as per user request"""
+        # Info panel removed, but keep update_info method working
+        # Create a hidden text widget for logging (not displayed)
         self.info_text = QTextEdit()
-        self.info_text.setReadOnly(True)
-        self.info_text.setStyleSheet("""
-            QTextEdit {
-                background-color: #FAF0FF;
-                color: #4B0082;
-                font-size: 9pt;
-                border: 2px inset #E0E0E0;
-            }
-        """)
-        self.info_text.setMaximumHeight(60)
-        
-        # Insert initial text (lines 981-983)
-        self.info_text.append('Welcome! Load your XRD data file to begin peak fitting.')
-        self.info_text.append('Use the toolbar buttons or mouse scroll wheel to zoom and pan.')
-        self.info_text.append('Click on peaks to select them for fitting.')
-        
-        info_layout.addWidget(self.info_text)
-        parent_layout.addWidget(info_frame)
+        self.info_text.setVisible(False)  # Hidden
     
     # ==================== Event Handlers (lines 986-1152) ====================
     
