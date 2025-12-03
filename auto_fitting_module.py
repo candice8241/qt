@@ -5,6 +5,8 @@ Interactive Peak Fitting with embedded matplotlib canvas
 """
 
 import numpy as np
+import matplotlib
+matplotlib.use('Qt5Agg')  # Set backend before importing pyplot
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt5agg import NavigationToolbar2QT as NavigationToolbar
@@ -143,6 +145,11 @@ class AutoFittingModule(QWidget):
         # Settings
         self.fit_method = "pseudo_voigt"
         self.overlap_mode = False
+        self.overlap_threshold = 5.0
+        self.fitting_window_multiplier = 3.0
+        
+        # Undo stack
+        self.undo_stack = []
         
         # Setup UI
         self.setup_ui()
@@ -201,7 +208,22 @@ class AutoFittingModule(QWidget):
         self.btn_load.clicked.connect(self.load_file)
         row1.addWidget(self.btn_load)
         
-        self.btn_auto_find = QPushButton("Auto Find Peaks")
+        # File navigation buttons
+        nav_btn_style = btn_style.replace('min-width: 100px', 'min-width: 40px')
+        
+        self.btn_prev = QPushButton("◀")
+        self.btn_prev.setStyleSheet(nav_btn_style)
+        self.btn_prev.clicked.connect(self.prev_file)
+        self.btn_prev.setEnabled(False)
+        row1.addWidget(self.btn_prev)
+        
+        self.btn_next = QPushButton("▶")
+        self.btn_next.setStyleSheet(nav_btn_style)
+        self.btn_next.clicked.connect(self.next_file)
+        self.btn_next.setEnabled(False)
+        row1.addWidget(self.btn_next)
+        
+        self.btn_auto_find = QPushButton("Auto Find")
         self.btn_auto_find.setStyleSheet(btn_style)
         self.btn_auto_find.clicked.connect(self.auto_find_peaks)
         self.btn_auto_find.setEnabled(False)
@@ -213,13 +235,25 @@ class AutoFittingModule(QWidget):
         self.btn_fit.setEnabled(False)
         row1.addWidget(self.btn_fit)
         
+        self.btn_clear_fit = QPushButton("Clear Fit")
+        self.btn_clear_fit.setStyleSheet(btn_style.replace('#B19CD9', '#FFA07A'))
+        self.btn_clear_fit.clicked.connect(self.clear_fit)
+        self.btn_clear_fit.setEnabled(False)
+        row1.addWidget(self.btn_clear_fit)
+        
+        self.btn_undo = QPushButton("Undo")
+        self.btn_undo.setStyleSheet(btn_style.replace('#B19CD9', '#DDA0DD'))
+        self.btn_undo.clicked.connect(self.undo_action)
+        self.btn_undo.setEnabled(False)
+        row1.addWidget(self.btn_undo)
+        
         self.btn_reset = QPushButton("Reset")
         self.btn_reset.setStyleSheet(btn_style.replace('#B19CD9', '#FFB6C1'))
         self.btn_reset.clicked.connect(self.reset_peaks)
         self.btn_reset.setEnabled(False)
         row1.addWidget(self.btn_reset)
         
-        self.btn_save = QPushButton("Save Results")
+        self.btn_save = QPushButton("Save")
         self.btn_save.setStyleSheet(btn_style.replace('#B19CD9', '#98FB98'))
         self.btn_save.clicked.connect(self.save_results)
         self.btn_save.setEnabled(False)
@@ -261,8 +295,10 @@ class AutoFittingModule(QWidget):
         plot_layout = QVBoxLayout(plot_frame)
         plot_layout.setContentsMargins(0, 0, 0, 0)
         
-        # Create matplotlib figure
-        self.fig, self.ax = plt.subplots(figsize=(12, 6), facecolor='white')
+        # Create matplotlib figure (don't use plt.subplots to avoid extra window)
+        from matplotlib.figure import Figure
+        self.fig = Figure(figsize=(12, 6), facecolor='white')
+        self.ax = self.fig.add_subplot(111)
         self.fig.subplots_adjust(left=0.08, right=0.98, top=0.95, bottom=0.12)
         self.ax.set_facecolor('#FAF0FF')
         self.ax.grid(True, alpha=0.3, linestyle='--', color='#D4A5D4')
@@ -413,6 +449,10 @@ class AutoFittingModule(QWidget):
             self.bg_markers.append(marker)
             self.canvas.draw()
             self.update_info(f"BG point {len(self.bg_points)} added at 2theta = {point_x:.4f}")
+            
+            # Add to undo stack
+            self.undo_stack.append(('bg_point', len(self.bg_points) - 1))
+            self.btn_undo.setEnabled(True)
         
         elif event.button == 3:  # Right click - remove
             if len(self.bg_points) > 0:
@@ -439,6 +479,10 @@ class AutoFittingModule(QWidget):
                 self.peak_texts.append(text)
                 self.canvas.draw()
                 self.update_info(f"Peak {len(self.selected_peaks)} added at 2theta = {point_x:.4f}")
+                
+                # Add to undo stack
+                self.undo_stack.append(('peak', idx))
+                self.btn_undo.setEnabled(True)
                 
                 if len(self.selected_peaks) >= 1:
                     self.btn_fit.setEnabled(True)
@@ -492,12 +536,18 @@ class AutoFittingModule(QWidget):
             self.filename = os.path.splitext(os.path.basename(filepath))[0]
             
             self.reset_peaks()
+            self._scan_folder(filepath)
             self.plot_data()
             
             self.btn_auto_find.setEnabled(True)
             self.btn_bg_mode.setEnabled(True)
             self.status_label.setText(f"Loaded: {self.filename}")
             self.update_info(f"Successfully loaded: {self.filename}\nData points: {len(self.x)}")
+            
+            # Enable file navigation if multiple files
+            if len(self.file_list) > 1:
+                self.btn_prev.setEnabled(True)
+                self.btn_next.setEnabled(True)
             
         except Exception as e:
             QMessageBox.critical(self, "Load Error", f"Failed to load file:\n{str(e)}")
@@ -637,6 +687,7 @@ class AutoFittingModule(QWidget):
             self.canvas.draw()
             self.fitted = True
             self.btn_save.setEnabled(True)
+            self.btn_clear_fit.setEnabled(True)
             self.display_results()
             self.status_label.setText(f"Fitted {len(self.fit_results)} peaks successfully")
             self.update_info(f"Successfully fitted {len(self.fit_results)} peaks")
@@ -746,6 +797,109 @@ class AutoFittingModule(QWidget):
         # Auto-scroll to bottom
         scrollbar = self.info_text.verticalScrollBar()
         scrollbar.setValue(scrollbar.maximum())
+    
+    def _scan_folder(self, filepath):
+        """Scan folder and build file list for navigation"""
+        folder = os.path.dirname(filepath)
+        all_files = []
+        
+        extensions = ['.xy', '.dat', '.txt']
+        for file in sorted(os.listdir(folder)):
+            if any(file.lower().endswith(ext) for ext in extensions):
+                full_path = os.path.join(folder, file)
+                if os.path.isfile(full_path):
+                    all_files.append(full_path)
+        
+        self.file_list = all_files
+        try:
+            self.current_file_index = self.file_list.index(filepath)
+        except ValueError:
+            self.current_file_index = 0
+    
+    def prev_file(self):
+        """Load previous file in folder"""
+        if self.current_file_index > 0:
+            self.current_file_index -= 1
+            self.load_file_by_path(self.file_list[self.current_file_index])
+    
+    def next_file(self):
+        """Load next file in folder"""
+        if self.current_file_index < len(self.file_list) - 1:
+            self.current_file_index += 1
+            self.load_file_by_path(self.file_list[self.current_file_index])
+    
+    def load_file_by_path(self, filepath):
+        """Load file from specific path"""
+        try:
+            with open(filepath, encoding='latin1') as f:
+                data = np.genfromtxt(f, comments="#")
+            
+            if data.ndim != 2 or data.shape[1] < 2:
+                raise ValueError("Data must have at least 2 columns")
+            
+            self.x = data[:, 0]
+            self.y = data[:, 1]
+            self.y_original = self.y.copy()
+            self.filepath = filepath
+            self.filename = os.path.splitext(os.path.basename(filepath))[0]
+            
+            self.reset_peaks()
+            self.plot_data()
+            
+            self.btn_auto_find.setEnabled(True)
+            self.btn_bg_mode.setEnabled(True)
+            self.status_label.setText(f"Loaded: {self.filename} ({self.current_file_index+1}/{len(self.file_list)})")
+            self.update_info(f"Loaded: {self.filename}")
+            
+        except Exception as e:
+            QMessageBox.critical(self, "Load Error", f"Failed to load file:\n{str(e)}")
+    
+    def clear_fit(self):
+        """Clear fit results but keep peak selections"""
+        # Clear fit lines
+        for line in self.fit_lines:
+            line.remove()
+        
+        self.fit_lines = []
+        self.fit_results = None
+        self.fitted = False
+        
+        self.results_table.setRowCount(0)
+        self.canvas.draw()
+        
+        self.btn_save.setEnabled(False)
+        self.btn_clear_fit.setEnabled(False)
+        self.update_info("Cleared fit results")
+    
+    def undo_action(self):
+        """Undo last action"""
+        if not self.undo_stack:
+            return
+        
+        action_type, data = self.undo_stack.pop()
+        
+        if action_type == 'peak':
+            # Undo peak addition
+            if len(self.selected_peaks) > 0:
+                idx = self.selected_peaks.pop()
+                self.peak_markers[-1].remove()
+                self.peak_texts[-1].remove()
+                self.peak_markers.pop()
+                self.peak_texts.pop()
+                self.canvas.draw()
+                self.update_info(f"Undid peak selection")
+        
+        elif action_type == 'bg_point':
+            # Undo background point
+            if len(self.bg_points) > 0:
+                self.bg_points.pop()
+                self.bg_markers[-1].remove()
+                self.bg_markers.pop()
+                self.canvas.draw()
+                self.update_info(f"Undid background point")
+        
+        if not self.undo_stack:
+            self.btn_undo.setEnabled(False)
 
 
 # For standalone testing
