@@ -56,6 +56,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         self.bcdi_cal_module = None
         self.dioptas_module = None
         self.auto_fitting_module = None
+        self.batch_module = None
 
         # Containers for each module (prebuilt and stacked to avoid flicker)
         self.module_frames = {
@@ -65,7 +66,8 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             "radial": None,
             "bcdi_cal": None,
             "dioptas": None,
-            "auto_fitting": None
+            "auto_fitting": None,
+            "batch": None
         }
         
         # Tool windows (embedded in right panel)
@@ -156,9 +158,13 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         self.auto_fitting_btn = self.create_sidebar_button("🔍  Auto Fit", lambda: self.switch_tab("auto_fitting"), is_active=False)
         sidebar_layout.addWidget(self.auto_fitting_btn)
 
-        # Curve Fitting button
-        self.curvefit_btn = self.create_sidebar_button("📈  curvefit", self.open_curvefit, is_active=False)
-        sidebar_layout.addWidget(self.curvefit_btn)
+        # Batch Fitting button (standalone)
+        self.batch_btn = self.create_sidebar_button("📊  Batch", self.open_batch, is_active=False)
+        sidebar_layout.addWidget(self.batch_btn)
+
+        # Curve Fitting button (hidden)
+        # self.curvefit_btn = self.create_sidebar_button("📈  curvefit", self.open_curvefit, is_active=False)
+        # sidebar_layout.addWidget(self.curvefit_btn)
 
         # EOS Fitting button
         self.EOSfit_btn = self.create_sidebar_button("📊  eosfit", self.open_EOSfit, is_active=False)
@@ -284,6 +290,10 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         button.clicked.connect(callback)
         return button
 
+    def open_batch(self):
+        """Open batch processing module (same as switch_tab)"""
+        self.switch_tab("batch")
+
     def open_curvefit(self):
         """Open curve fitting (Interactive Fitting) window"""
         # Hide all module frames
@@ -291,7 +301,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             if frame is not None:
                 frame.hide()
         
-        # Hide EOS fitting if visible
+        # Hide other tool windows
         if self.interactive_eos_window is not None:
             self.interactive_eos_window.hide()
         
@@ -317,7 +327,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             if frame is not None:
                 frame.hide()
         
-        # Hide curve fitting if visible
+        # Hide other tool windows
         if self.interactive_fitting_window is not None:
             self.interactive_fitting_window.hide()
         
@@ -353,7 +363,8 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             "bcdi_cal": self.bcdi_cal_btn,
             "dioptas": self.dioptas_btn,
             "auto_fitting": self.auto_fitting_btn,
-            "curvefit": self.curvefit_btn,
+            "batch": self.batch_btn,
+            # "curvefit": self.curvefit_btn,  # Hidden
             "eosfit": self.EOSfit_btn
         }
         
@@ -460,6 +471,15 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             self.auto_fitting_module = AutoFittingModule()
             auto_fitting_frame.layout().addWidget(self.auto_fitting_module)
         auto_fitting_frame.hide()  # Ensure hidden after prebuild
+        
+        batch_frame = self._ensure_frame("batch")
+        if self.batch_module is None:
+            from batch_fitting_dialog import BatchFittingDialog
+            self.batch_module = BatchFittingDialog(batch_frame)
+            # Large margins on right and bottom to ensure border visibility
+            batch_frame.layout().setContentsMargins(0, 0, 35, 20)  # Right:35px Bottom:20px
+            batch_frame.layout().addWidget(self.batch_module)
+        batch_frame.hide()  # Ensure hidden after prebuild
     
     def prebuild_interactive_windows(self):
         """Prebuild interactive tool windows in background to avoid flash on first open"""
@@ -548,6 +568,15 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             if self.auto_fitting_module is None:
                 self.auto_fitting_module = AutoFittingModule()
                 target_frame.layout().addWidget(self.auto_fitting_module)
+
+        elif tab_name == "batch":
+            target_frame = self._ensure_frame("batch")
+            if self.batch_module is None:
+                from batch_fitting_dialog import BatchFittingDialog
+                self.batch_module = BatchFittingDialog(target_frame)
+                # Large margins on right and bottom to ensure border visibility
+                target_frame.layout().setContentsMargins(0, 0, 35, 20)  # Right:35px Bottom:20px
+                target_frame.layout().addWidget(self.batch_module)
 
         if target_frame is not None:
             target_frame.show()

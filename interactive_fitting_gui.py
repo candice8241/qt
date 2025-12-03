@@ -2686,7 +2686,21 @@ class InteractiveFittingGUI(QWidget):
     def show_batch_info(self):
         """Open batch processing dialog"""
         from batch_fitting_dialog import BatchFittingDialog
-        dialog = BatchFittingDialog(self)
+        from PyQt6.QtWidgets import QDialog, QVBoxLayout
+        
+        # Create a dialog wrapper for the batch widget
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Batch Peak Fitting")
+        dialog.setMinimumWidth(1600)
+        dialog.setMinimumHeight(900)
+        
+        layout = QVBoxLayout(dialog)
+        layout.setContentsMargins(0, 0, 0, 0)
+        
+        # Add batch widget to dialog
+        batch_widget = BatchFittingDialog(dialog)
+        layout.addWidget(batch_widget)
+        
         dialog.exec()
 
     def show_settings_info(self):
