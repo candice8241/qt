@@ -17,6 +17,8 @@ from radial_module import AzimuthalIntegrationModule
 from single_crystal_module import SingleCrystalModule
 from bcdi_cal_module import BCDICalModule
 from dioptas_module import DioptasModule
+from auto_fitting_module_v2 import AutoFittingModule
+from batch_fitting_module import BatchFittingModule
 
 
 class XRDProcessingGUI(QMainWindow, GUIBase):
@@ -54,6 +56,8 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         self.single_crystal_module = None
         self.bcdi_cal_module = None
         self.dioptas_module = None
+        self.auto_fitting_module = None
+        self.batch_fitting_module = None
 
         # Containers for each module (prebuilt and stacked to avoid flicker)
         self.module_frames = {
@@ -62,7 +66,9 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             "single": None,
             "radial": None,
             "bcdi_cal": None,
-            "dioptas": None
+            "dioptas": None,
+            "auto_fitting": None,
+            "batch_fitting": None
         }
         
         # Tool windows (embedded in right panel)
@@ -149,9 +155,17 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         self.dioptas_btn = self.create_sidebar_button("💎  Dioptas", lambda: self.switch_tab("dioptas"), is_active=False)
         sidebar_layout.addWidget(self.dioptas_btn)
 
-        # Curve Fitting button
-        self.curvefit_btn = self.create_sidebar_button("📈  curvefit", self.open_curvefit, is_active=False)
-        sidebar_layout.addWidget(self.curvefit_btn)
+        # Auto Fitting button
+        self.auto_fitting_btn = self.create_sidebar_button("🔍  Auto Fit", lambda: self.switch_tab("auto_fitting"), is_active=False)
+        sidebar_layout.addWidget(self.auto_fitting_btn)
+
+        # Batch Fitting button (extracted from curvefit)
+        self.batch_fitting_btn = self.create_sidebar_button("📊  Batch Fit", lambda: self.switch_tab("batch_fitting"), is_active=False)
+        sidebar_layout.addWidget(self.batch_fitting_btn)
+
+        # Curve Fitting button - HIDDEN per user request
+        # self.curvefit_btn = self.create_sidebar_button("📈  curvefit", self.open_curvefit, is_active=False)
+        # sidebar_layout.addWidget(self.curvefit_btn)
 
         # EOS Fitting button
         self.EOSfit_btn = self.create_sidebar_button("📊  eosfit", self.open_EOSfit, is_active=False)
@@ -345,7 +359,9 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             # "single": self.single_btn,  # Hidden
             "bcdi_cal": self.bcdi_cal_btn,
             "dioptas": self.dioptas_btn,
-            "curvefit": self.curvefit_btn,
+            "auto_fitting": self.auto_fitting_btn,
+            "batch_fitting": self.batch_fitting_btn,
+            # "curvefit": self.curvefit_btn,  # Hidden
             "eosfit": self.EOSfit_btn
         }
         
@@ -446,6 +462,18 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             self.dioptas_module = DioptasModule(dioptas_frame, self)
             self.dioptas_module.setup_ui()
         dioptas_frame.hide()  # Ensure hidden after prebuild
+        
+        auto_fitting_frame = self._ensure_frame("auto_fitting")
+        if self.auto_fitting_module is None:
+            self.auto_fitting_module = AutoFittingModule()
+            auto_fitting_frame.layout().addWidget(self.auto_fitting_module)
+        auto_fitting_frame.hide()  # Ensure hidden after prebuild
+        
+        batch_fitting_frame = self._ensure_frame("batch_fitting")
+        if self.batch_fitting_module is None:
+            self.batch_fitting_module = BatchFittingModule()
+            batch_fitting_frame.layout().addWidget(self.batch_fitting_module)
+        batch_fitting_frame.hide()  # Ensure hidden after prebuild
     
     def prebuild_interactive_windows(self):
         """Prebuild interactive tool windows in background to avoid flash on first open"""
@@ -528,6 +556,18 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             if self.dioptas_module is None:
                 self.dioptas_module = DioptasModule(target_frame, self)
                 self.dioptas_module.setup_ui()
+
+        elif tab_name == "auto_fitting":
+            target_frame = self._ensure_frame("auto_fitting")
+            if self.auto_fitting_module is None:
+                self.auto_fitting_module = AutoFittingModule()
+                target_frame.layout().addWidget(self.auto_fitting_module)
+
+        elif tab_name == "batch_fitting":
+            target_frame = self._ensure_frame("batch_fitting")
+            if self.batch_fitting_module is None:
+                self.batch_fitting_module = BatchFittingModule()
+                target_frame.layout().addWidget(self.batch_fitting_module)
 
         if target_frame is not None:
             target_frame.show()
