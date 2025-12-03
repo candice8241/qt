@@ -293,11 +293,11 @@ class PowderXRDModule(GUIBase):
         h5_btn_row_layout.addWidget(h5_label)
 
         h5_preview_btn = ModernButton(
-            "🔍 H5 Preview & Select Region",
+            "🔍 H5 Preview && Select Region",
             self.open_h5_preview,
             bg_color="#E6ECFB",
             hover_color="#D4DDFA",
-            width=220, height=28,
+            width=220, height=32,
             parent=h5_btn_row
         )
         h5_preview_btn.setFont(QFont('Arial', 9))
@@ -337,7 +337,7 @@ class PowderXRDModule(GUIBase):
             self.open_bin_config,
             bg_color="#E6ECFB",
             hover_color="#D4DDFA",
-            width=160, height=28,
+            width=160, height=32,
             parent=bin_btn_row
         )
         bin_config_btn.setFont(QFont('Arial', 9))
