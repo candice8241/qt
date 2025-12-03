@@ -90,7 +90,7 @@ class MaskModule(GUIBase):
         content_widget.setStyleSheet(f"background-color: {self.colors['bg']};")
         content_layout = QVBoxLayout(content_widget)
         content_layout.setContentsMargins(10, 2, 10, 2)
-        content_layout.setSpacing(2)
+        content_layout.setSpacing(1)
 
         # Control area (includes Save/Clear buttons now)
         control_group = self.create_control_group()
@@ -216,9 +216,9 @@ class MaskModule(GUIBase):
             QGroupBox {{
                 border: 2px solid {self.colors['border']};
                 border-radius: 4px;
-                margin-top: 2px;
+                margin-top: 0px;
                 font-weight: bold;
-                padding-top: 5px;
+                padding-top: 3px;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
@@ -229,8 +229,8 @@ class MaskModule(GUIBase):
         """)
 
         layout = QVBoxLayout(group)
-        layout.setSpacing(3)
-        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setSpacing(2)
+        layout.setContentsMargins(10, 3, 10, 3)
 
         # Main canvas layout - Image on left, Operations on right
         main_canvas_layout = QHBoxLayout()
@@ -348,11 +348,15 @@ class MaskModule(GUIBase):
                 font-weight: bold;
                 padding-top: 8px;
                 background-color: {self.colors['bg']};
+                font-family: Arial;
+                color: #000000;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
                 left: 10px;
                 padding: 0 3px;
+                font-family: Arial;
+                color: #000000;
             }}
         """)
         panel.setFixedWidth(250)  # Fixed width
