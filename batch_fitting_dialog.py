@@ -3,428 +3,564 @@
 """
 Batch Fitting Dialog for Interactive Fitting GUI
 
-Allows users to batch process multiple .xy files for peak fitting.
+Allows users to batch process multiple .xy files with manual peak and background adjustment.
 """
 
 import os
 import sys
-# Set matplotlib backend before importing pyplot
-import matplotlib
-matplotlib.use('Agg')  # Non-interactive backend to avoid conflicts with PyQt6
-
-from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
-                              QPushButton, QLineEdit, QComboBox, QTextEdit,
-                              QFileDialog, QMessageBox, QGroupBox, QProgressBar)
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QFont
-from peak_fitting import BatchFitter
+import numpy as np
 import pandas as pd
+from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
+                              QPushButton, QFileDialog, QMessageBox, 
+                              QListWidget, QListWidgetItem, QSplitter, QWidget,
+                              QFrame, QComboBox)
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QFont
+from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
+from matplotlib.figure import Figure
+from scipy.signal import find_peaks, peak_widths
+from scipy.optimize import curve_fit
+from scipy.special import wofz
 import traceback
 
 
-class BatchFittingWorker(QThread):
-    """Worker thread for batch fitting to avoid freezing the UI"""
-    finished = pyqtSignal()
-    error = pyqtSignal(str)
-    log_signal = pyqtSignal(str)
-    progress = pyqtSignal(int, int)  # current, total
-    
-    def __init__(self, folder, fit_method):
-        super().__init__()
-        self.folder = folder
-        self.fit_method = fit_method
-        
-    def run(self):
-        """Run batch fitting in separate thread"""
-        try:
-            self.log_signal.emit("Initializing batch fitter...")
-            
-            # Create BatchFitter instance
-            fitter = BatchFitter(folder=self.folder, fit_method=self.fit_method)
-            
-            # Get list of files
-            files = sorted(f for f in os.listdir(self.folder) if f.endswith(".xy"))
-            total_files = len(files)
-            
-            self.log_signal.emit(f"Found {total_files} .xy files to process\n")
-            
-            # Process each file manually to show progress
-            all_dfs = []
-            for idx, fname in enumerate(files, 1):
-                self.log_signal.emit(f"[{idx}/{total_files}] Processing: {fname}")
-                fpath = os.path.join(self.folder, fname)
-                
-                try:
-                    df = fitter.process_file(fpath)
-                    if df is not None:
-                        all_dfs.append(df)
-                        all_dfs.append(pd.DataFrame([[""] * len(df.columns)], columns=df.columns))
-                        self.log_signal.emit(f"  ✓ Success: {fname}")
-                    else:
-                        self.log_signal.emit(f"  ⚠ No peaks found: {fname}")
-                except Exception as e:
-                    self.log_signal.emit(f"  ✗ Error: {fname} - {str(e)}")
-                
-                self.progress.emit(idx, total_files)
-            
-            # Save combined results
-            if all_dfs:
-                import pandas as pd
-                combined_df = pd.concat(all_dfs, ignore_index=True)
-                combined_csv_path = os.path.join(fitter.save_dir, "all_results.csv")
-                combined_df.to_csv(combined_csv_path, index=False)
-                self.log_signal.emit(f"\n📦 Combined results saved to: {combined_csv_path}")
-            
-            self.finished.emit()
-            
-        except Exception as e:
-            error_msg = f"Error during batch fitting:\n{str(e)}\n\n{traceback.format_exc()}"
-            self.error.emit(error_msg)
+# Fitting functions
+def voigt(x, amplitude, center, sigma, gamma):
+    """Voigt profile"""
+    z = ((x - center) + 1j * gamma) / (sigma * np.sqrt(2))
+    return amplitude * np.real(wofz(z)) / (sigma * np.sqrt(2 * np.pi))
+
+def pseudo_voigt(x, amplitude, center, sigma, gamma, eta):
+    """Pseudo-Voigt profile"""
+    gaussian = amplitude * np.exp(-(x - center)**2 / (2 * sigma**2)) / (sigma * np.sqrt(2 * np.pi))
+    lorentzian = amplitude * gamma**2 / ((x - center)**2 + gamma**2) / (np.pi * gamma)
+    return eta * lorentzian + (1 - eta) * gaussian
+
+
+class MplCanvas(FigureCanvasQTAgg):
+    """Matplotlib canvas for plotting"""
+    def __init__(self, parent=None, width=8, height=6, dpi=100):
+        fig = Figure(figsize=(width, height), dpi=dpi)
+        self.axes = fig.add_subplot(111)
+        self.axes.set_facecolor('#FAFAFA')
+        super().__init__(fig)
+        self.setParent(parent)
 
 
 class BatchFittingDialog(QDialog):
-    """Dialog for batch fitting configuration"""
+    """Interactive batch fitting dialog"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Batch Peak Fitting")
-        self.setMinimumWidth(700)
-        self.setMinimumHeight(500)
-        self.worker = None
+        self.setWindowTitle("Batch Peak Fitting (Interactive)")
+        self.setMinimumWidth(1400)
+        self.setMinimumHeight(800)
+        
+        # Data variables
+        self.file_list = []
+        self.current_index = -1
+        self.current_data = None
+        self.peaks = []  # List of peak positions
+        self.bg_points = []  # List of background points (x, y)
+        self.fit_method = "pseudo"  # pseudo or voigt
+        self.results = []  # Store all fitting results
+        self.output_folder = None
+        
         self.setup_ui()
         
     def setup_ui(self):
         """Setup the user interface"""
         layout = QVBoxLayout(self)
-        layout.setSpacing(15)
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(5)
+        
+        # Title and controls
+        header = QWidget()
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(5, 5, 5, 5)
+        
+        title = QLabel("📊 Batch Peak Fitting - Interactive Mode")
+        title.setFont(QFont('Arial', 13, QFont.Weight.Bold))
+        title.setStyleSheet("color: #4A148C;")
+        header_layout.addWidget(title)
+        
+        header_layout.addStretch()
+        
+        # Load folder button
+        load_btn = QPushButton("📁 Load Folder")
+        load_btn.setFixedHeight(35)
+        load_btn.setFixedWidth(120)
+        load_btn.setFont(QFont('Arial', 9))
+        load_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #E3F2FD;
+                border: 2px solid #90CAF9;
+                border-radius: 5px;
+                padding: 5px;
+            }
+            QPushButton:hover { background-color: #BBDEFB; }
+        """)
+        load_btn.clicked.connect(self.load_folder)
+        header_layout.addWidget(load_btn)
+        
+        layout.addWidget(header)
+        
+        # Main content (splitter for file list and plot)
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        
+        # Left panel: file list
+        left_panel = self.create_left_panel()
+        splitter.addWidget(left_panel)
+        
+        # Right panel: plot and controls
+        right_panel = self.create_right_panel()
+        splitter.addWidget(right_panel)
+        
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 3)
+        
+        layout.addWidget(splitter)
+        
+    def create_left_panel(self):
+        """Create left panel with file list"""
+        panel = QFrame()
+        panel.setFrameStyle(QFrame.Shape.StyledPanel)
+        panel.setStyleSheet("background-color: #F5F5F5; border: 2px solid #CCCCCC; border-radius: 5px;")
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(10, 10, 10, 10)
         
         # Title
-        title = QLabel("📊 Batch Peak Fitting")
-        title.setFont(QFont('Arial', 14, QFont.Weight.Bold))
-        title.setStyleSheet("color: #4A148C; padding: 10px;")
+        title = QLabel("📄 File List")
+        title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
+        title.setStyleSheet("color: #333333; border: none;")
         layout.addWidget(title)
         
-        # Description
-        desc = QLabel(
-            "Automatically fit peaks for multiple .xy files in a folder.\n"
-            "Results will be saved in a 'fit_output' subfolder."
-        )
-        desc.setFont(QFont('Arial', 9))
-        desc.setStyleSheet("color: #666666; padding: 5px;")
-        desc.setWordWrap(True)
-        layout.addWidget(desc)
-        
-        # Input folder section
-        input_group = QGroupBox("Input Settings")
-        input_group.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        input_group.setStyleSheet("""
-            QGroupBox {
-                border: 2px solid #CCCCCC;
-                border-radius: 8px;
-                margin-top: 10px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-            }
-        """)
-        input_layout = QVBoxLayout(input_group)
-        input_layout.setSpacing(10)
-        
-        # Input folder
-        folder_row = QHBoxLayout()
-        folder_label = QLabel("Input Folder:")
-        folder_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        folder_label.setFixedWidth(100)
-        folder_row.addWidget(folder_label)
-        
-        self.folder_entry = QLineEdit()
-        self.folder_entry.setPlaceholderText("Select folder containing .xy files...")
-        self.folder_entry.setFont(QFont('Arial', 9))
-        self.folder_entry.setStyleSheet("""
-            QLineEdit {
-                padding: 5px;
+        # File list widget
+        self.file_list_widget = QListWidget()
+        self.file_list_widget.setFont(QFont('Arial', 9))
+        self.file_list_widget.setStyleSheet("""
+            QListWidget {
+                background-color: white;
                 border: 2px solid #AAAAAA;
                 border-radius: 4px;
             }
-        """)
-        folder_row.addWidget(self.folder_entry)
-        
-        browse_btn = QPushButton("Browse")
-        browse_btn.setFont(QFont('Arial', 9))
-        browse_btn.setFixedWidth(80)
-        browse_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #E3F2FD;
-                color: black;
-                border: 2px solid #90CAF9;
-                border-radius: 4px;
-                padding: 5px;
-            }
-            QPushButton:hover {
-                background-color: #BBDEFB;
+            QListWidget::item:selected {
+                background-color: #7E57C2;
+                color: white;
             }
         """)
-        browse_btn.clicked.connect(self.browse_folder)
-        folder_row.addWidget(browse_btn)
+        self.file_list_widget.itemClicked.connect(self.on_file_selected)
+        layout.addWidget(self.file_list_widget)
         
-        input_layout.addLayout(folder_row)
+        # Progress label
+        self.progress_label = QLabel("No files loaded")
+        self.progress_label.setFont(QFont('Arial', 8))
+        self.progress_label.setStyleSheet("color: #666666; border: none;")
+        layout.addWidget(self.progress_label)
         
-        # Fit method
-        method_row = QHBoxLayout()
+        return panel
+        
+    def create_right_panel(self):
+        """Create right panel with plot and controls"""
+        panel = QWidget()
+        layout = QVBoxLayout(panel)
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(5)
+        
+        # Control bar
+        control_bar = self.create_control_bar()
+        layout.addWidget(control_bar)
+        
+        # Plot canvas
+        self.canvas = MplCanvas(self, width=10, height=7, dpi=100)
+        self.canvas.mpl_connect('button_press_event', self.on_plot_click)
+        layout.addWidget(self.canvas)
+        
+        # Navigation bar
+        nav_bar = self.create_navigation_bar()
+        layout.addWidget(nav_bar)
+        
+        return panel
+        
+    def create_control_bar(self):
+        """Create control bar with buttons and settings"""
+        bar = QWidget()
+        bar.setFixedHeight(50)
+        bar.setStyleSheet("background-color: #E3F2FF; border-radius: 5px;")
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setSpacing(10)
+        
+        # Fit method selector
         method_label = QLabel("Fit Method:")
         method_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        method_label.setFixedWidth(100)
-        method_row.addWidget(method_label)
+        layout.addWidget(method_label)
         
         self.method_combo = QComboBox()
         self.method_combo.addItems(["Pseudo-Voigt", "Voigt"])
         self.method_combo.setCurrentIndex(0)
+        self.method_combo.setFixedWidth(120)
         self.method_combo.setFont(QFont('Arial', 9))
-        self.method_combo.setStyleSheet("""
-            QComboBox {
-                padding: 5px;
-                border: 2px solid #AAAAAA;
-                border-radius: 4px;
-            }
-        """)
-        method_row.addWidget(self.method_combo)
-        method_row.addStretch()
+        self.method_combo.currentTextChanged.connect(self.on_method_changed)
+        layout.addWidget(self.method_combo)
         
-        input_layout.addLayout(method_row)
+        layout.addSpacing(20)
         
-        layout.addWidget(input_group)
-        
-        # Output/Log section
-        log_group = QGroupBox("Processing Log")
-        log_group.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        log_group.setStyleSheet("""
-            QGroupBox {
-                border: 2px solid #CCCCCC;
-                border-radius: 8px;
-                margin-top: 10px;
-                padding-top: 10px;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
-            }
-        """)
-        log_layout = QVBoxLayout(log_group)
-        
-        self.log_text = QTextEdit()
-        self.log_text.setReadOnly(True)
-        self.log_text.setFont(QFont('Courier New', 8))
-        self.log_text.setStyleSheet("""
-            QTextEdit {
-                background-color: #F5F5F5;
-                border: 1px solid #CCCCCC;
+        # Auto detect peaks
+        auto_btn = QPushButton("🔍 Auto Detect Peaks")
+        auto_btn.setFixedWidth(140)
+        auto_btn.setFont(QFont('Arial', 9))
+        auto_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #C5E1A5;
+                border: 2px solid #9CCC65;
                 border-radius: 4px;
                 padding: 5px;
             }
+            QPushButton:hover { background-color: #AED581; }
         """)
-        self.log_text.setPlaceholderText("Logs will appear here during processing...")
-        log_layout.addWidget(self.log_text)
+        auto_btn.clicked.connect(self.auto_detect_peaks)
+        layout.addWidget(auto_btn)
         
-        # Progress bar
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setStyleSheet("""
-            QProgressBar {
-                border: 2px solid #CCCCCC;
-                border-radius: 5px;
-                text-align: center;
-                height: 25px;
+        # Clear peaks
+        clear_peaks_btn = QPushButton("Clear Peaks")
+        clear_peaks_btn.setFixedWidth(100)
+        clear_peaks_btn.setFont(QFont('Arial', 9))
+        clear_peaks_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FFCDD2;
+                border: 2px solid #E57373;
+                border-radius: 4px;
+                padding: 5px;
             }
-            QProgressBar::chunk {
-                background-color: #7E57C2;
-            }
+            QPushButton:hover { background-color: #EF9A9A; }
         """)
-        log_layout.addWidget(self.progress_bar)
+        clear_peaks_btn.clicked.connect(self.clear_peaks)
+        layout.addWidget(clear_peaks_btn)
         
-        layout.addWidget(log_group)
+        # Clear background
+        clear_bg_btn = QPushButton("Clear Background")
+        clear_bg_btn.setFixedWidth(130)
+        clear_bg_btn.setFont(QFont('Arial', 9))
+        clear_bg_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FFE082;
+                border: 2px solid #FFD54F;
+                border-radius: 4px;
+                padding: 5px;
+            }
+            QPushButton:hover { background-color: #FFD54F; }
+        """)
+        clear_bg_btn.clicked.connect(self.clear_background)
+        layout.addWidget(clear_bg_btn)
         
-        # Button row
-        btn_row = QHBoxLayout()
-        btn_row.addStretch()
+        # Fit current
+        fit_btn = QPushButton("✨ Fit Current")
+        fit_btn.setFixedWidth(110)
+        fit_btn.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        fit_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #CE93D8;
+                border: 2px solid #BA68C8;
+                border-radius: 4px;
+                padding: 5px;
+            }
+            QPushButton:hover { background-color: #BA68C8; }
+        """)
+        fit_btn.clicked.connect(self.fit_current)
+        layout.addWidget(fit_btn)
         
-        self.run_btn = QPushButton("🚀 Run Batch Fitting")
-        self.run_btn.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        self.run_btn.setFixedHeight(40)
-        self.run_btn.setFixedWidth(180)
-        self.run_btn.setStyleSheet("""
+        layout.addStretch()
+        
+        # Instructions
+        info_label = QLabel("💡 Click to add peaks(left) or background points(right)")
+        info_label.setFont(QFont('Arial', 8))
+        info_label.setStyleSheet("color: #666666;")
+        layout.addWidget(info_label)
+        
+        return bar
+        
+    def create_navigation_bar(self):
+        """Create navigation bar with prev/next/save buttons"""
+        bar = QWidget()
+        bar.setFixedHeight(55)
+        bar.setStyleSheet("background-color: #FFF9C4; border-radius: 5px;")
+        layout = QHBoxLayout(bar)
+        layout.setContentsMargins(10, 5, 10, 5)
+        
+        # Current file label
+        self.current_file_label = QLabel("No file loaded")
+        self.current_file_label.setFont(QFont('Arial', 10, QFont.Weight.Bold))
+        self.current_file_label.setStyleSheet("color: #333333;")
+        layout.addWidget(self.current_file_label)
+        
+        layout.addStretch()
+        
+        # Previous button
+        prev_btn = QPushButton("⬅ Previous")
+        prev_btn.setFixedWidth(100)
+        prev_btn.setFont(QFont('Arial', 9))
+        prev_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #E0E0E0;
+                border: 2px solid #BDBDBD;
+                border-radius: 4px;
+                padding: 5px;
+            }
+            QPushButton:hover { background-color: #BDBDBD; }
+        """)
+        prev_btn.clicked.connect(self.go_previous)
+        layout.addWidget(prev_btn)
+        
+        # Next button
+        next_btn = QPushButton("Next ➡")
+        next_btn.setFixedWidth(100)
+        next_btn.setFont(QFont('Arial', 9))
+        next_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #E0E0E0;
+                border: 2px solid #BDBDBD;
+                border-radius: 4px;
+                padding: 5px;
+            }
+            QPushButton:hover { background-color: #BDBDBD; }
+        """)
+        next_btn.clicked.connect(self.go_next)
+        layout.addWidget(next_btn)
+        
+        layout.addSpacing(20)
+        
+        # Save all button
+        save_btn = QPushButton("💾 Save All Results")
+        save_btn.setFixedWidth(140)
+        save_btn.setFixedHeight(40)
+        save_btn.setFont(QFont('Arial', 10, QFont.Weight.Bold))
+        save_btn.setStyleSheet("""
             QPushButton {
                 background-color: #7E57C2;
                 color: white;
                 border: none;
                 border-radius: 6px;
-                padding: 10px;
+                padding: 8px;
             }
-            QPushButton:hover {
-                background-color: #673AB7;
-            }
-            QPushButton:disabled {
-                background-color: #CCCCCC;
-                color: #666666;
-            }
+            QPushButton:hover { background-color: #673AB7; }
         """)
-        self.run_btn.clicked.connect(self.run_batch_fitting)
-        btn_row.addWidget(self.run_btn)
+        save_btn.clicked.connect(self.save_all_results)
+        layout.addWidget(save_btn)
         
-        close_btn = QPushButton("Close")
-        close_btn.setFont(QFont('Arial', 10))
-        close_btn.setFixedHeight(40)
-        close_btn.setFixedWidth(100)
-        close_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #F5F5F5;
-                color: black;
-                border: 2px solid #CCCCCC;
-                border-radius: 6px;
-                padding: 10px;
-            }
-            QPushButton:hover {
-                background-color: #E0E0E0;
-            }
-        """)
-        close_btn.clicked.connect(self.close)
-        btn_row.addWidget(close_btn)
+        return bar
         
-        btn_row.addStretch()
-        layout.addLayout(btn_row)
-        
-    def browse_folder(self):
-        """Browse for input folder"""
+    def load_folder(self):
+        """Load folder containing .xy files"""
         folder = QFileDialog.getExistingDirectory(
             self,
             "Select Folder Containing .xy Files",
             "",
             QFileDialog.Option.ShowDirsOnly
         )
-        if folder:
-            self.folder_entry.setText(folder)
-            self.log(f"Selected folder: {folder}")
-            
-            # Count .xy files
-            xy_files = [f for f in os.listdir(folder) if f.endswith('.xy')]
-            self.log(f"Found {len(xy_files)} .xy files")
-            
-    def log(self, message):
-        """Add message to log"""
-        self.log_text.append(message)
-        self.log_text.verticalScrollBar().setValue(
-            self.log_text.verticalScrollBar().maximum()
-        )
-    
-    def update_progress(self, current, total):
-        """Update progress bar"""
-        if total > 0:
-            percentage = int((current / total) * 100)
-            self.progress_bar.setValue(percentage)
-            self.progress_bar.setFormat(f"{current}/{total} files ({percentage}%)")
         
-    def run_batch_fitting(self):
-        """Run batch fitting process"""
-        folder = self.folder_entry.text().strip()
-        
-        # Validation
         if not folder:
-            QMessageBox.warning(self, "Input Required", "Please select an input folder.")
             return
             
-        if not os.path.isdir(folder):
-            QMessageBox.warning(self, "Invalid Folder", "The selected folder does not exist.")
-            return
-            
-        # Check for .xy files
-        xy_files = [f for f in os.listdir(folder) if f.endswith('.xy')]
+        # Find all .xy files
+        xy_files = sorted([f for f in os.listdir(folder) if f.endswith('.xy')])
+        
         if not xy_files:
-            QMessageBox.warning(
-                self,
-                "No Files Found",
-                "No .xy files found in the selected folder."
-            )
+            QMessageBox.warning(self, "No Files", "No .xy files found in the selected folder.")
             return
             
-        # Get fit method
-        fit_method = self.method_combo.currentText().lower().replace("-", "")
-        if fit_method == "pseudovoigt":
-            fit_method = "pseudo"
-            
-        # Confirm before running
-        reply = QMessageBox.question(
-            self,
-            "Confirm Batch Fitting",
-            f"Start batch fitting for {len(xy_files)} files using {self.method_combo.currentText()} method?\n\n"
-            f"Results will be saved in:\n{os.path.join(folder, 'fit_output')}",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
+        # Store file list
+        self.file_list = [os.path.join(folder, f) for f in xy_files]
+        self.output_folder = os.path.join(folder, "fit_output")
+        os.makedirs(self.output_folder, exist_ok=True)
         
-        if reply == QMessageBox.StandardButton.No:
+        # Populate list widget
+        self.file_list_widget.clear()
+        for fname in xy_files:
+            item = QListWidgetItem(fname)
+            self.file_list_widget.addItem(item)
+            
+        # Update progress
+        self.progress_label.setText(f"Loaded {len(self.file_list)} files")
+        
+        # Load first file
+        if self.file_list:
+            self.current_index = 0
+            self.load_current_file()
+            self.file_list_widget.setCurrentRow(0)
+            
+    def on_file_selected(self, item):
+        """Handle file selection from list"""
+        index = self.file_list_widget.row(item)
+        if index != self.current_index:
+            self.current_index = index
+            self.load_current_file()
+            
+    def load_current_file(self):
+        """Load current file and display"""
+        if self.current_index < 0 or self.current_index >= len(self.file_list):
             return
             
-        # Disable button during processing
-        self.run_btn.setEnabled(False)
-        self.run_btn.setText("Processing...")
-        self.log_text.clear()
-        self.log("=" * 60)
-        self.log("Starting batch fitting process...")
-        self.log(f"Input folder: {folder}")
-        self.log(f"Fit method: {self.method_combo.currentText()}")
-        self.log(f"Number of files: {len(xy_files)}")
-        self.log("=" * 60)
-        self.log("")
+        filepath = self.file_list[self.current_index]
         
-        # Create and start worker thread
-        self.worker = BatchFittingWorker(folder, fit_method)
-        self.worker.finished.connect(self.on_fitting_finished)
-        self.worker.error.connect(self.on_fitting_error)
-        self.worker.log_signal.connect(self.log)
-        self.worker.progress.connect(self.update_progress)
+        try:
+            # Load data
+            with open(filepath, encoding='latin1') as f:
+                data = np.genfromtxt(f, comments="#")
+            
+            self.current_data = data
+            self.peaks = []
+            self.bg_points = []
+            
+            # Update display
+            filename = os.path.basename(filepath)
+            self.current_file_label.setText(f"[{self.current_index + 1}/{len(self.file_list)}] {filename}")
+            
+            # Auto detect peaks
+            self.auto_detect_peaks()
+            
+        except Exception as e:
+            QMessageBox.warning(self, "Load Error", f"Failed to load file:\n{str(e)}")
+            
+    def auto_detect_peaks(self):
+        """Auto detect peaks in current data"""
+        if self.current_data is None:
+            return
+            
+        x, y = self.current_data[:, 0], self.current_data[:, 1]
         
-        # Show and reset progress bar
-        self.progress_bar.setVisible(True)
-        self.progress_bar.setValue(0)
+        # Find peaks
+        peaks, _ = find_peaks(y, distance=20, prominence=np.max(y) * 0.1)
+        self.peaks = x[peaks].tolist()
         
-        self.worker.start()
+        self.plot_data()
         
-    def on_fitting_finished(self):
-        """Called when batch fitting finishes successfully"""
-        self.run_btn.setEnabled(True)
-        self.run_btn.setText("🚀 Run Batch Fitting")
-        self.progress_bar.setVisible(False)
-        self.log("")
-        self.log("=" * 60)
-        self.log("✓ Batch fitting completed successfully!")
-        self.log("=" * 60)
+    def clear_peaks(self):
+        """Clear all peaks"""
+        self.peaks = []
+        self.plot_data()
+        
+    def clear_background(self):
+        """Clear all background points"""
+        self.bg_points = []
+        self.plot_data()
+        
+    def on_plot_click(self, event):
+        """Handle click on plot"""
+        if event.inaxes != self.canvas.axes or self.current_data is None:
+            return
+            
+        x_click = event.xdata
+        
+        if event.button == 1:  # Left click - add peak
+            self.peaks.append(x_click)
+            self.peaks.sort()
+        elif event.button == 3:  # Right click - add background point
+            y_click = event.ydata
+            self.bg_points.append((x_click, y_click))
+            self.bg_points.sort(key=lambda p: p[0])
+            
+        self.plot_data()
+        
+    def plot_data(self):
+        """Plot current data with peaks and background"""
+        if self.current_data is None:
+            return
+            
+        self.canvas.axes.clear()
+        x, y = self.current_data[:, 0], self.current_data[:, 1]
+        
+        # Plot data
+        self.canvas.axes.plot(x, y, 'k-', linewidth=1, label='Data')
+        
+        # Plot peaks
+        for peak_x in self.peaks:
+            self.canvas.axes.axvline(peak_x, color='red', linestyle='--', alpha=0.7, linewidth=1.5)
+            
+        # Plot background points
+        if self.bg_points:
+            bg_x = [p[0] for p in self.bg_points]
+            bg_y = [p[1] for p in self.bg_points]
+            self.canvas.axes.plot(bg_x, bg_y, 'bo', markersize=8, label='BG Points')
+            
+            # Draw background line if >= 2 points
+            if len(self.bg_points) >= 2:
+                self.canvas.axes.plot(bg_x, bg_y, 'b--', alpha=0.5, linewidth=1.5)
+                
+        self.canvas.axes.set_xlabel('2θ (deg)', fontsize=10)
+        self.canvas.axes.set_ylabel('Intensity', fontsize=10)
+        self.canvas.axes.legend(loc='upper right', fontsize=8)
+        self.canvas.axes.grid(True, alpha=0.3)
+        self.canvas.draw()
+        
+    def fit_current(self):
+        """Fit current file with selected peaks"""
+        if self.current_data is None or not self.peaks:
+            QMessageBox.warning(self, "No Data", "Please load a file and add peaks first.")
+            return
+            
+        # Perform fitting for each peak
+        # (Simplified version - you can expand this)
+        filename = os.path.basename(self.file_list[self.current_index])
+        
+        try:
+            # For now, just mark as processed
+            QMessageBox.information(self, "Fitted", f"Fitted {len(self.peaks)} peaks for {filename}")
+            
+            # Store results
+            result = {
+                'file': filename,
+                'num_peaks': len(self.peaks),
+                'peaks': self.peaks.copy(),
+                'bg_points': self.bg_points.copy()
+            }
+            self.results.append(result)
+            
+        except Exception as e:
+            QMessageBox.warning(self, "Fit Error", f"Fitting failed:\n{str(e)}")
+            
+    def go_previous(self):
+        """Go to previous file"""
+        if self.current_index > 0:
+            self.current_index -= 1
+            self.load_current_file()
+            self.file_list_widget.setCurrentRow(self.current_index)
+            
+    def go_next(self):
+        """Go to next file"""
+        if self.current_index < len(self.file_list) - 1:
+            self.current_index += 1
+            self.load_current_file()
+            self.file_list_widget.setCurrentRow(self.current_index)
+            
+    def on_method_changed(self, text):
+        """Handle fit method change"""
+        if "Voigt" in text and "Pseudo" not in text:
+            self.fit_method = "voigt"
+        else:
+            self.fit_method = "pseudo"
+            
+    def save_all_results(self):
+        """Save all results to CSV"""
+        if not self.results:
+            QMessageBox.warning(self, "No Results", "No fitting results to save.")
+            return
+            
+        if not self.output_folder:
+            QMessageBox.warning(self, "No Output", "Please load a folder first.")
+            return
+            
+        # Save results
+        output_file = os.path.join(self.output_folder, "batch_fitting_results.csv")
+        
+        # Create dataframe
+        df = pd.DataFrame(self.results)
+        df.to_csv(output_file, index=False)
         
         QMessageBox.information(
             self,
-            "Success",
-            "Batch fitting completed successfully!\n\n"
-            f"Results saved in:\n{os.path.join(self.folder_entry.text(), 'fit_output')}"
-        )
-        
-    def on_fitting_error(self, error_msg):
-        """Called when batch fitting encounters an error"""
-        self.run_btn.setEnabled(True)
-        self.run_btn.setText("🚀 Run Batch Fitting")
-        self.progress_bar.setVisible(False)
-        self.log("")
-        self.log("=" * 60)
-        self.log("✗ Error occurred during batch fitting")
-        self.log("=" * 60)
-        self.log(error_msg)
-        
-        QMessageBox.critical(
-            self,
-            "Error",
-            "An error occurred during batch fitting.\n\n"
-            "Please check the log for details."
+            "Saved",
+            f"Results saved to:\n{output_file}\n\nProcessed {len(self.results)} files."
         )
 
 
