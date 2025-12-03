@@ -8,12 +8,17 @@ Allows users to batch process multiple .xy files for peak fitting.
 
 import os
 import sys
+# Set matplotlib backend before importing pyplot
+import matplotlib
+matplotlib.use('Agg')  # Non-interactive backend to avoid conflicts with PyQt6
+
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                               QPushButton, QLineEdit, QComboBox, QTextEdit,
-                              QFileDialog, QMessageBox, QGroupBox)
+                              QFileDialog, QMessageBox, QGroupBox, QProgressBar)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal
 from PyQt6.QtGui import QFont
 from peak_fitting import BatchFitter
+import pandas as pd
 import traceback
 
 
@@ -22,6 +27,7 @@ class BatchFittingWorker(QThread):
     finished = pyqtSignal()
     error = pyqtSignal(str)
     log_signal = pyqtSignal(str)
+    progress = pyqtSignal(int, int)  # current, total
     
     def __init__(self, folder, fit_method):
         super().__init__()
@@ -31,21 +37,43 @@ class BatchFittingWorker(QThread):
     def run(self):
         """Run batch fitting in separate thread"""
         try:
-            # Redirect print to signal
-            import io
-            import contextlib
+            self.log_signal.emit("Initializing batch fitter...")
             
-            # Create string buffer to capture print output
-            log_buffer = io.StringIO()
+            # Create BatchFitter instance
+            fitter = BatchFitter(folder=self.folder, fit_method=self.fit_method)
             
-            with contextlib.redirect_stdout(log_buffer):
-                fitter = BatchFitter(folder=self.folder, fit_method=self.fit_method)
-                fitter.run_batch_fitting()
+            # Get list of files
+            files = sorted(f for f in os.listdir(self.folder) if f.endswith(".xy"))
+            total_files = len(files)
             
-            # Send all captured output
-            output = log_buffer.getvalue()
-            if output:
-                self.log_signal.emit(output)
+            self.log_signal.emit(f"Found {total_files} .xy files to process\n")
+            
+            # Process each file manually to show progress
+            all_dfs = []
+            for idx, fname in enumerate(files, 1):
+                self.log_signal.emit(f"[{idx}/{total_files}] Processing: {fname}")
+                fpath = os.path.join(self.folder, fname)
+                
+                try:
+                    df = fitter.process_file(fpath)
+                    if df is not None:
+                        all_dfs.append(df)
+                        all_dfs.append(pd.DataFrame([[""] * len(df.columns)], columns=df.columns))
+                        self.log_signal.emit(f"  ✓ Success: {fname}")
+                    else:
+                        self.log_signal.emit(f"  ⚠ No peaks found: {fname}")
+                except Exception as e:
+                    self.log_signal.emit(f"  ✗ Error: {fname} - {str(e)}")
+                
+                self.progress.emit(idx, total_files)
+            
+            # Save combined results
+            if all_dfs:
+                import pandas as pd
+                combined_df = pd.concat(all_dfs, ignore_index=True)
+                combined_csv_path = os.path.join(fitter.save_dir, "all_results.csv")
+                combined_df.to_csv(combined_csv_path, index=False)
+                self.log_signal.emit(f"\n📦 Combined results saved to: {combined_csv_path}")
             
             self.finished.emit()
             
@@ -202,6 +230,22 @@ class BatchFittingDialog(QDialog):
         self.log_text.setPlaceholderText("Logs will appear here during processing...")
         log_layout.addWidget(self.log_text)
         
+        # Progress bar
+        self.progress_bar = QProgressBar()
+        self.progress_bar.setVisible(False)
+        self.progress_bar.setStyleSheet("""
+            QProgressBar {
+                border: 2px solid #CCCCCC;
+                border-radius: 5px;
+                text-align: center;
+                height: 25px;
+            }
+            QProgressBar::chunk {
+                background-color: #7E57C2;
+            }
+        """)
+        log_layout.addWidget(self.progress_bar)
+        
         layout.addWidget(log_group)
         
         # Button row
@@ -275,6 +319,13 @@ class BatchFittingDialog(QDialog):
         self.log_text.verticalScrollBar().setValue(
             self.log_text.verticalScrollBar().maximum()
         )
+    
+    def update_progress(self, current, total):
+        """Update progress bar"""
+        if total > 0:
+            percentage = int((current / total) * 100)
+            self.progress_bar.setValue(percentage)
+            self.progress_bar.setFormat(f"{current}/{total} files ({percentage}%)")
         
     def run_batch_fitting(self):
         """Run batch fitting process"""
@@ -333,12 +384,19 @@ class BatchFittingDialog(QDialog):
         self.worker.finished.connect(self.on_fitting_finished)
         self.worker.error.connect(self.on_fitting_error)
         self.worker.log_signal.connect(self.log)
+        self.worker.progress.connect(self.update_progress)
+        
+        # Show and reset progress bar
+        self.progress_bar.setVisible(True)
+        self.progress_bar.setValue(0)
+        
         self.worker.start()
         
     def on_fitting_finished(self):
         """Called when batch fitting finishes successfully"""
         self.run_btn.setEnabled(True)
         self.run_btn.setText("🚀 Run Batch Fitting")
+        self.progress_bar.setVisible(False)
         self.log("")
         self.log("=" * 60)
         self.log("✓ Batch fitting completed successfully!")
@@ -355,6 +413,7 @@ class BatchFittingDialog(QDialog):
         """Called when batch fitting encounters an error"""
         self.run_btn.setEnabled(True)
         self.run_btn.setText("🚀 Run Batch Fitting")
+        self.progress_bar.setVisible(False)
         self.log("")
         self.log("=" * 60)
         self.log("✗ Error occurred during batch fitting")
