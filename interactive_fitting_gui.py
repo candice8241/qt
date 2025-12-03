@@ -2523,10 +2523,15 @@ class InteractiveFittingGUI(QWidget):
             self.status_label.setText("Overlap mode OFF")
 
     def show_batch_info(self):
-        """Open batch processing dialog"""
-        from batch_fitting_dialog import BatchFittingDialog
-        dialog = BatchFittingDialog(self)
-        dialog.exec()
+        """Show batch processing information"""
+        QMessageBox.information(
+            self,
+            "Batch Processing",
+            "Batch processing feature:\n\n"
+            "This feature allows you to automatically fit peaks for multiple files.\n"
+            "Please use the batch_integration.py script for batch processing.\n\n"
+            "Usage: python batch_integration.py"
+        )
 
     def show_settings_info(self):
         """Show settings information"""
