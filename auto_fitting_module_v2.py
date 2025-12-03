@@ -268,26 +268,26 @@ class AutoFittingModule(QWidget):
     
     def _create_control_panel(self, parent_layout):
         """Create top control panel (lines 685-773)"""
-        # Create frame (line 687)
+        # Create frame
         control_frame = QFrame()
         control_frame.setStyleSheet("QFrame { background-color: #E6D5F5; border-radius: 5px; }")
-        control_frame.setFixedHeight(60)  # height=60 in original
+        control_frame.setFixedHeight(30)  # Half of original 60px
         control_layout = QHBoxLayout(control_frame)
-        control_layout.setContentsMargins(5, 8, 5, 8)
-        control_layout.setSpacing(5)
+        control_layout.setContentsMargins(3, 2, 3, 2)
+        control_layout.setSpacing(3)
         
-        # Button style (lines 691-697)
+        # Button style
         btn_style = """
             QPushButton {
                 background-color: #B19CD9;
                 color: black;
                 border: none;
-                border-radius: 4px;
-                padding: 6px;
+                border-radius: 3px;
+                padding: 3px;
                 font-weight: bold;
-                font-size: 9pt;
+                font-size: 7.5pt;
                 min-width: 85px;
-                min-height: 35px;
+                min-height: 17px;
             }
             QPushButton:hover { background-color: #9370DB; }
             QPushButton:disabled { background-color: #CCCCCC; color: #666666; }
@@ -373,7 +373,7 @@ class AutoFittingModule(QWidget):
         
         # Batch Settings button (lines 760-766)
         self.btn_batch_settings = QPushButton("⚙")
-        self.btn_batch_settings.setStyleSheet(btn_style.replace('min-width: 85px', 'min-width: 28px').replace('#B19CD9', '#B0C4DE'))
+        self.btn_batch_settings.setStyleSheet(nav_btn_style.replace('#B19CD9', '#B0C4DE'))
         self.btn_batch_settings.clicked.connect(self.show_batch_settings)
         self.btn_batch_settings.setEnabled(True)  # state=tk.NORMAL
         control_layout.addWidget(self.btn_batch_settings)
@@ -384,9 +384,9 @@ class AutoFittingModule(QWidget):
             QLabel {
                 color: #9370DB;
                 font-weight: bold;
-                font-size: 10pt;
+                font-size: 8.5pt;
                 background-color: #E6D5F5;
-                padding: 5px;
+                padding: 2px;
             }
         """)
         self.status_label.setMinimumWidth(300)
@@ -396,8 +396,8 @@ class AutoFittingModule(QWidget):
         parent_layout.addWidget(control_frame)
     
     def _create_background_panel(self, parent_layout):
-        """Create background fitting control panel (lines 774-849)"""
-        # Create frame (line 776)
+        """Create background fitting control panel"""
+        # Create frame
         bg_frame = QFrame()
         bg_frame.setStyleSheet("QFrame { background-color: #F5E6FA; border-radius: 5px; }")
         bg_frame.setFixedHeight(50)
@@ -405,12 +405,12 @@ class AutoFittingModule(QWidget):
         bg_layout.setContentsMargins(10, 8, 10, 8)
         bg_layout.setSpacing(5)
         
-        # Background label (lines 780-783)
+        # Background label
         bg_label = QLabel("Background:")
-        bg_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 9pt;")
+        bg_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 7.5pt;")
         bg_layout.addWidget(bg_label)
         
-        # Button style (lines 785-791)
+        # Button style
         btn_bg_style = """
             QPushButton {
                 background-color: #B19CD9;
@@ -419,7 +419,7 @@ class AutoFittingModule(QWidget):
                 border-radius: 4px;
                 padding: 6px 10px;
                 font-weight: bold;
-                font-size: 8pt;
+                font-size: 6.5pt;
                 min-width: 100px;
             }
             QPushButton:hover { background-color: #9370DB; }
@@ -454,9 +454,9 @@ class AutoFittingModule(QWidget):
         self.btn_auto_bg.setEnabled(False)
         bg_layout.addWidget(self.btn_auto_bg)
         
-        # Fit Method (lines 817-825)
+        # Fit Method
         fit_method_label = QLabel("Fit Method:")
-        fit_method_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 8pt; margin-left: 20px;")
+        fit_method_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 6.5pt; margin-left: 20px;")
         bg_layout.addWidget(fit_method_label)
         
         self.fit_method_combo = QComboBox()
@@ -464,40 +464,40 @@ class AutoFittingModule(QWidget):
         self.fit_method_combo.setCurrentIndex(0)
         self.fit_method_combo.currentTextChanged.connect(self.on_fit_method_changed)
         self.fit_method_combo.setMaximumWidth(110)
-        self.fit_method_combo.setStyleSheet("font-size: 8pt;")
+        self.fit_method_combo.setStyleSheet("font-size: 6.5pt;")
         bg_layout.addWidget(self.fit_method_combo)
         
-        # Overlap threshold (lines 827-834)
+        # Overlap threshold
         overlap_label = QLabel("Overlap FWHM×:")
-        overlap_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 8pt; margin-left: 20px;")
+        overlap_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 6.5pt; margin-left: 20px;")
         bg_layout.addWidget(overlap_label)
         
         self.overlap_threshold_entry = QLineEdit(str(self.overlap_threshold))
         self.overlap_threshold_entry.setMaximumWidth(45)
-        self.overlap_threshold_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 8pt;")
+        self.overlap_threshold_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 6.5pt;")
         bg_layout.addWidget(self.overlap_threshold_entry)
         
-        # Fitting window (lines 836-843)
+        # Fitting window
         window_label = QLabel("Fit Window×:")
-        window_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 8pt; margin-left: 20px;")
+        window_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 6.5pt; margin-left: 20px;")
         bg_layout.addWidget(window_label)
         
         self.fitting_window_entry = QLineEdit(str(self.fitting_window_multiplier))
         self.fitting_window_entry.setMaximumWidth(45)
-        self.fitting_window_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 8pt;")
+        self.fitting_window_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 6.5pt;")
         bg_layout.addWidget(self.fitting_window_entry)
         
-        # Coordinate label (lines 845-848)
+        # Coordinate label
         self.coord_label = QLabel("")
-        self.coord_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 8pt;")
+        self.coord_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 6.5pt;")
         bg_layout.addWidget(self.coord_label)
         
         bg_layout.addStretch()
         parent_layout.addWidget(bg_frame)
     
     def _create_smoothing_panel(self, parent_layout):
-        """Create smoothing control panel (lines 850-907)"""
-        # Create frame (line 852)
+        """Create smoothing control panel"""
+        # Create frame
         smooth_frame = QFrame()
         smooth_frame.setStyleSheet("QFrame { background-color: #E6E6FA; border-radius: 5px; }")
         smooth_frame.setFixedHeight(50)
@@ -505,50 +505,50 @@ class AutoFittingModule(QWidget):
         smooth_layout.setContentsMargins(10, 8, 10, 8)
         smooth_layout.setSpacing(5)
         
-        # Smoothing label (lines 856-859)
+        # Smoothing label
         smooth_label = QLabel("Smoothing:")
-        smooth_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 9pt;")
+        smooth_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 7.5pt;")
         smooth_layout.addWidget(smooth_label)
         
-        # Enable checkbox (lines 861-865)
+        # Enable checkbox
         self.chk_smooth = QCheckBox("Enable")
-        self.chk_smooth.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 8pt;")
+        self.chk_smooth.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 6.5pt;")
         self.chk_smooth.setChecked(self.smoothing_enabled)
         smooth_layout.addWidget(self.chk_smooth)
         
-        # Method (lines 867-874)
+        # Method
         method_label = QLabel("Method:")
-        method_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 8pt; margin-left: 10px;")
+        method_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 6.5pt; margin-left: 10px;")
         smooth_layout.addWidget(method_label)
         
         self.smooth_method_combo = QComboBox()
         self.smooth_method_combo.addItems(["gaussian", "savgol"])
         self.smooth_method_combo.setCurrentText(self.smoothing_method)
         self.smooth_method_combo.setMaximumWidth(90)
-        self.smooth_method_combo.setStyleSheet("font-size: 8pt;")
+        self.smooth_method_combo.setStyleSheet("font-size: 6.5pt;")
         smooth_layout.addWidget(self.smooth_method_combo)
         
-        # Sigma (lines 876-882)
+        # Sigma
         sigma_label = QLabel("Sigma:")
-        sigma_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 8pt; margin-left: 10px;")
+        sigma_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 6.5pt; margin-left: 10px;")
         smooth_layout.addWidget(sigma_label)
         
         self.smooth_sigma_entry = QLineEdit(str(self.smoothing_sigma))
         self.smooth_sigma_entry.setMaximumWidth(45)
-        self.smooth_sigma_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 8pt;")
+        self.smooth_sigma_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 6.5pt;")
         smooth_layout.addWidget(self.smooth_sigma_entry)
         
-        # Window (lines 884-890)
+        # Window
         window_label = QLabel("Window:")
-        window_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 8pt; margin-left: 10px;")
+        window_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 6.5pt; margin-left: 10px;")
         smooth_layout.addWidget(window_label)
         
         self.smooth_window_entry = QLineEdit(str(self.smoothing_window))
         self.smooth_window_entry.setMaximumWidth(45)
-        self.smooth_window_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 8pt;")
+        self.smooth_window_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 6.5pt;")
         smooth_layout.addWidget(self.smooth_window_entry)
         
-        # Buttons style (lines 892-898, 900-906)
+        # Buttons style
         btn_smooth_style = """
             QPushButton {
                 background-color: #98FB98;
@@ -557,7 +557,7 @@ class AutoFittingModule(QWidget):
                 border-radius: 4px;
                 padding: 6px 10px;
                 font-weight: bold;
-                font-size: 8pt;
+                font-size: 6.5pt;
                 min-width: 70px;
             }
             QPushButton:hover { background-color: #7FD77F; }
@@ -580,8 +580,8 @@ class AutoFittingModule(QWidget):
         parent_layout.addWidget(smooth_frame)
     
     def _create_results_panel(self, parent_layout):
-        """Create results display panel (lines 908-940)"""
-        # Create frame (line 910)
+        """Create results display panel"""
+        # Create frame
         results_frame = QGroupBox("Fitting Results:")
         results_frame.setStyleSheet("""
             QGroupBox {
@@ -590,7 +590,7 @@ class AutoFittingModule(QWidget):
                 border-radius: 5px;
                 margin-top: 10px;
                 font-weight: bold;
-                font-size: 9pt;
+                font-size: 7.5pt;
                 color: #FF6B9D;
             }
             QGroupBox::title {
@@ -615,20 +615,20 @@ class AutoFittingModule(QWidget):
         for i, col in enumerate(columns):
             self.results_tree.setColumnWidth(i, col_widths.get(col, 80))
         
-        # Style (lines 935-939)
+        # Style
         self.results_tree.setStyleSheet("""
             QTableWidget {
                 background-color: #FFFBF0;
                 gridline-color: #E0E0E0;
                 font-weight: bold;
-                font-size: 8pt;
+                font-size: 6.5pt;
             }
             QHeaderView::section {
                 background-color: #FFE4E1;
                 padding: 4px;
                 border: 1px solid #E0E0E0;
                 font-weight: bold;
-                font-size: 8pt;
+                font-size: 6.5pt;
             }
         """)
         
@@ -641,24 +641,31 @@ class AutoFittingModule(QWidget):
         parent_layout.addWidget(results_frame)
     
     def _create_plot_area(self, parent_layout):
-        """Create main plot area (lines 941-970)"""
-        # Create frame (line 943)
+        """Create main plot area"""
+        # Create frame
         plot_frame = QFrame()
         plot_frame.setStyleSheet("QFrame { background-color: white; }")
         plot_layout = QVBoxLayout(plot_frame)
         plot_layout.setContentsMargins(5, 5, 5, 5)
         
-        # Create matplotlib figure (lines 946-954)
-        # Use Figure() instead of plt.subplots() to avoid popup
+        # Create matplotlib figure with new styling
         self.fig = Figure(figsize=(12, 6), facecolor='white')
         self.ax = self.fig.add_subplot(111)
         self.fig.subplots_adjust(left=0.08, right=0.98, top=0.92, bottom=0.15)
-        self.ax.set_facecolor('#FAF0FF')  # Light purple
+        self.ax.set_facecolor('#F4F6FB')  # New background color
         self.ax.grid(True, alpha=0.3, linestyle='--', color='#D4A5D4')
-        self.ax.set_xlabel('2theta (degree)', fontsize=13, color='#9370DB')
-        self.ax.set_ylabel('Intensity', fontsize=13, color='#9370DB')
+        
+        # Set labels with Arial font and black color
+        self.ax.set_xlabel('2theta (degree)', fontsize=11, color='black', fontname='Arial')
+        self.ax.set_ylabel('Intensity', fontsize=11, color='black', fontname='Arial')
         self.ax.set_title('Click on peaks to select | Use toolbar or scroll to zoom/pan',
-                         fontsize=11, color='#9370DB')
+                         fontsize=9, color='black', fontname='Arial')
+        
+        # Set tick labels to Arial and black
+        for label in self.ax.get_xticklabels() + self.ax.get_yticklabels():
+            label.set_fontname('Arial')
+            label.set_color('black')
+            label.set_fontsize(9)
         
         # Embed canvas (lines 956-958)
         self.canvas = FigureCanvas(self.fig)
@@ -904,12 +911,17 @@ class AutoFittingModule(QWidget):
             
             self.ax.clear()
             self.ax.plot(self.x, self.y, '-', color='#9370DB', linewidth=0.8, label='Data')
-            self.ax.set_facecolor('#FAF0FF')
+            self.ax.set_facecolor('#F4F6FB')
             self.ax.grid(True, alpha=0.3, linestyle='--', color='#D4A5D4')
-            self.ax.set_xlabel('2theta (degree)', fontsize=13, color='#9370DB')
-            self.ax.set_ylabel('Intensity', fontsize=13, color='#9370DB')
+            self.ax.set_xlabel('2theta (degree)', fontsize=11, color='black', fontname='Arial')
+            self.ax.set_ylabel('Intensity', fontsize=11, color='black', fontname='Arial')
             self.ax.set_title(f'{self.filename} | Click on peaks to select',
-                            fontsize=11, color='#9370DB')
+                            fontsize=9, color='black', fontname='Arial')
+            # Set tick labels to Arial and black
+            for label in self.ax.get_xticklabels() + self.ax.get_yticklabels():
+                label.set_fontname('Arial')
+                label.set_color('black')
+                label.set_fontsize(9)
             # Expand x-axis range
             x_range = self.x.max() - self.x.min()
             self.ax.set_xlim(self.x.min() - x_range * 0.05, self.x.max() + x_range * 0.05)
@@ -1047,7 +1059,7 @@ class AutoFittingModule(QWidget):
             self.ax.set_xlabel('2theta (degree)', fontsize=13, color='#9370DB')
             self.ax.set_ylabel('Intensity', fontsize=13, color='#9370DB')
             self.ax.set_title(f'{self.filename} (BG Subtracted)',
-                            fontsize=11, color='#9370DB')
+                            fontsize=9, color='black', fontname='Arial')
             
             # Re-add peak markers
             for i, idx in enumerate(self.selected_peaks):
@@ -1304,7 +1316,7 @@ class AutoFittingModule(QWidget):
         
         if self.x is not None:
             self.ax.set_title(f'{self.filename} | Click on peaks to select',
-                            fontsize=11, color='#9370DB')
+                            fontsize=9, color='black', fontname='Arial')
             self.canvas.draw()
             self.update_info("All peaks and fits cleared\n")
             self.status_label.setText("Ready to select peaks")
@@ -1666,7 +1678,7 @@ class AutoFittingModule(QWidget):
             self.results_tree.setItem(row_idx, 7, QTableWidgetItem(eta_str))
         
         self.ax.set_title(f'{self.filename} - Fit Complete ({fit_method})',
-                        fontsize=11, fontweight='bold', color='#32CD32')
+                        fontsize=9, fontweight='bold', color='black', fontname='Arial')
         self.canvas.draw()
         
         self.update_info(info_msg)
@@ -1744,12 +1756,17 @@ class AutoFittingModule(QWidget):
         
         self.ax.clear()
         self.ax.plot(self.x, self.y, '-', color='#9370DB', linewidth=0.8, label='Data')
-        self.ax.set_facecolor('#FAF0FF')
+        self.ax.set_facecolor('#F4F6FB')
         self.ax.grid(True, alpha=0.3, linestyle='--', color='#D4A5D4')
-        self.ax.set_xlabel('2theta (degree)', fontsize=13, color='#9370DB')
-        self.ax.set_ylabel('Intensity', fontsize=13, color='#9370DB')
+        self.ax.set_xlabel('2theta (degree)', fontsize=11, color='black', fontname='Arial')
+        self.ax.set_ylabel('Intensity', fontsize=11, color='black', fontname='Arial')
         self.ax.set_title(f'{self.filename} | Click on peaks to select',
-                        fontsize=11, color='#9370DB')
+                        fontsize=9, color='black', fontname='Arial')
+        # Set tick labels
+        for label in self.ax.get_xticklabels() + self.ax.get_yticklabels():
+            label.set_fontname('Arial')
+            label.set_color('black')
+            label.set_fontsize(9)
         self.canvas.draw()
     
     def update_info(self, message):
@@ -1791,42 +1808,42 @@ class AutoFittingModule(QWidget):
         delay_frame = QFrame()
         delay_layout = QHBoxLayout(delay_frame)
         delay_label = QLabel("Display delay per file (seconds):")
-        delay_label.setStyleSheet("color: #4B0082; font-weight: bold; font-size: 9pt;")
+        delay_label.setStyleSheet("color: #4B0082; font-weight: bold; font-size: 7.5pt;")
         delay_layout.addWidget(delay_label)
         
         delay_spinbox = QDoubleSpinBox()
         delay_spinbox.setRange(0.01, 10.0)
         delay_spinbox.setSingleStep(0.01)
         delay_spinbox.setValue(self.batch_delay)
-        delay_spinbox.setStyleSheet("font-weight: bold; font-size: 9pt;")
+        delay_spinbox.setStyleSheet("font-weight: bold; font-size: 7.5pt;")
         delay_layout.addWidget(delay_spinbox)
         layout.addWidget(delay_frame)
         
         # Auto-save setting
         autosave_check = QCheckBox("Auto-save results for each file")
         autosave_check.setChecked(self.batch_auto_save)
-        autosave_check.setStyleSheet("color: #4B0082; font-weight: bold; font-size: 9pt;")
+        autosave_check.setStyleSheet("color: #4B0082; font-weight: bold; font-size: 7.5pt;")
         layout.addWidget(autosave_check)
         
         # Failure handling
         failure_group = QGroupBox("When auto-fitting fails:")
-        failure_group.setStyleSheet("QGroupBox { color: #4B0082; font-weight: bold; font-size: 9pt; }")
+        failure_group.setStyleSheet("QGroupBox { color: #4B0082; font-weight: bold; font-size: 7.5pt; }")
         failure_layout = QVBoxLayout(failure_group)
         
         failure_buttons = QButtonGroup(dialog)
         
         pause_radio = QRadioButton("Pause and allow manual adjustment")
-        pause_radio.setStyleSheet("color: #4B0082; font-weight: bold; font-size: 8pt;")
+        pause_radio.setStyleSheet("color: #4B0082; font-weight: bold; font-size: 6.5pt;")
         failure_layout.addWidget(pause_radio)
         failure_buttons.addButton(pause_radio, 0)
         
         skip_radio = QRadioButton("Skip to next file")
-        skip_radio.setStyleSheet("color: #4B0082; font-weight: bold; font-size: 8pt;")
+        skip_radio.setStyleSheet("color: #4B0082; font-weight: bold; font-size: 6.5pt;")
         failure_layout.addWidget(skip_radio)
         failure_buttons.addButton(skip_radio, 1)
         
         stop_radio = QRadioButton("Stop batch processing")
-        stop_radio.setStyleSheet("color: #4B0082; font-weight: bold; font-size: 8pt;")
+        stop_radio.setStyleSheet("color: #4B0082; font-weight: bold; font-size: 6.5pt;")
         failure_layout.addWidget(stop_radio)
         failure_buttons.addButton(stop_radio, 2)
         
@@ -1853,7 +1870,7 @@ class AutoFittingModule(QWidget):
                 background-color: #FAF0FF;
                 color: #4B0082;
                 font-weight: bold;
-                font-size: 8pt;
+                font-size: 6.5pt;
                 border: 2px inset;
                 padding: 10px;
             }
@@ -1867,7 +1884,7 @@ class AutoFittingModule(QWidget):
                 background-color: #B19CD9;
                 color: black;
                 font-weight: bold;
-                font-size: 10pt;
+                font-size: 8.5pt;
                 padding: 10px;
                 min-width: 140px;
             }
@@ -2097,7 +2114,7 @@ class AutoFittingModule(QWidget):
                 background-color: #E6F3FF;
                 color: #2C5282;
                 font-weight: bold;
-                font-size: 9pt;
+                font-size: 7.5pt;
                 padding: 5px;
             }
         """)
@@ -2131,7 +2148,7 @@ class AutoFittingModule(QWidget):
                 background-color: #10B981;
                 color: white;
                 font-weight: bold;
-                font-size: 9pt;
+                font-size: 7.5pt;
                 padding: 8px;
                 border-radius: 4px;
             }
@@ -2146,7 +2163,7 @@ class AutoFittingModule(QWidget):
                 background-color: #F59E0B;
                 color: white;
                 font-weight: bold;
-                font-size: 9pt;
+                font-size: 7.5pt;
                 padding: 8px;
                 border-radius: 4px;
             }
@@ -2161,7 +2178,7 @@ class AutoFittingModule(QWidget):
                 background-color: #EF4444;
                 color: white;
                 font-weight: bold;
-                font-size: 9pt;
+                font-size: 7.5pt;
                 padding: 8px;
                 border-radius: 4px;
             }
@@ -2206,7 +2223,7 @@ class AutoFittingModule(QWidget):
                 background-color: #FFF8DC;
                 color: #8B4513;
                 font-weight: bold;
-                font-size: 9pt;
+                font-size: 7.5pt;
             }
         """)
         layout.addWidget(msg)
@@ -2238,7 +2255,7 @@ class AutoFittingModule(QWidget):
                 background-color: #90EE90;
                 color: #006400;
                 font-weight: bold;
-                font-size: 9pt;
+                font-size: 7.5pt;
                 padding: 8px;
             }
             QPushButton:hover { background-color: #7FD77F; }
@@ -2252,7 +2269,7 @@ class AutoFittingModule(QWidget):
                 background-color: #FFD700;
                 color: #8B4513;
                 font-weight: bold;
-                font-size: 9pt;
+                font-size: 7.5pt;
                 padding: 8px;
             }
             QPushButton:hover { background-color: #FFC700; }
@@ -2266,7 +2283,7 @@ class AutoFittingModule(QWidget):
                 background-color: #FF6347;
                 color: black;
                 font-weight: bold;
-                font-size: 9pt;
+                font-size: 7.5pt;
                 padding: 8px;
             }
             QPushButton:hover { background-color: #FF4500; }
