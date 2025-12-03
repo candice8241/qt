@@ -386,9 +386,9 @@ class BatchFittingDialog(QDialog):
         fit_btn.clicked.connect(self.fit_current)
         row2.addWidget(fit_btn)
         
-        # Auto fit all (Enter key)
-        auto_fit_btn = QPushButton("⚡ Auto Fit All (Enter)")
-        auto_fit_btn.setFixedWidth(150)
+        # Auto fit (Enter key)
+        auto_fit_btn = QPushButton("⚡ Auto Fit (Enter)")
+        auto_fit_btn.setFixedWidth(140)
         auto_fit_btn.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         auto_fit_btn.setStyleSheet("""
             QPushButton {
@@ -840,6 +840,13 @@ class BatchFittingDialog(QDialog):
                 alpha = 0.5
                 self.canvas.axes.plot(ox, oy, '-', linewidth=1, alpha=alpha, 
                                     color=color, label=fname, zorder=1)
+                
+                # Plot fit curves for this overlapped file if available
+                for result in self.results:
+                    if result['file'] == fname and 'fit_curves' in result:
+                        for fit_x, fit_y in result['fit_curves']:
+                            self.canvas.axes.plot(fit_x, fit_y, '-', linewidth=1.5, 
+                                                 color='#E53935', alpha=0.6, zorder=4)
         
         # Plot current data
         self.canvas.axes.plot(x, y, 'k-', linewidth=1.5, label='Current', zorder=2)
@@ -925,6 +932,7 @@ class BatchFittingDialog(QDialog):
             # Fit each peak
             peak_results = []
             fit_quality = []
+            fit_curves = []  # Store fit curves for this file
             
             for peak_pos in self.peaks:
                 # Define window around peak
@@ -952,6 +960,8 @@ class BatchFittingDialog(QDialog):
                                           bounds=bounds, maxfev=10000)
                         y_fit = voigt(x_local, *popt)
                         y_fit_fine = voigt(x_fine, *popt)
+                        sigma = popt[2]
+                        gamma = popt[3]
                     else:  # pseudo-voigt
                         p0 = [np.max(y_local), peak_pos, 0.1, 0.1, 0.5]
                         bounds = ([0, x_local.min(), 0, 0, 0], 
@@ -960,6 +970,8 @@ class BatchFittingDialog(QDialog):
                                           bounds=bounds, maxfev=10000)
                         y_fit = pseudo_voigt(x_local, *popt)
                         y_fit_fine = pseudo_voigt(x_fine, *popt)
+                        sigma = popt[2]
+                        gamma = popt[3]
                     
                     # Add background back for display
                     bg_fine = np.interp(x_fine, bg_x, bg_y) if len(self.bg_points) >= 2 else background
@@ -967,6 +979,18 @@ class BatchFittingDialog(QDialog):
                     
                     # Store fit curve for plotting
                     self.current_fit_curves.append((x_fine, y_fit_display))
+                    fit_curves.append((x_fine.copy(), y_fit_display.copy()))
+                    
+                    # Calculate FWHM (Full Width at Half Maximum)
+                    # For Voigt/Pseudo-Voigt, approximate FWHM
+                    fwhm = 2 * np.sqrt(2 * np.log(2)) * sigma  # Gaussian approximation
+                    
+                    # Calculate area under peak (integrate the fitted curve without background)
+                    dx = x_fine[1] - x_fine[0]
+                    area = np.trapz(y_fit_fine, dx=dx)
+                    
+                    # Intensity is the amplitude (peak height)
+                    intensity = popt[0]
                         
                     # Calculate R-squared
                     ss_res = np.sum((y_local - y_fit)**2)
@@ -975,16 +999,20 @@ class BatchFittingDialog(QDialog):
                     
                     fit_quality.append(r_squared)
                     peak_results.append({
-                        'position': popt[1],
-                        'amplitude': popt[0],
+                        'center': popt[1],
+                        'fwhm': fwhm,
+                        'area': area,
+                        'intensity': intensity,
                         'r_squared': r_squared
                     })
                     
                 except Exception as e:
                     fit_quality.append(0)
                     peak_results.append({
-                        'position': peak_pos,
-                        'amplitude': 0,
+                        'center': peak_pos,
+                        'fwhm': 0,
+                        'area': 0,
+                        'intensity': 0,
                         'r_squared': 0
                     })
             
@@ -999,7 +1027,8 @@ class BatchFittingDialog(QDialog):
                 'bg_points': self.bg_points.copy(),
                 'peak_results': peak_results,
                 'r_squared': avg_r_squared,
-                'fit_method': self.fit_method
+                'fit_method': self.fit_method,
+                'fit_curves': fit_curves  # Store fit curves for this file
             }
             self.results.append(result)
             
@@ -1239,17 +1268,45 @@ class BatchFittingDialog(QDialog):
             QMessageBox.warning(self, "No Output", "Please load a folder first.")
             return
             
-        # Save results
-        output_file = os.path.join(self.output_folder, "batch_fitting_results.csv")
+        # Prepare data for CSV output
+        # Format: each peak in each file gets its own row
+        rows = []
         
+        for result in self.results:
+            filename = result['file']
+            peak_results = result.get('peak_results', [])
+            
+            for peak_data in peak_results:
+                rows.append({
+                    'File': filename,
+                    'Center': peak_data.get('center', 0),
+                    'FWHM': peak_data.get('fwhm', 0),
+                    'Area': peak_data.get('area', 0),
+                    'Intensity': peak_data.get('intensity', 0),
+                    'R_squared': peak_data.get('r_squared', 0)
+                })
+        
+        if not rows:
+            QMessageBox.warning(self, "No Data", "No peak fitting data to save.")
+            return
+            
         # Create dataframe
-        df = pd.DataFrame(self.results)
-        df.to_csv(output_file, index=False)
+        df = pd.DataFrame(rows)
+        
+        # Save to CSV
+        output_file = os.path.join(self.output_folder, "batch_fitting_results.csv")
+        df.to_csv(output_file, index=False, float_format='%.6f')
+        
+        # Count total files and peaks
+        total_files = len(self.results)
+        total_peaks = len(rows)
         
         QMessageBox.information(
             self,
             "Saved",
-            f"Results saved to:\n{output_file}\n\nProcessed {len(self.results)} files."
+            f"Results saved to:\n{output_file}\n\n"
+            f"Processed {total_files} files\n"
+            f"Total peaks fitted: {total_peaks}"
         )
 
 
