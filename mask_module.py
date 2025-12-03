@@ -233,7 +233,7 @@ class MaskModule(GUIBase):
 
         layout = QVBoxLayout(group)
         layout.setSpacing(0)
-        layout.setContentsMargins(10, -15, 10, 0)
+        layout.setContentsMargins(10, -25, 10, 0)
 
         # Main canvas layout - Image on left, Operations on right
         main_canvas_layout = QHBoxLayout()
