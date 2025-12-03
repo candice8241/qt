@@ -1134,6 +1134,9 @@ class MaskModule(GUIBase):
         self.ax.set_ylim(0, self.image_data.shape[0])
         self.ax.set_xlabel('X (pixels)', fontsize=8)
         self.ax.set_ylabel('Y (pixels)', fontsize=8)
+        # Move x-axis to top
+        self.ax.xaxis.tick_top()
+        self.ax.xaxis.set_label_position('top')
         self.ax.tick_params(axis='both', which='major', labelsize=5)
         self.ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
 
