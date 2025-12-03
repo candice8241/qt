@@ -588,6 +588,7 @@ class BatchFittingDialog(QDialog):
             self.current_data = data
             self.peaks = []
             self.bg_points = []
+            self.current_fit_curves = []  # Clear fit curves for new file
             
             # Reset zoom limits for new file
             self.xlim_original = None
@@ -597,7 +598,7 @@ class BatchFittingDialog(QDialog):
             filename = os.path.basename(filepath)
             self.current_file_label.setText(f"[{self.current_index + 1}/{len(self.file_list)}] {filename}")
             
-            # Auto detect peaks
+            # Auto detect peaks (this will call plot_data with preserve_zoom=False implicitly)
             self.auto_detect_peaks()
             
         except Exception as e:
@@ -633,23 +634,25 @@ class BatchFittingDialog(QDialog):
                 (x[right_idx], right_y)
             ]
         
-        self.plot_data()
+        # Don't preserve zoom when auto-detecting peaks on new file
+        self.plot_data(preserve_zoom=False)
         
     def clear_peaks(self):
         """Clear all peaks"""
         self.peaks = []
-        self.plot_data()
+        self.plot_data(preserve_zoom=True)
         
     def clear_background(self):
         """Clear all background points"""
         self.bg_points = []
-        self.plot_data()
+        self.plot_data(preserve_zoom=True)
         
     def clear_all(self):
         """Clear all peaks and background points"""
         self.peaks = []
         self.bg_points = []
-        self.plot_data()
+        self.current_fit_curves = []
+        self.plot_data(preserve_zoom=True)
         
     def set_mode(self, mode):
         """Set add mode (peak or background)"""
@@ -762,7 +765,8 @@ class BatchFittingDialog(QDialog):
                 if idx is not None:
                     del self.bg_points[idx]
             
-        self.plot_data()
+        # Preserve zoom when adding/removing peaks
+        self.plot_data(preserve_zoom=True)
         
     def on_scroll(self, event):
         """Handle mouse scroll for zooming"""
@@ -804,10 +808,20 @@ class BatchFittingDialog(QDialog):
             self.canvas.axes.set_ylim(self.ylim_original)
             self.canvas.draw()
         
-    def plot_data(self):
+    def plot_data(self, preserve_zoom=True):
         """Plot current data with peaks and background"""
         if self.current_data is None:
             return
+        
+        # Save current zoom state before clearing
+        current_xlim = None
+        current_ylim = None
+        if preserve_zoom:
+            try:
+                current_xlim = self.canvas.axes.get_xlim()
+                current_ylim = self.canvas.axes.get_ylim()
+            except:
+                pass
             
         self.canvas.axes.clear()
         x, y = self.current_data[:, 0], self.current_data[:, 1]
@@ -830,13 +844,11 @@ class BatchFittingDialog(QDialog):
         # Plot current data
         self.canvas.axes.plot(x, y, 'k-', linewidth=1.5, label='Current', zorder=2)
         
-        # Plot fitted curves
+        # Plot fitted curves in red
         if self.current_fit_curves:
-            colors_fit = ['#BA68C8', '#9C27B0', '#7B1FA2', '#6A1B9A', '#4A148C']
             for idx, (fit_x, fit_y) in enumerate(self.current_fit_curves):
-                color = colors_fit[idx % len(colors_fit)]
-                self.canvas.axes.plot(fit_x, fit_y, '--', linewidth=2, 
-                                     color=color, alpha=0.8, 
+                self.canvas.axes.plot(fit_x, fit_y, '-', linewidth=2, 
+                                     color='#E53935', alpha=0.85, 
                                      label=f'Fit Peak {idx+1}', zorder=4)
         
         # Plot peaks as red vertical lines
@@ -866,6 +878,18 @@ class BatchFittingDialog(QDialog):
                                ncol=2 if len(self.current_fit_curves) > 3 else 1)
         self.canvas.axes.grid(True, alpha=0.3, linestyle=':', linewidth=0.5)
         self.canvas.axes.set_facecolor('#FAFAFA')
+        
+        # Restore zoom state if it was saved and preserve_zoom is True
+        if preserve_zoom and current_xlim is not None and current_ylim is not None:
+            # Check if the saved limits are valid and reasonable
+            try:
+                if (current_xlim[0] < current_xlim[1] and 
+                    current_ylim[0] < current_ylim[1] and
+                    current_xlim[0] < x.max() and current_xlim[1] > x.min()):
+                    self.canvas.axes.set_xlim(current_xlim)
+                    self.canvas.axes.set_ylim(current_ylim)
+            except:
+                pass  # If restoration fails, use default view
         
         self.canvas.draw()
         
@@ -1016,10 +1040,56 @@ class BatchFittingDialog(QDialog):
         if not self.peaks:
             QMessageBox.warning(self, "No Peaks", "Please add peaks to the current file first.")
             return
+        
+        # If in overlap mode, fit all overlapped files
+        if self.overlap_mode and self.overlapped_data:
+            self.fit_all_overlapped()
+        else:
+            # Start auto-fitting from current file onwards
+            self.auto_fitting = True
+            self.continue_auto_fitting()
             
-        # Start auto-fitting directly without confirmation
-        self.auto_fitting = True
-        self.continue_auto_fitting()
+    def fit_all_overlapped(self):
+        """Fit all files in overlap mode"""
+        if not self.overlapped_data:
+            QMessageBox.warning(self, "No Overlapped Data", "No files in overlay to fit.")
+            return
+            
+        total_files = len(self.overlapped_data)
+        success_count = 0
+        failed_count = 0
+        
+        # Store current peaks and bg_points as template
+        template_peaks = self.peaks.copy()
+        template_bg_points = self.bg_points.copy()
+        
+        for idx, (fname, ox, oy, opeaks, obg) in enumerate(self.overlapped_data):
+            # Temporarily set data to this overlapped file
+            self.current_data = np.column_stack((ox, oy))
+            self.peaks = template_peaks.copy()  # Use template peaks
+            self.bg_points = template_bg_points.copy()  # Use template bg
+            
+            # Perform fitting
+            r_squared = self.fit_current()
+            
+            if r_squared >= self.fit_tolerance:
+                success_count += 1
+            else:
+                failed_count += 1
+                
+        # Restore original current file
+        if self.file_list and self.current_index >= 0:
+            self.load_current_file()
+            
+        # Show summary
+        QMessageBox.information(
+            self,
+            "Overlap Fitting Complete",
+            f"✓ Fitting completed for {total_files} overlapped files!\n\n"
+            f"Success: {success_count}\n"
+            f"Failed (R² < {self.fit_tolerance:.2f}): {failed_count}\n\n"
+            f"Click 'Save All Results' to save."
+        )
         
     def continue_auto_fitting(self):
         """Continue auto-fitting to next file"""
@@ -1122,7 +1192,7 @@ class BatchFittingDialog(QDialog):
                 filename = os.path.basename(self.file_list[self.current_index])
                 self.current_file_label.setText(f"[{self.current_index + 1}/{len(self.file_list)}] {filename}")
             
-        self.plot_data()
+        self.plot_data(preserve_zoom=True)
         
     def clear_overlap(self):
         """Clear all overlapped data"""
@@ -1136,7 +1206,7 @@ class BatchFittingDialog(QDialog):
             filename = os.path.basename(self.file_list[self.current_index])
             self.current_file_label.setText(f"[{self.current_index + 1}/{len(self.file_list)}] {filename}")
             
-        self.plot_data()
+        self.plot_data(preserve_zoom=True)
         
     def add_to_overlay(self):
         """Add current file to overlay"""
@@ -1157,7 +1227,7 @@ class BatchFittingDialog(QDialog):
                 self.bg_points.copy()
             ))
             self.overlap_btn.setText(f"📊 Overlap ({len(self.overlapped_data)})")
-            self.plot_data()
+            self.plot_data(preserve_zoom=True)
             
     def save_all_results(self):
         """Save all results to CSV"""
