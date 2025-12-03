@@ -914,8 +914,365 @@ class BatchFittingDialog(QDialog):
         
         self.canvas.draw()
         
+    def _estimate_peak_fwhm(self, x, y, peak_idx):
+        """Estimate FWHM for a peak using half-maximum method"""
+        try:
+            results_half = peak_widths(y, [peak_idx], rel_height=0.5)
+            width_pts = results_half[0][0] if len(results_half[0]) > 0 else 40
+            # Convert from points to x-axis units
+            if width_pts > 0 and peak_idx > 0 and peak_idx < len(x) - 1:
+                dx = np.mean(np.diff(x))
+                fwhm = width_pts * dx
+            else:
+                fwhm = 0.5  # Default fallback
+            return fwhm
+        except:
+            return 0.5  # Default fallback
+    
+    def _group_overlapping_peaks(self, peak_positions, x, y):
+        """Group overlapping peaks based on their positions and FWHM"""
+        if len(peak_positions) == 0:
+            return []
+        
+        # Estimate FWHM for each peak
+        peak_indices = [np.argmin(np.abs(x - pos)) for pos in peak_positions]
+        peak_fwhms = [self._estimate_peak_fwhm(x, y, idx) for idx in peak_indices]
+        
+        # Overlap threshold multiplier (1.5 means peaks overlap if distance < 1.5*FWHM)
+        overlap_mult = 1.5
+        
+        # Convert to sorted list with positions
+        peak_data = [(pos, idx, fwhm) for pos, idx, fwhm in zip(peak_positions, peak_indices, peak_fwhms)]
+        peak_data.sort(key=lambda x: x[0])  # Sort by position
+        
+        groups = []
+        current_group = [(peak_data[0][0], peak_data[0][1])]  # (position, index)
+        current_end = peak_data[0][0] + overlap_mult * peak_data[0][2]  # Position + overlap_mult*FWHM
+        
+        for i in range(1, len(peak_data)):
+            pos, idx, fwhm = peak_data[i]
+            peak_start = pos - overlap_mult * fwhm
+            
+            # Check if this peak overlaps with current group
+            if peak_start <= current_end:
+                # Overlapping - add to current group
+                current_group.append((pos, idx))
+                # Extend the end boundary
+                current_end = max(current_end, pos + overlap_mult * fwhm)
+            else:
+                # Not overlapping - start new group
+                groups.append(current_group)
+                current_group = [(pos, idx)]
+                current_end = pos + overlap_mult * fwhm
+        
+        # Add last group
+        if current_group:
+            groups.append(current_group)
+        
+        return groups
+    
+    def _fit_single_peak(self, x, y, peak_idx, peak_pos):
+        """Fit a single peak independently using improved background subtraction"""
+        try:
+            # Get peak width for window estimation
+            results_half = peak_widths(y, [peak_idx], rel_height=0.5)
+            width_pts = results_half[0][0] if len(results_half[0]) > 0 else 40
+            
+            # Fit window multiplier (3.0 is standard)
+            fit_window_mult = 3.0
+            window = int(width_pts * fit_window_mult)
+            window = max(20, min(window, 200))
+            
+            # Extract local region
+            left = max(0, peak_idx - window)
+            right = min(len(x), peak_idx + window)
+            x_local = x[left:right]
+            y_local = y[left:right]
+            
+            if len(x_local) < 5:
+                return None
+            
+            # Improved background subtraction using lowest points at edges
+            if len(self.bg_points) >= 2:
+                bg_x = np.array([p[0] for p in self.bg_points])
+                bg_y = np.array([p[1] for p in self.bg_points])
+                background = np.interp(x_local, bg_x, bg_y)
+            else:
+                # Use edge-based background estimation
+                split_index = max(1, int(len(y_local) * 0.05))
+                
+                left_y = y_local[:split_index]
+                left_x = x_local[:split_index]
+                N_left = max(1, int(len(left_y) * 0.1))
+                low_left_idx = np.argsort(left_y)[:N_left]
+                bg_left_y = np.mean(left_y[low_left_idx])
+                bg_left_x = np.mean(left_x[low_left_idx])
+                
+                right_y = y_local[-split_index:]
+                right_x = x_local[-split_index:]
+                N_right = max(1, int(len(right_y) * 0.1))
+                low_right_idx = np.argsort(right_y)[:N_right]
+                bg_right_y = np.mean(right_y[low_right_idx])
+                bg_right_x = np.mean(right_x[low_right_idx])
+                
+                slope = (bg_right_y - bg_left_y) / (bg_right_x - bg_left_x + 1e-10)
+                background = bg_left_y + slope * (x_local - bg_left_x)
+            
+            y_fit_input = y_local - background
+            y_fit_input = np.maximum(y_fit_input, 0)  # Ensure non-negative
+            
+            # Initial guess
+            amplitude_guess = np.max(y_fit_input)
+            center_guess = x_local[np.argmax(y_fit_input)]
+            sigma_guess = np.std(x_local) / 5
+            gamma_guess = sigma_guess
+            
+            # Fit peak
+            if self.fit_method == "voigt":
+                p0 = [amplitude_guess, center_guess, sigma_guess, gamma_guess]
+                bounds = ([0, x_local.min(), 0, 0], [np.inf, x_local.max(), np.inf, np.inf])
+                popt, _ = curve_fit(voigt, x_local, y_fit_input, p0=p0, bounds=bounds, maxfev=10000)
+                sigma = popt[2]
+                gamma = popt[3]
+                eta = None
+            else:  # pseudo-voigt
+                p0 = [amplitude_guess, center_guess, sigma_guess, gamma_guess, 0.5]
+                bounds = ([0, x_local.min(), 0, 0, 0], [np.inf, x_local.max(), np.inf, np.inf, 1.0])
+                popt, _ = curve_fit(pseudo_voigt, x_local, y_fit_input, p0=p0, bounds=bounds, maxfev=10000)
+                sigma = popt[2]
+                gamma = popt[3]
+                eta = popt[4]
+            
+            # Generate fine x points for smooth curve
+            x_fine = np.linspace(x_local.min(), x_local.max(), 500)
+            
+            # Calculate fitted curve
+            if self.fit_method == "voigt":
+                y_fit = voigt(x_local, *popt)
+                y_fit_fine = voigt(x_fine, *popt)
+            else:
+                y_fit = pseudo_voigt(x_local, *popt)
+                y_fit_fine = pseudo_voigt(x_fine, *popt)
+            
+            # Add background back for display
+            if len(self.bg_points) >= 2:
+                bg_x = np.array([p[0] for p in self.bg_points])
+                bg_y = np.array([p[1] for p in self.bg_points])
+                bg_fine = np.interp(x_fine, bg_x, bg_y)
+            else:
+                bg_fine = np.interp(x_fine, x_local, background)
+            
+            y_fit_display = y_fit_fine + bg_fine
+            
+            # Calculate metrics
+            fwhm = 2 * np.sqrt(2 * np.log(2)) * sigma  # Gaussian approximation
+            dx = x_fine[1] - x_fine[0]
+            area = np.trapz(y_fit_fine, dx=dx)
+            intensity = popt[0]
+            
+            # Calculate R-squared
+            ss_res = np.sum((y_fit_input - y_fit)**2)
+            ss_tot = np.sum((y_fit_input - np.mean(y_fit_input))**2)
+            r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+            
+            return {
+                'x_fine': x_fine,
+                'y_fit_display': y_fit_display,
+                'center': popt[1],
+                'fwhm': fwhm,
+                'area': area,
+                'intensity': intensity,
+                'r_squared': r_squared
+            }
+            
+        except Exception as e:
+            print(f"Failed to fit peak at position {peak_pos}: {e}")
+            return None
+    
+    def _fit_multi_peaks_group(self, x, y, group):
+        """Fit multiple overlapping peaks together"""
+        try:
+            peak_positions = [pos for pos, idx in group]
+            peak_indices = [idx for pos, idx in group]
+            
+            # Define fitting region for entire group
+            min_peak_idx = min(peak_indices)
+            max_peak_idx = max(peak_indices)
+            
+            # Get average width for window estimation
+            avg_width = 40
+            try:
+                results_half = peak_widths(y, peak_indices, rel_height=0.5)
+                if len(results_half[0]) > 0:
+                    avg_width = np.mean(results_half[0])
+            except:
+                pass
+            
+            fit_window_mult = 3.0
+            window = int(avg_width * fit_window_mult * 0.8)  # Slightly smaller for multi-peak
+            window = max(40, min(window, 250))
+            
+            # Extract local region covering all peaks in group
+            left = max(0, min_peak_idx - window)
+            right = min(len(x), max_peak_idx + window)
+            x_local = x[left:right]
+            y_local = y[left:right]
+            
+            if len(x_local) < 10:
+                return [None] * len(group)
+            
+            # Background subtraction
+            if len(self.bg_points) >= 2:
+                bg_x = np.array([p[0] for p in self.bg_points])
+                bg_y = np.array([p[1] for p in self.bg_points])
+                background = np.interp(x_local, bg_x, bg_y)
+            else:
+                split_index = max(1, int(len(y_local) * 0.05))
+                
+                left_y = y_local[:split_index]
+                left_x = x_local[:split_index]
+                N_left = max(1, int(len(left_y) * 0.1))
+                low_left_idx = np.argsort(left_y)[:N_left]
+                bg_left_y = np.mean(left_y[low_left_idx])
+                bg_left_x = np.mean(left_x[low_left_idx])
+                
+                right_y = y_local[-split_index:]
+                right_x = x_local[-split_index:]
+                N_right = max(1, int(len(right_y) * 0.1))
+                low_right_idx = np.argsort(right_y)[:N_right]
+                bg_right_y = np.mean(right_y[low_right_idx])
+                bg_right_x = np.mean(right_x[low_right_idx])
+                
+                slope = (bg_right_y - bg_left_y) / (bg_right_x - bg_left_x + 1e-10)
+                background = bg_left_y + slope * (x_local - bg_left_x)
+            
+            y_fit_input = y_local - background
+            y_fit_input = np.maximum(y_fit_input, 0)
+            
+            # Multi-peak fitting function
+            def multi_peak_func(x_vals, *params):
+                """Sum of multiple peaks"""
+                n_peaks = len(group)
+                result = np.zeros_like(x_vals)
+                
+                if self.fit_method == "voigt":
+                    # 4 parameters per peak
+                    for i in range(n_peaks):
+                        amplitude = params[i*4]
+                        center = params[i*4 + 1]
+                        sigma = params[i*4 + 2]
+                        gamma = params[i*4 + 3]
+                        result += voigt(x_vals, amplitude, center, sigma, gamma)
+                else:  # pseudo-voigt
+                    # 5 parameters per peak
+                    for i in range(n_peaks):
+                        amplitude = params[i*5]
+                        center = params[i*5 + 1]
+                        sigma = params[i*5 + 2]
+                        gamma = params[i*5 + 3]
+                        eta = params[i*5 + 4]
+                        result += pseudo_voigt(x_vals, amplitude, center, sigma, gamma, eta)
+                
+                return result
+            
+            # Initial guess for all peaks in group
+            p0 = []
+            bounds_lower = []
+            bounds_upper = []
+            
+            for pos, peak_idx in group:
+                # Find local peak position in extracted region
+                local_peak_idx = peak_idx - left
+                if local_peak_idx < 0 or local_peak_idx >= len(y_fit_input):
+                    local_peak_idx = np.argmax(y_fit_input)
+                
+                amplitude_guess = max(y_fit_input[local_peak_idx], np.max(y_fit_input) / len(group))
+                center_guess = x_local[local_peak_idx]
+                sigma_guess = np.std(x_local) / (5 * len(group))
+                gamma_guess = sigma_guess
+                
+                if self.fit_method == "voigt":
+                    p0.extend([amplitude_guess, center_guess, sigma_guess, gamma_guess])
+                    bounds_lower.extend([0, x_local.min(), 0, 0])
+                    bounds_upper.extend([np.inf, x_local.max(), np.inf, np.inf])
+                else:  # pseudo-voigt
+                    p0.extend([amplitude_guess, center_guess, sigma_guess, gamma_guess, 0.5])
+                    bounds_lower.extend([0, x_local.min(), 0, 0, 0])
+                    bounds_upper.extend([np.inf, x_local.max(), np.inf, np.inf, 1.0])
+            
+            # Fit all peaks together
+            popt, _ = curve_fit(multi_peak_func, x_local, y_fit_input, 
+                               p0=p0, bounds=(bounds_lower, bounds_upper), maxfev=20000)
+            
+            # Calculate fitted curve
+            y_fit = multi_peak_func(x_local, *popt)
+            
+            # Generate results for each peak
+            results = []
+            n_peaks = len(group)
+            
+            for i in range(n_peaks):
+                if self.fit_method == "voigt":
+                    amplitude = popt[i*4]
+                    center = popt[i*4 + 1]
+                    sigma = popt[i*4 + 2]
+                    gamma = popt[i*4 + 3]
+                    eta = None
+                else:  # pseudo-voigt
+                    amplitude = popt[i*5]
+                    center = popt[i*5 + 1]
+                    sigma = popt[i*5 + 2]
+                    gamma = popt[i*5 + 3]
+                    eta = popt[i*5 + 4]
+                
+                # Generate fine x points for this peak
+                x_fine = np.linspace(x_local.min(), x_local.max(), 500)
+                
+                # Calculate individual peak contribution
+                if self.fit_method == "voigt":
+                    y_peak_fine = voigt(x_fine, amplitude, center, sigma, gamma)
+                else:
+                    y_peak_fine = pseudo_voigt(x_fine, amplitude, center, sigma, gamma, eta)
+                
+                # Add background back for display
+                if len(self.bg_points) >= 2:
+                    bg_x = np.array([p[0] for p in self.bg_points])
+                    bg_y = np.array([p[1] for p in self.bg_points])
+                    bg_fine = np.interp(x_fine, bg_x, bg_y)
+                else:
+                    bg_fine = np.interp(x_fine, x_local, background)
+                
+                y_fit_display = y_peak_fine + bg_fine
+                
+                # Calculate metrics
+                fwhm = 2 * np.sqrt(2 * np.log(2)) * sigma
+                dx = x_fine[1] - x_fine[0]
+                area = np.trapz(y_peak_fine, dx=dx)
+                intensity = amplitude
+                
+                # Calculate R-squared for the entire multi-peak fit (same for all peaks in group)
+                ss_res = np.sum((y_fit_input - y_fit)**2)
+                ss_tot = np.sum((y_fit_input - np.mean(y_fit_input))**2)
+                r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+                
+                results.append({
+                    'x_fine': x_fine,
+                    'y_fit_display': y_fit_display,
+                    'center': center,
+                    'fwhm': fwhm,
+                    'area': area,
+                    'intensity': intensity,
+                    'r_squared': r_squared
+                })
+            
+            return results
+            
+        except Exception as e:
+            print(f"Failed to fit multi-peak group: {e}")
+            return [None] * len(group)
+    
     def fit_current(self):
-        """Fit current file with selected peaks"""
+        """Fit current file with selected peaks using improved curve fitting from curvefit module"""
         if self.current_data is None or not self.peaks:
             QMessageBox.warning(self, "No Data", "Please load a file and add peaks first.")
             return
@@ -926,109 +1283,70 @@ class BatchFittingDialog(QDialog):
             # Perform actual fitting
             x, y = self.current_data[:, 0], self.current_data[:, 1]
             
-            # Calculate background
-            if len(self.bg_points) >= 2:
-                bg_x = np.array([p[0] for p in self.bg_points])
-                bg_y = np.array([p[1] for p in self.bg_points])
-                # Linear interpolation for background
-                background = np.interp(x, bg_x, bg_y)
-            else:
-                # Use simple baseline
-                background = np.percentile(y, 5)
-                
-            # Subtract background
-            y_corrected = y - background
-            y_corrected = np.maximum(y_corrected, 0)  # Ensure non-negative
-            
             # Clear previous fit curves
             self.current_fit_curves = []
             
-            # Fit each peak
+            # Group overlapping peaks
+            peak_groups = self._group_overlapping_peaks(self.peaks, x, y)
+            
+            # Fit each group (single peak or multi-peak)
             peak_results = []
             fit_quality = []
-            fit_curves = []  # Store fit curves for this file
+            fit_curves = []
             
-            for peak_pos in self.peaks:
-                # Define window around peak
-                window = 50  # points
-                peak_idx = np.argmin(np.abs(x - peak_pos))
-                left = max(0, peak_idx - window)
-                right = min(len(x), peak_idx + window)
-                
-                x_local = x[left:right]
-                y_local = y_corrected[left:right]
-                
-                if len(x_local) < 5:
-                    continue
+            for group in peak_groups:
+                if len(group) == 1:
+                    # Single peak - fit independently
+                    pos, idx = group[0]
+                    result = self._fit_single_peak(x, y, idx, pos)
                     
-                try:
-                    # Generate fine x points for smooth curve
-                    x_fine = np.linspace(x_local.min(), x_local.max(), 500)
+                    if result is not None:
+                        fit_curves.append((result['x_fine'].copy(), result['y_fit_display'].copy()))
+                        peak_results.append({
+                            'center': result['center'],
+                            'fwhm': result['fwhm'],
+                            'area': result['area'],
+                            'intensity': result['intensity'],
+                            'r_squared': result['r_squared']
+                        })
+                        fit_quality.append(result['r_squared'])
+                    else:
+                        peak_results.append({
+                            'center': pos,
+                            'fwhm': 0,
+                            'area': 0,
+                            'intensity': 0,
+                            'r_squared': 0
+                        })
+                        fit_quality.append(0)
+                else:
+                    # Multiple overlapping peaks - fit together
+                    results = self._fit_multi_peaks_group(x, y, group)
                     
-                    # Fit peak
-                    if self.fit_method == "voigt":
-                        p0 = [np.max(y_local), peak_pos, 0.1, 0.1]
-                        bounds = ([0, x_local.min(), 0, 0], 
-                                 [np.inf, x_local.max(), np.inf, np.inf])
-                        popt, _ = curve_fit(voigt, x_local, y_local, p0=p0, 
-                                          bounds=bounds, maxfev=10000)
-                        y_fit = voigt(x_local, *popt)
-                        y_fit_fine = voigt(x_fine, *popt)
-                        sigma = popt[2]
-                        gamma = popt[3]
-                    else:  # pseudo-voigt
-                        p0 = [np.max(y_local), peak_pos, 0.1, 0.1, 0.5]
-                        bounds = ([0, x_local.min(), 0, 0, 0], 
-                                 [np.inf, x_local.max(), np.inf, np.inf, 1.0])
-                        popt, _ = curve_fit(pseudo_voigt, x_local, y_local, p0=p0, 
-                                          bounds=bounds, maxfev=10000)
-                        y_fit = pseudo_voigt(x_local, *popt)
-                        y_fit_fine = pseudo_voigt(x_fine, *popt)
-                        sigma = popt[2]
-                        gamma = popt[3]
-                    
-                    # Add background back for display
-                    bg_fine = np.interp(x_fine, bg_x, bg_y) if len(self.bg_points) >= 2 else background
-                    y_fit_display = y_fit_fine + bg_fine
-                    
-                    # Store fit curve for plotting
-                    self.current_fit_curves.append((x_fine, y_fit_display))
-                    fit_curves.append((x_fine.copy(), y_fit_display.copy()))
-                    
-                    # Calculate FWHM (Full Width at Half Maximum)
-                    # For Voigt/Pseudo-Voigt, approximate FWHM
-                    fwhm = 2 * np.sqrt(2 * np.log(2)) * sigma  # Gaussian approximation
-                    
-                    # Calculate area under peak (integrate the fitted curve without background)
-                    dx = x_fine[1] - x_fine[0]
-                    area = np.trapz(y_fit_fine, dx=dx)
-                    
-                    # Intensity is the amplitude (peak height)
-                    intensity = popt[0]
-                        
-                    # Calculate R-squared
-                    ss_res = np.sum((y_local - y_fit)**2)
-                    ss_tot = np.sum((y_local - np.mean(y_local))**2)
-                    r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
-                    
-                    fit_quality.append(r_squared)
-                    peak_results.append({
-                        'center': popt[1],
-                        'fwhm': fwhm,
-                        'area': area,
-                        'intensity': intensity,
-                        'r_squared': r_squared
-                    })
-                    
-                except Exception as e:
-                    fit_quality.append(0)
-                    peak_results.append({
-                        'center': peak_pos,
-                        'fwhm': 0,
-                        'area': 0,
-                        'intensity': 0,
-                        'r_squared': 0
-                    })
+                    for i, result in enumerate(results):
+                        if result is not None:
+                            fit_curves.append((result['x_fine'].copy(), result['y_fit_display'].copy()))
+                            peak_results.append({
+                                'center': result['center'],
+                                'fwhm': result['fwhm'],
+                                'area': result['area'],
+                                'intensity': result['intensity'],
+                                'r_squared': result['r_squared']
+                            })
+                            fit_quality.append(result['r_squared'])
+                        else:
+                            pos, idx = group[i]
+                            peak_results.append({
+                                'center': pos,
+                                'fwhm': 0,
+                                'area': 0,
+                                'intensity': 0,
+                                'r_squared': 0
+                            })
+                            fit_quality.append(0)
+            
+            # Store fit curves
+            self.current_fit_curves = fit_curves
             
             # Calculate average fit quality
             avg_r_squared = np.mean(fit_quality) if fit_quality else 0
@@ -1051,27 +1369,31 @@ class BatchFittingDialog(QDialog):
             
             # Show result only if not in auto-fitting mode
             if not self.auto_fitting:
+                multi_groups = len([g for g in peak_groups if len(g) > 1])
+                status_msg = f"✓ Fitted {len(self.peaks)} peaks for {filename}\n\n"
+                if multi_groups > 0:
+                    status_msg += f"({multi_groups} multi-peak groups)\n"
+                status_msg += f"Average R² = {avg_r_squared:.3f}"
+                
                 if avg_r_squared < self.fit_tolerance:
                     QMessageBox.warning(
                         self, 
                         "Poor Fit Quality", 
-                        f"Fitted {len(self.peaks)} peaks for {filename}\n\n"
-                        f"⚠️ Average R² = {avg_r_squared:.3f} (< {self.fit_tolerance:.2f})\n"
+                        status_msg + f"\n\n⚠️ R² < {self.fit_tolerance:.2f}\n"
                         f"Consider adjusting peaks or background points."
                     )
                 else:
                     QMessageBox.information(
                         self, 
                         "Fit Successful", 
-                        f"✓ Fitted {len(self.peaks)} peaks for {filename}\n\n"
-                        f"Average R² = {avg_r_squared:.3f}"
+                        status_msg
                     )
             
             return avg_r_squared
             
         except Exception as e:
             if not self.auto_fitting:
-                QMessageBox.warning(self, "Fit Error", f"Fitting failed:\n{str(e)}")
+                QMessageBox.warning(self, "Fit Error", f"Fitting failed:\n{str(e)}\n{traceback.format_exc()}")
             return 0
             
     def start_auto_fitting(self):
