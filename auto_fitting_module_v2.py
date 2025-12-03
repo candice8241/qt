@@ -211,6 +211,10 @@ class AutoFittingModule(QWidget):
         # Dialog geometry persistence (lines 604-605)
         self.verification_dialog_geometry = None
         
+        # Store previous peaks/bg points for retention between files
+        self._previous_peaks = None
+        self._previous_bg_points = None
+        
         # Undo stack (lines 607-608)
         self.undo_stack = []
         
@@ -612,11 +616,15 @@ class AutoFittingModule(QWidget):
         self.results_tree.setColumnCount(len(columns))
         self.results_tree.setHorizontalHeaderLabels(columns)
         
-        # Set column widths (lines 922-926)
+        # Set column widths (lines 922-926) - Fixed widths to prevent layout shift
         col_widths = {'Peak': 50, '2theta': 100, 'FWHM': 100, 'Area': 100,
-                      'Amplitude': 100, 'Sigma': 80, 'Gamma': 80, 'Eta': 60}
+                      'Amplitude': 100, 'Sigma': 80, 'Gamma': 80, 'Eta': 80}
         for i, col in enumerate(columns):
             self.results_tree.setColumnWidth(i, col_widths.get(col, 80))
+        
+        # Disable column resize on content change to prevent flickering
+        header = self.results_tree.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.Fixed)
         
         # Style
         self.results_tree.setStyleSheet("""
@@ -2051,36 +2059,66 @@ class AutoFittingModule(QWidget):
             QApplication.processEvents()
             self.update_info("  ✓ File loaded successfully\n")
             
-            # Step 2: Auto-find peaks
-            self.update_info("  Step 2: Auto-detecting peaks...\n")
-            self.auto_find_peaks()
-            QApplication.processEvents()
+            # Restore previous peaks and background points if they exist
+            # This ensures modifications from previous verification are retained
+            if hasattr(self, '_previous_peaks') and self._previous_peaks is not None:
+                self.selected_peaks = self._previous_peaks.copy()
+                self._previous_peaks = None
             
+            if hasattr(self, '_previous_bg_points') and self._previous_bg_points is not None:
+                self.bg_points = self._previous_bg_points.copy()
+                self._previous_bg_points = None
+            
+            # If no previous state, auto-detect
             if len(self.selected_peaks) == 0:
-                self.update_info("  ❌ No peaks detected!\n")
-                return False
+                # Step 2: Auto-find peaks
+                self.update_info("  Step 2: Auto-detecting peaks...\n")
+                self.auto_find_peaks()
+                QApplication.processEvents()
+                
+                if len(self.selected_peaks) == 0:
+                    self.update_info("  ❌ No peaks detected!\n")
+                    return False
+                
+                self.update_info(f"  ✓ Detected {len(self.selected_peaks)} peaks\n")
+            else:
+                self.update_info(f"  Using previous {len(self.selected_peaks)} peak(s)\n")
             
-            self.update_info(f"  ✓ Detected {len(self.selected_peaks)} peaks\n")
-            
-            # Auto-select background
-            self.update_info("  Auto-selecting background...\n")
-            self.auto_select_background()
-            QApplication.processEvents()
-            self.update_info(f"  ✓ Selected {len(self.bg_points)} background points\n")
+            # If no previous background, auto-select
+            if len(self.bg_points) == 0:
+                # Auto-select background
+                self.update_info("  Auto-selecting background...\n")
+                self.auto_select_background()
+                QApplication.processEvents()
+                self.update_info(f"  ✓ Selected {len(self.bg_points)} background points\n")
+            else:
+                self.update_info(f"  Using previous {len(self.bg_points)} background point(s)\n")
             
             # Manual verification step - allow user to review and adjust
             self.update_info("  Waiting for manual verification...\n")
+            
+            # Save current state before showing verification dialog
+            peaks_before = self.selected_peaks.copy()
+            bg_before = self.bg_points.copy()
+            
             user_action = self._show_verification_dialog()
             
             if user_action == "skip":
                 self.update_info("  User chose to skip this file\n")
                 self.batch_skip_current = True
+                # Save current state for next file
+                self._previous_peaks = self.selected_peaks.copy()
+                self._previous_bg_points = self.bg_points.copy()
                 return False
             elif user_action == "stop":
                 self.update_info("  User chose to stop batch processing\n")
                 self.batch_running = False
                 self.batch_stopped_by_user = True
                 return False
+            
+            # Check if user made modifications
+            if len(self.selected_peaks) != len(peaks_before) or len(self.bg_points) != len(bg_before):
+                self.update_info(f"  User adjusted: {len(self.selected_peaks)} peaks, {len(self.bg_points)} BG points\n")
             
             self.update_info("  ✓ Manual verification completed\n")
             
@@ -2117,11 +2155,13 @@ class AutoFittingModule(QWidget):
         dialog = QDialog(self)
         dialog.setWindowTitle("Manual Verification - Review Peaks and Background")
         dialog.setMinimumSize(420, 320)
+        dialog.setMaximumSize(450, 400)  # Fix size to prevent flickering
         dialog.setStyleSheet("QDialog { background-color: #E6F3FF; }")
         
         # Set non-modal to allow interaction with plot area
         dialog.setModal(False)
-        dialog.setWindowFlags(dialog.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        # Remove WindowStaysOnTopHint to reduce flickering
+        dialog.setWindowFlags(Qt.WindowType.Dialog | Qt.WindowType.WindowCloseButtonHint)
         
         layout = QVBoxLayout(dialog)
         layout.setContentsMargins(18, 12, 18, 12)
@@ -2254,47 +2294,53 @@ class AutoFittingModule(QWidget):
         return user_action["action"]
     
     def _merge_batch_csv_files(self):
-        """Merge all batch CSV files into a single summary file"""
+        """Merge all batch CSV files into a single summary file with blank lines between files"""
         if not self.batch_csv_paths:
             return
         
         import pandas as pd
         
-        # Read all CSV files
-        all_dataframes = []
-        for csv_path in self.batch_csv_paths:
-            try:
-                df = pd.read_csv(csv_path)
-                # Add source filename column
-                df.insert(0, 'Source_File', os.path.basename(csv_path).replace('_peaks.csv', ''))
-                all_dataframes.append(df)
-            except Exception as e:
-                print(f"Warning: Failed to read {csv_path}: {e}")
-                continue
-        
-        if not all_dataframes:
-            return
-        
-        # Concatenate all dataframes
-        merged_df = pd.concat(all_dataframes, ignore_index=True)
-        
         # Get output directory from first CSV file
         output_dir = os.path.dirname(self.batch_csv_paths[0])
-        
-        # Generate summary filename with timestamp
-        from datetime import datetime
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        summary_filename = f"batch_summary_{timestamp}.csv"
+        summary_filename = "batch_summary.csv"
         summary_path = os.path.join(output_dir, summary_filename)
         
-        # Save merged CSV
-        merged_df.to_csv(summary_path, index=False)
+        # Read and merge CSV files with blank lines between different files
+        total_peaks = 0
+        with open(summary_path, 'w', newline='', encoding='utf-8') as outfile:
+            import csv
+            writer = None
+            
+            for idx, csv_path in enumerate(self.batch_csv_paths):
+                try:
+                    df = pd.read_csv(csv_path)
+                    # Add source filename column
+                    source_name = os.path.basename(csv_path).replace('_fit_results.csv', '').replace('_peaks.csv', '')
+                    df.insert(0, 'Source_File', source_name)
+                    
+                    # Write header only for first file
+                    if writer is None:
+                        writer = csv.writer(outfile)
+                        writer.writerow(df.columns.tolist())
+                    
+                    # Write data rows
+                    for _, row in df.iterrows():
+                        writer.writerow(row.tolist())
+                        total_peaks += 1
+                    
+                    # Add blank line between different files (except after last file)
+                    if idx < len(self.batch_csv_paths) - 1:
+                        writer.writerow([])
+                    
+                except Exception as e:
+                    print(f"Warning: Failed to read {csv_path}: {e}")
+                    continue
         
         self.update_info(f"All CSV files merged into: {summary_filename}\n")
         QMessageBox.information(self, "CSV Merged", 
                               f"All batch results merged into:\n{summary_filename}\n\n"
                               f"Location: {output_dir}\n"
-                              f"Total peaks: {len(merged_df)}")
+                              f"Total peaks: {total_peaks}")
     
     def _show_manual_adjustment_dialog(self):
         """Show dialog for manual adjustment during batch processing (lines 2399-2466)"""
