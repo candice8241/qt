@@ -13,9 +13,9 @@ import pandas as pd
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                               QPushButton, QFileDialog, QMessageBox, 
                               QListWidget, QListWidgetItem, QSplitter, QWidget,
-                              QFrame, QComboBox, QLineEdit)
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+                              QFrame, QComboBox, QLineEdit, QSizePolicy)
+from PyQt6.QtCore import Qt, QRect
+from PyQt6.QtGui import QFont, QPainter, QPen, QColor
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
@@ -126,37 +126,52 @@ class BatchFittingDialog(QWidget):
         else:
             super().keyPressEvent(event)
         
+    def paintEvent(self, event):
+        """Custom paint event to draw border manually"""
+        super().paintEvent(event)
+        
+        # Draw border manually to ensure visibility
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        # Set pen for border
+        pen = QPen(QColor("#7E57C2"), 5)  # 5px thick purple border
+        pen.setStyle(Qt.PenStyle.SolidLine)
+        painter.setPen(pen)
+        
+        # Draw rectangle border (inset by pen width/2)
+        rect = self.rect()
+        painter.drawRoundedRect(
+            rect.adjusted(3, 3, -3, -3),  # Inset to keep border inside widget
+            10, 10  # Border radius
+        )
+        
+        painter.end()
+    
     def setup_ui(self):
         """Setup the user interface"""
-        # Set a distinctive background to make border visible
+        # Set background with padding for border
         self.setStyleSheet("""
             BatchFittingDialog {
-                background-color: #E0E0E0;
-                padding: 10px;
+                background-color: #E8E8E8;
             }
         """)
         
-        # Use a wrapper layout with generous margins
-        wrapper_layout = QVBoxLayout(self)
-        wrapper_layout.setContentsMargins(12, 12, 12, 12)  # Large margins for border visibility
-        wrapper_layout.setSpacing(0)
+        # Main layout with margins for manual border
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(8, 8, 8, 8)  # Space for painted border
+        main_layout.setSpacing(0)
         
-        # Create the bordered container with explicit size policy
-        container = QFrame()
-        container.setObjectName("mainContainer")
+        # Create content container
+        container = QWidget()
         container.setStyleSheet("""
-            QFrame#mainContainer {
-                border: 4px solid #7E57C2;
-                border-radius: 10px;
+            QWidget {
                 background-color: #FAFAFA;
+                border-radius: 8px;
             }
         """)
         
-        # Force the container to take available space
-        from PyQt6.QtWidgets import QSizePolicy
-        container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
-        
-        wrapper_layout.addWidget(container)
+        main_layout.addWidget(container)
         
         # Inner layout for actual content
         layout = QVBoxLayout(container)
