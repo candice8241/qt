@@ -18,6 +18,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
 from scipy.signal import find_peaks, peak_widths
 from scipy.optimize import curve_fit
 from scipy.special import wofz
@@ -127,29 +128,35 @@ class BatchFittingDialog(QWidget):
         
     def setup_ui(self):
         """Setup the user interface"""
-        # Set border style for the main widget with proper margins
+        # Set border style for the main widget - use box-shadow approach for visibility
         self.setStyleSheet("""
             QWidget {
-                background-color: #FAFAFA;
+                background-color: #F0F0F0;
             }
         """)
         
-        # Create main container with border
-        main_container = QFrame(self)
-        main_container.setStyleSheet("""
+        # Main layout with explicit margins to ensure border visibility
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(8, 8, 8, 8)  # Space for border on ALL sides
+        main_layout.setSpacing(0)
+        
+        # Create bordered container
+        container = QFrame()
+        container.setStyleSheet("""
             QFrame {
                 border: 3px solid #7E57C2;
                 border-radius: 8px;
                 background-color: #FAFAFA;
+                margin: 0px;
             }
         """)
+        container.setFrameShape(QFrame.Shape.Box)
+        container.setLineWidth(3)
         
-        # Container layout
-        container_layout = QVBoxLayout(self)
-        container_layout.setContentsMargins(5, 5, 5, 5)
-        container_layout.addWidget(main_container)
+        main_layout.addWidget(container)
         
-        layout = QVBoxLayout(main_container)
+        # Inner layout for actual content
+        layout = QVBoxLayout(container)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(5)
         
@@ -703,10 +710,17 @@ class BatchFittingDialog(QWidget):
         self.plot_data(preserve_zoom=True)
         
     def clear_all(self):
-        """Clear all peaks and background points"""
+        """Clear all peaks, background points, and fitted curves"""
         self.peaks = []
         self.bg_points = []
         self.current_fit_curves = []
+        
+        # Also clear fit results for current file
+        if self.file_list and self.current_index >= 0 and self.current_index < len(self.file_list):
+            current_filename = os.path.basename(self.file_list[self.current_index])
+            # Remove results for current file
+            self.results = [r for r in self.results if r['file'] != current_filename]
+        
         self.plot_data(preserve_zoom=True)
         
     def set_mode(self, mode):
@@ -890,28 +904,82 @@ class BatchFittingDialog(QWidget):
         # Plot current data
         self.canvas.axes.plot(x, y, 'k-', linewidth=1.5, label='Data', zorder=2)
         
-        # Plot fitted curves for current file (always show if exists, regardless of overlap mode)
+        # Plot fitted curves for current file (matching auto_fitting_module.py style)
         current_filename = os.path.basename(self.file_list[self.current_index]) if self.file_list and self.current_index >= 0 else None
-        fit_curves_to_plot = []
         
         if current_filename:
-            # Find fit curves from results
+            # Find fit results from results list
             for result in self.results:
                 if result['file'] == current_filename and 'fit_curves' in result:
-                    fit_curves_to_plot = result['fit_curves']
+                    fit_curves = result['fit_curves']
+                    
+                    # Plot background line if available
+                    if self.bg_points and len(self.bg_points) >= 2:
+                        bg_x = [p[0] for p in self.bg_points]
+                        bg_y = [p[1] for p in self.bg_points]
+                        self.canvas.axes.plot(bg_x, bg_y, 's', color='#4169E1',
+                                            markersize=4, alpha=0.8, label='BG Points', zorder=3)
+                        # Interpolate background line
+                        bg_line_y = np.interp(x, bg_x, bg_y)
+                        self.canvas.axes.plot(x, bg_line_y, '-', color='#4169E1',
+                                            linewidth=1.5, alpha=0.4, label='Background', zorder=3)
+                    
+                    # Plot individual peak components (dashed lines, different colors)
+                    colors = plt.cm.tab10(np.linspace(0, 1, len(fit_curves)))
+                    
+                    for idx, (fit_x, fit_y) in enumerate(fit_curves):
+                        label = f'Peak {idx+1}' if idx < 3 else None  # Only label first 3
+                        self.canvas.axes.plot(fit_x, fit_y, '--', linewidth=1.5, 
+                                            color=colors[idx], alpha=0.7, 
+                                            label=label, zorder=4)
+                    
+                    # Calculate and plot total fit (red solid line)
+                    if len(fit_curves) > 0:
+                        # Find common x range
+                        x_min = min(fit_x.min() for fit_x, _ in fit_curves)
+                        x_max = max(fit_x.max() for fit_x, _ in fit_curves)
+                        x_total = np.linspace(x_min, x_max, 500)
+                        
+                        # Add background
+                        if self.bg_points and len(self.bg_points) >= 2:
+                            bg_x = [p[0] for p in self.bg_points]
+                            bg_y = [p[1] for p in self.bg_points]
+                            y_total = np.interp(x_total, bg_x, bg_y)
+                        else:
+                            y_total = np.zeros_like(x_total)
+                        
+                        # Sum all peak components (without background, as they already include it)
+                        for fit_x, fit_y in fit_curves:
+                            # Subtract background first, then add to total
+                            if self.bg_points and len(self.bg_points) >= 2:
+                                bg_x = [p[0] for p in self.bg_points]
+                                bg_y = [p[1] for p in self.bg_points]
+                                bg_interp = np.interp(fit_x, bg_x, bg_y)
+                                peak_only = fit_y - bg_interp
+                            else:
+                                peak_only = fit_y
+                            # Interpolate to common x grid and add
+                            peak_interp = np.interp(x_total, fit_x, peak_only, left=0, right=0)
+                            y_total += peak_interp
+                        
+                        # Plot total fit
+                        self.canvas.axes.plot(x_total, y_total, '-', linewidth=2.0, 
+                                            color='#FF0000', alpha=0.6, 
+                                            label='Total Fit', zorder=5)
+                    
                     break
         
-        # Plot fitted curves in red
-        if fit_curves_to_plot:
-            for idx, (fit_x, fit_y) in enumerate(fit_curves_to_plot):
-                self.canvas.axes.plot(fit_x, fit_y, '-', linewidth=2.5, 
-                                     color='#E53935', alpha=0.9, 
-                                     label=f'Fit Peak {idx+1}', zorder=4)
-        
-        # Plot peaks as red vertical lines
-        for peak_x in self.peaks:
-            self.canvas.axes.axvline(peak_x, color='#E57373', linestyle='--', 
-                                     alpha=0.8, linewidth=2, zorder=3)
+        # Plot peaks as markers (matching auto_fitting_module.py)
+        if self.peaks:
+            # Get y values at peak positions
+            peak_y_vals = []
+            for peak_x in self.peaks:
+                idx = np.argmin(np.abs(x - peak_x))
+                peak_y_vals.append(y[idx])
+            
+            # Plot peak markers
+            self.canvas.axes.plot(self.peaks, peak_y_vals, 'v', color='#E57373', 
+                                 markersize=8, alpha=0.8, label='Peaks', zorder=6)
             
         # Plot background points as smaller light blue squares
         if self.bg_points:
