@@ -1,0 +1,29 @@
+快速完成auto_fitting_module_v2.py的计划
+
+第1批: 事件处理器 (立即添加)
+- on_scroll, on_mouse_move, on_click
+- _handle_bg_click, _handle_peak_click  
+- update_bg_connect_line
+
+第2批: 文件操作 (立即添加)
+- load_file, _scan_folder, load_file_by_path
+- prev_file, next_file
+
+第3批: 显示和更新 (立即添加)
+- plot_data, update_info, display_results
+
+第4批: 峰和背景操作 (立即添加)
+- auto_find_peaks, fit_peaks, reset_peaks
+- toggle_bg_selection, auto_select_background
+- subtract_background, clear_background
+
+第5批: 其他功能 (立即添加)
+- apply_smoothing_to_data, reset_to_original_data
+- toggle_overlap_mode, undo_action, clear_fit
+- save_results, on_fit_method_changed
+
+第6批: 批处理 (基础版本)
+- batch_auto_fit, show_batch_settings
+
+预计新增代码: 约800-1000行
+总计: 约1700-1800行（完整可运行版本）
