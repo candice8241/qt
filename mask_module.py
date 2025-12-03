@@ -234,7 +234,7 @@ class MaskModule(GUIBase):
 
         layout = QVBoxLayout(group)
         layout.setSpacing(0)
-        layout.setContentsMargins(10, -10, 10, 0)
+        layout.setContentsMargins(10, -30, 10, 0)
 
         # Main canvas layout - Image on left, Operations on right
         main_canvas_layout = QHBoxLayout()
@@ -247,15 +247,13 @@ class MaskModule(GUIBase):
         canvas_container.setFixedSize(1050, 620)  # Fixed container size (reduced height)
         canvas_layout = QHBoxLayout(canvas_container)
         canvas_layout.setSpacing(5)
-        canvas_layout.setContentsMargins(0, 0, 0, 0)
+        canvas_layout.setContentsMargins(0, -20, 0, 0)
         
         # Matplotlib canvas - Fixed size for better display
         self.figure = Figure(figsize=(10, 6))
-        self.figure.subplots_adjust(left=0.07, right=0.98, top=0.93, bottom=0.05)
+        self.figure.subplots_adjust(left=0.07, right=0.98, top=0.97, bottom=0.07)
         self.canvas = FigureCanvas(self.figure)
         self.canvas.setFixedSize(1000, 600)  # Fixed canvas size (reduced height)
-        # Use negative spacing to move canvas up
-        canvas_layout.addSpacing(-20)
         canvas_layout.addWidget(self.canvas)
         
         # Vertical contrast slider
@@ -1134,8 +1132,6 @@ class MaskModule(GUIBase):
         self.ax.set_ylim(0, self.image_data.shape[0])
         self.ax.set_xlabel('X (pixels)', fontsize=8)
         self.ax.set_ylabel('Y (pixels)', fontsize=8)
-        # Move x-axis label to top (keep ticks at bottom)
-        self.ax.xaxis.set_label_position('top')
         self.ax.tick_params(axis='both', which='major', labelsize=5)
         self.ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
 
