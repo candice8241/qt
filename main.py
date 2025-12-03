@@ -18,7 +18,7 @@ from single_crystal_module import SingleCrystalModule
 from bcdi_cal_module import BCDICalModule
 from dioptas_module import DioptasModule
 from auto_fitting_module_v2 import AutoFittingModule
-from batch_fitting_module import BatchFittingModule
+from batch_fitting_module import BatchFittingModule  # Batch fitting from curvefit
 
 
 class XRDProcessingGUI(QMainWindow, GUIBase):
@@ -471,8 +471,8 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         
         batch_fitting_frame = self._ensure_frame("batch_fitting")
         if self.batch_fitting_module is None:
-            self.batch_fitting_module = BatchFittingModule()
-            batch_fitting_frame.layout().addWidget(self.batch_fitting_module)
+            self.batch_fitting_module = BatchFittingModule(batch_fitting_frame, self)
+            self.batch_fitting_module.setup_ui()
         batch_fitting_frame.hide()  # Ensure hidden after prebuild
     
     def prebuild_interactive_windows(self):
@@ -566,8 +566,8 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         elif tab_name == "batch_fitting":
             target_frame = self._ensure_frame("batch_fitting")
             if self.batch_fitting_module is None:
-                self.batch_fitting_module = BatchFittingModule()
-                target_frame.layout().addWidget(self.batch_fitting_module)
+                self.batch_fitting_module = BatchFittingModule(target_frame, self)
+                self.batch_fitting_module.setup_ui()
 
         if target_frame is not None:
             target_frame.show()
