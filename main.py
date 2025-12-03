@@ -162,9 +162,9 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         self.batch_btn = self.create_sidebar_button("📊  Batch", self.open_batch, is_active=False)
         sidebar_layout.addWidget(self.batch_btn)
 
-        # Curve Fitting button
-        self.curvefit_btn = self.create_sidebar_button("📈  curvefit", self.open_curvefit, is_active=False)
-        sidebar_layout.addWidget(self.curvefit_btn)
+        # Curve Fitting button (hidden)
+        # self.curvefit_btn = self.create_sidebar_button("📈  curvefit", self.open_curvefit, is_active=False)
+        # sidebar_layout.addWidget(self.curvefit_btn)
 
         # EOS Fitting button
         self.EOSfit_btn = self.create_sidebar_button("📊  eosfit", self.open_EOSfit, is_active=False)
@@ -364,7 +364,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             "dioptas": self.dioptas_btn,
             "auto_fitting": self.auto_fitting_btn,
             "batch": self.batch_btn,
-            "curvefit": self.curvefit_btn,
+            # "curvefit": self.curvefit_btn,  # Hidden
             "eosfit": self.EOSfit_btn
         }
         

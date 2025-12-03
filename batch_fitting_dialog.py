@@ -85,6 +85,10 @@ class BatchFittingDialog(QWidget):
         self.overlap_mode = False
         self.overlapped_data = []  # List of (filename, x, y, peaks, bg_points) for overlay
         
+        # Peak grouping and fitting parameters (matching auto_fitting_module.py)
+        self.overlap_threshold = 1.5  # Overlap FWHM multiplier for grouping peaks
+        self.fitting_window_multiplier = 3.0  # Fit window multiplier for peak fitting
+        
         self.setup_ui()
         
     def keyPressEvent(self, event):
@@ -128,14 +132,30 @@ class BatchFittingDialog(QWidget):
         
     def setup_ui(self):
         """Setup the user interface"""
+        # Set border style for the main widget
+        self.setStyleSheet("""
+            BatchFittingDialog {
+                border: 2px solid #7E57C2;
+                border-radius: 8px;
+                background-color: #FAFAFA;
+            }
+        """)
+        
         layout = QVBoxLayout(self)
         layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(5)
         
         # Title and controls
         header = QWidget()
+        header.setStyleSheet("""
+            QWidget {
+                background-color: #F3E5F5;
+                border: 1px solid #CE93D8;
+                border-radius: 5px;
+            }
+        """)
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(5, 5, 5, 5)
+        header_layout.setContentsMargins(8, 8, 8, 8)
         
         title = QLabel("📊 Batch Peak Fitting - Interactive Mode")
         title.setFont(QFont('Arial', 13, QFont.Weight.Bold))
@@ -245,7 +265,13 @@ class BatchFittingDialog(QWidget):
         """Create control bar with buttons and settings"""
         bar = QWidget()
         bar.setFixedHeight(90)
-        bar.setStyleSheet("background-color: #E3F2FF; border-radius: 5px;")
+        bar.setStyleSheet("""
+            QWidget {
+                background-color: #E3F2FF;
+                border: 2px solid #90CAF9;
+                border-radius: 6px;
+            }
+        """)
         main_layout = QVBoxLayout(bar)
         main_layout.setContentsMargins(10, 5, 10, 5)
         main_layout.setSpacing(5)
@@ -254,7 +280,7 @@ class BatchFittingDialog(QWidget):
         row1 = QHBoxLayout()
         
         # Add mode selector
-        mode_label = QLabel("Add Mode:")
+        mode_label = QLabel("Mode:")
         mode_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         row1.addWidget(mode_label)
         
@@ -313,6 +339,36 @@ class BatchFittingDialog(QWidget):
         self.method_combo.setFont(QFont('Arial', 9))
         self.method_combo.currentTextChanged.connect(self.on_method_changed)
         row1.addWidget(self.method_combo)
+        
+        row1.addSpacing(20)
+        
+        # Overlap FWHM parameter
+        overlap_label = QLabel("Overlap FWHM×:")
+        overlap_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        overlap_label.setToolTip("Peaks within this multiplier of FWHM will be grouped together")
+        row1.addWidget(overlap_label)
+        
+        self.overlap_entry = QLineEdit(str(self.overlap_threshold))
+        self.overlap_entry.setFixedWidth(50)
+        self.overlap_entry.setFont(QFont('Arial', 9))
+        self.overlap_entry.setStyleSheet("padding: 3px;")
+        self.overlap_entry.textChanged.connect(self.on_overlap_changed)
+        row1.addWidget(self.overlap_entry)
+        
+        row1.addSpacing(20)
+        
+        # Fit window parameter
+        fit_window_label = QLabel("Fit Window×:")
+        fit_window_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        fit_window_label.setToolTip("Fitting window size as multiplier of peak FWHM")
+        row1.addWidget(fit_window_label)
+        
+        self.fit_window_entry = QLineEdit(str(self.fitting_window_multiplier))
+        self.fit_window_entry.setFixedWidth(50)
+        self.fit_window_entry.setFont(QFont('Arial', 9))
+        self.fit_window_entry.setStyleSheet("padding: 3px;")
+        self.fit_window_entry.textChanged.connect(self.on_fit_window_changed)
+        row1.addWidget(self.fit_window_entry)
         
         row1.addStretch()
         
@@ -462,7 +518,13 @@ class BatchFittingDialog(QWidget):
         """Create navigation bar with prev/next/save buttons"""
         bar = QWidget()
         bar.setFixedHeight(55)
-        bar.setStyleSheet("background-color: #FFF9C4; border-radius: 5px;")
+        bar.setStyleSheet("""
+            QWidget {
+                background-color: #FFF9C4;
+                border: 2px solid #FFD54F;
+                border-radius: 6px;
+            }
+        """)
         layout = QHBoxLayout(bar)
         layout.setContentsMargins(10, 5, 10, 5)
         
@@ -931,7 +993,24 @@ class BatchFittingDialog(QWidget):
             return 0.5  # Default fallback
     
     def _group_overlapping_peaks(self, peak_positions, x, y):
-        """Group overlapping peaks based on their positions and FWHM"""
+        """
+        Group overlapping peaks based on their positions and FWHM.
+        Uses configurable overlap_threshold for grouping decision.
+        
+        Parameters:
+        -----------
+        peak_positions : list
+            List of peak center positions
+        x : array
+            X-axis data
+        y : array
+            Y-axis data
+            
+        Returns:
+        --------
+        groups : list of lists
+            Each group contains tuples of (position, index) for peaks that should be fitted together
+        """
         if len(peak_positions) == 0:
             return []
         
@@ -939,8 +1018,8 @@ class BatchFittingDialog(QWidget):
         peak_indices = [np.argmin(np.abs(x - pos)) for pos in peak_positions]
         peak_fwhms = [self._estimate_peak_fwhm(x, y, idx) for idx in peak_indices]
         
-        # Overlap threshold multiplier (1.5 means peaks overlap if distance < 1.5*FWHM)
-        overlap_mult = 1.5
+        # Use configurable overlap threshold
+        overlap_mult = self.overlap_threshold
         
         # Convert to sorted list with positions
         peak_data = [(pos, idx, fwhm) for pos, idx, fwhm in zip(peak_positions, peak_indices, peak_fwhms)]
@@ -973,14 +1052,33 @@ class BatchFittingDialog(QWidget):
         return groups
     
     def _fit_single_peak(self, x, y, peak_idx, peak_pos):
-        """Fit a single peak independently using improved background subtraction"""
+        """
+        Fit a single peak independently using improved background subtraction.
+        Uses configurable fitting_window_multiplier.
+        
+        Parameters:
+        -----------
+        x : array
+            X-axis data
+        y : array
+            Y-axis data
+        peak_idx : int
+            Index of peak in data array
+        peak_pos : float
+            Position of peak center
+            
+        Returns:
+        --------
+        result : dict or None
+            Dictionary containing fit results or None if fitting failed
+        """
         try:
             # Get peak width for window estimation
             results_half = peak_widths(y, [peak_idx], rel_height=0.5)
             width_pts = results_half[0][0] if len(results_half[0]) > 0 else 40
             
-            # Fit window multiplier (3.0 is standard)
-            fit_window_mult = 3.0
+            # Use configurable fit window multiplier
+            fit_window_mult = self.fitting_window_multiplier
             window = int(width_pts * fit_window_mult)
             window = max(20, min(window, 200))
             
@@ -1091,7 +1189,24 @@ class BatchFittingDialog(QWidget):
             return None
     
     def _fit_multi_peaks_group(self, x, y, group):
-        """Fit multiple overlapping peaks together"""
+        """
+        Fit multiple overlapping peaks together.
+        Uses configurable fitting_window_multiplier.
+        
+        Parameters:
+        -----------
+        x : array
+            X-axis data
+        y : array
+            Y-axis data
+        group : list of tuples
+            List of (position, index) tuples for peaks in the group
+            
+        Returns:
+        --------
+        results : list of dicts or list of None
+            List of fit results for each peak, or None values if fitting failed
+        """
         try:
             peak_positions = [pos for pos, idx in group]
             peak_indices = [idx for pos, idx in group]
@@ -1109,7 +1224,8 @@ class BatchFittingDialog(QWidget):
             except:
                 pass
             
-            fit_window_mult = 3.0
+            # Use configurable fit window multiplier
+            fit_window_mult = self.fitting_window_multiplier
             window = int(avg_width * fit_window_mult * 0.8)  # Slightly smaller for multi-peak
             window = max(40, min(window, 250))
             
@@ -1522,6 +1638,24 @@ class BatchFittingDialog(QWidget):
             self.fit_method = "voigt"
         else:
             self.fit_method = "pseudo"
+    
+    def on_overlap_changed(self):
+        """Handle overlap FWHM multiplier change"""
+        try:
+            value = float(self.overlap_entry.text())
+            if value > 0:
+                self.overlap_threshold = value
+        except ValueError:
+            pass
+    
+    def on_fit_window_changed(self):
+        """Handle fit window multiplier change"""
+        try:
+            value = float(self.fit_window_entry.text())
+            if value > 0:
+                self.fitting_window_multiplier = value
+        except ValueError:
+            pass
             
     def toggle_overlap_mode(self):
         """Toggle overlap mode"""
