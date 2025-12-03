@@ -89,8 +89,8 @@ class MaskModule(GUIBase):
         content_widget = QWidget()
         content_widget.setStyleSheet(f"background-color: {self.colors['bg']};")
         content_layout = QVBoxLayout(content_widget)
-        content_layout.setContentsMargins(10, 5, 10, 5)
-        content_layout.setSpacing(4)
+        content_layout.setContentsMargins(10, 2, 10, 2)
+        content_layout.setSpacing(2)
 
         # Control area (includes Save/Clear buttons now)
         control_group = self.create_control_group()
@@ -112,9 +112,9 @@ class MaskModule(GUIBase):
             QGroupBox {{
                 border: 2px solid {self.colors['border']};
                 border-radius: 4px;
-                margin-top: 5px;
+                margin-top: 3px;
                 font-weight: bold;
-                padding-top: 8px;
+                padding-top: 5px;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
@@ -125,7 +125,7 @@ class MaskModule(GUIBase):
 
         layout = QHBoxLayout(group)
         layout.setSpacing(5)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(10, 8, 10, 8)
         
         # Load Image button
         load_img_btn = QPushButton("📂 Load Image")
@@ -167,8 +167,9 @@ class MaskModule(GUIBase):
         """)
         load_mask_btn.clicked.connect(self.load_mask)
         layout.addWidget(load_mask_btn)
-
-        layout.addStretch()
+        
+        # Separator
+        layout.addWidget(QLabel("|"))
         
         # File info label
         self.file_info_label = QLabel("Image: --")
@@ -202,6 +203,8 @@ class MaskModule(GUIBase):
         self.position_label.setFont(QFont('Arial', 9))
         self.position_label.setStyleSheet("color: #333333; padding: 3px;")
         layout.addWidget(self.position_label)
+        
+        layout.addStretch()
 
         return group
     
@@ -213,9 +216,9 @@ class MaskModule(GUIBase):
             QGroupBox {{
                 border: 2px solid {self.colors['border']};
                 border-radius: 4px;
-                margin-top: 5px;
+                margin-top: 2px;
                 font-weight: bold;
-                padding-top: 8px;
+                padding-top: 5px;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
@@ -226,8 +229,8 @@ class MaskModule(GUIBase):
         """)
 
         layout = QVBoxLayout(group)
-        layout.setSpacing(5)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(3)
+        layout.setContentsMargins(10, 5, 10, 5)
 
         # Main canvas layout - Image on left, Operations on right
         main_canvas_layout = QHBoxLayout()
