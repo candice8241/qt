@@ -402,7 +402,7 @@ class PowderXRDModule(GUIBase):
             }}
         """)
         output_layout = QVBoxLayout(output_card)
-        output_layout.setContentsMargins(15, 0, 15, 12)
+        output_layout.setContentsMargins(15, 12, 15, 12)
         output_layout.setSpacing(8)
 
         # Number of Points - horizontal layout
@@ -414,7 +414,7 @@ class PowderXRDModule(GUIBase):
 
         npt_label = QLabel("Number of Points")
         npt_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        npt_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: transparent; border: none; padding: 0px; margin: 0px;")
+        npt_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: transparent; border: none;")
         npt_layout.addWidget(npt_label)
 
         from PyQt6.QtWidgets import QSpinBox
