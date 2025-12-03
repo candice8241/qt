@@ -21,7 +21,7 @@ class GUIBase:
             'card_bg': '#FFFFFF',
             'primary': '#E8D5F0',
             'primary_hover': '#D4BBFF',
-            'secondary': '#E8D5F0',
+            'secondary': '#E6ECFB',
             'accent': '#FF6B9D',
             'text_dark': '#2B2D42',
             'text_light': '#8B8BA7',
@@ -31,7 +31,7 @@ class GUIBase:
             'light_purple': '#FF9FB5',
             'active_module': '#C8B3E6'
         }
-
+#E8D5F0
         self.control_indicator_styles = (
             "QCheckBox::indicator {"
             " width: 16px;"
