@@ -295,8 +295,8 @@ class PowderXRDModule(GUIBase):
         h5_preview_btn = ModernButton(
             "🔍 H5 Preview & Select Region",
             self.open_h5_preview,
-            bg_color="#F4F6FB",
-            hover_color="#E8EEFA",
+            bg_color="#E6ECFB",
+            hover_color="#D4DDFA",
             width=220, height=28,
             parent=h5_btn_row
         )
@@ -335,8 +335,8 @@ class PowderXRDModule(GUIBase):
         bin_config_btn = ModernButton(
             "⚙️ Configure Bins",
             self.open_bin_config,
-            bg_color="#F4F6FB",
-            hover_color="#E8EEFA",
+            bg_color="#E6ECFB",
+            hover_color="#D4DDFA",
             width=160, height=28,
             parent=bin_btn_row
         )
