@@ -128,36 +128,39 @@ class BatchFittingDialog(QWidget):
         
     def setup_ui(self):
         """Setup the user interface"""
-        # Set border style for the main widget - use box-shadow approach for visibility
+        # Set a distinctive background to make border visible
         self.setStyleSheet("""
-            QWidget {
-                background-color: #F0F0F0;
+            BatchFittingDialog {
+                background-color: #E0E0E0;
+                padding: 10px;
             }
         """)
         
-        # Main layout with explicit margins to ensure border visibility
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(8, 8, 8, 8)  # Space for border on ALL sides
-        main_layout.setSpacing(0)
+        # Use a wrapper layout with generous margins
+        wrapper_layout = QVBoxLayout(self)
+        wrapper_layout.setContentsMargins(12, 12, 12, 12)  # Large margins for border visibility
+        wrapper_layout.setSpacing(0)
         
-        # Create bordered container
+        # Create the bordered container with explicit size policy
         container = QFrame()
+        container.setObjectName("mainContainer")
         container.setStyleSheet("""
-            QFrame {
-                border: 3px solid #7E57C2;
-                border-radius: 8px;
+            QFrame#mainContainer {
+                border: 4px solid #7E57C2;
+                border-radius: 10px;
                 background-color: #FAFAFA;
-                margin: 0px;
             }
         """)
-        container.setFrameShape(QFrame.Shape.Box)
-        container.setLineWidth(3)
         
-        main_layout.addWidget(container)
+        # Force the container to take available space
+        from PyQt6.QtWidgets import QSizePolicy
+        container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        
+        wrapper_layout.addWidget(container)
         
         # Inner layout for actual content
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(5)
         
         # Title and controls
@@ -969,17 +972,10 @@ class BatchFittingDialog(QWidget):
                     
                     break
         
-        # Plot peaks as markers (matching auto_fitting_module.py)
-        if self.peaks:
-            # Get y values at peak positions
-            peak_y_vals = []
-            for peak_x in self.peaks:
-                idx = np.argmin(np.abs(x - peak_x))
-                peak_y_vals.append(y[idx])
-            
-            # Plot peak markers
-            self.canvas.axes.plot(self.peaks, peak_y_vals, 'v', color='#E57373', 
-                                 markersize=8, alpha=0.8, label='Peaks', zorder=6)
+        # Plot peaks as vertical lines
+        for peak_x in self.peaks:
+            self.canvas.axes.axvline(peak_x, color='#E57373', linestyle='--', 
+                                     alpha=0.8, linewidth=2, zorder=3)
             
         # Plot background points as smaller light blue squares
         if self.bg_points:
