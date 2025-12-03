@@ -251,7 +251,7 @@ class MaskModule(GUIBase):
         
         # Matplotlib canvas - Fixed size for better display
         self.figure = Figure(figsize=(10, 6))
-        self.figure.subplots_adjust(left=0.07, right=0.98, top=0.99, bottom=0.07)
+        self.figure.subplots_adjust(left=0.07, right=0.98, top=0.99, bottom=0.10)
         self.canvas = FigureCanvas(self.figure)
         self.canvas.setFixedSize(1000, 600)  # Fixed canvas size (reduced height)
         canvas_layout.addWidget(self.canvas)
