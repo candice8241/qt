@@ -171,15 +171,34 @@ class MaskModule(GUIBase):
         layout.addStretch()
         
         # File info label
-        self.file_info_label = QLabel("No image loaded")
-        self.file_info_label.setStyleSheet("color: #666666; font-size: 9px;")
+        self.file_info_label = QLabel("Image: --")
+        self.file_info_label.setFont(QFont('Arial', 9))
+        self.file_info_label.setStyleSheet("color: #666666; padding: 3px;")
         layout.addWidget(self.file_info_label)
         
         # Separator
         layout.addWidget(QLabel("|"))
         
+        # Mask status label
+        self.mask_status_label = QLabel("Mask: Not loaded")
+        self.mask_status_label.setFont(QFont('Arial', 9))
+        self.mask_status_label.setStyleSheet("color: #FF5722; padding: 3px;")
+        layout.addWidget(self.mask_status_label)
+        
+        # Separator
+        layout.addWidget(QLabel("|"))
+        
+        # Total pixels label
+        self.total_pixels_label = QLabel("Total: --")
+        self.total_pixels_label.setFont(QFont('Arial', 9))
+        self.total_pixels_label.setStyleSheet("color: #666666; padding: 3px;")
+        layout.addWidget(self.total_pixels_label)
+        
+        # Separator
+        layout.addWidget(QLabel("|"))
+        
         # Position label
-        self.position_label = QLabel("📍 Position: --")
+        self.position_label = QLabel("Position: --")
         self.position_label.setFont(QFont('Arial', 9))
         self.position_label.setStyleSheet("color: #333333; padding: 3px;")
         layout.addWidget(self.position_label)
@@ -209,22 +228,6 @@ class MaskModule(GUIBase):
         layout = QVBoxLayout(group)
         layout.setSpacing(5)
         layout.setContentsMargins(10, 10, 10, 10)
-
-        # Info row with mask status and total pixels
-        info_row = QHBoxLayout()
-
-        self.mask_status_label = QLabel("🔴 Mask: Not loaded")
-        self.mask_status_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        self.mask_status_label.setStyleSheet("color: #FF5722; padding: 3px;")
-        info_row.addWidget(self.mask_status_label)
-        
-        self.total_pixels_label = QLabel("Total: --")
-        self.total_pixels_label.setFont(QFont('Arial', 9))
-        self.total_pixels_label.setStyleSheet("color: #666666; padding: 3px;")
-        info_row.addWidget(self.total_pixels_label)
-
-        info_row.addStretch()
-        layout.addLayout(info_row)
 
         # Main canvas layout - Image on left, Operations on right
         main_canvas_layout = QHBoxLayout()
@@ -780,7 +783,7 @@ class MaskModule(GUIBase):
 
             # Update info
             self.file_info_label.setText(
-                f"Image: {os.path.basename(file_path)} | Shape: {self.image_data.shape}"
+                f"Image: {os.path.basename(file_path)} ({self.image_data.shape[0]}x{self.image_data.shape[1]})"
             )
             
             # Update threshold range
@@ -789,8 +792,8 @@ class MaskModule(GUIBase):
             )
             
             # Update mask status
-            self.mask_status_label.setText("🟢 Mask: Active (empty)")
-            self.mask_status_label.setStyleSheet("color: #4CAF50; padding: 3px; font-weight: bold;")
+            self.mask_status_label.setText("Mask: Active (empty)")
+            self.mask_status_label.setStyleSheet("color: #4CAF50; padding: 3px;")
 
             # Display with caching
             self.update_display(force_recalc=True)
@@ -829,8 +832,8 @@ class MaskModule(GUIBase):
             self._redo_deque.clear()
 
             self.mask_file_path = file_path
-            self.mask_status_label.setText(f"🟢 Mask: {os.path.basename(file_path)}")
-            self.mask_status_label.setStyleSheet("color: #4CAF50; padding: 3px; font-weight: bold;")
+            self.mask_status_label.setText(f"Mask: {os.path.basename(file_path)}")
+            self.mask_status_label.setStyleSheet("color: #4CAF50; padding: 3px;")
             
             self.update_display()
             self.update_mask_statistics()
