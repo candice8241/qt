@@ -476,8 +476,8 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         if self.batch_module is None:
             from batch_fitting_dialog import BatchFittingDialog
             self.batch_module = BatchFittingDialog(batch_frame)
-            # Add generous margins to the frame layout for border visibility
-            batch_frame.layout().setContentsMargins(0, 0, 15, 0)  # Extra right margin
+            # Add right margin for border visibility, shift left overall
+            batch_frame.layout().setContentsMargins(0, 0, 20, 0)  # 20px right margin
             batch_frame.layout().addWidget(self.batch_module)
         batch_frame.hide()  # Ensure hidden after prebuild
     
@@ -574,8 +574,8 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             if self.batch_module is None:
                 from batch_fitting_dialog import BatchFittingDialog
                 self.batch_module = BatchFittingDialog(target_frame)
-                # Add generous margins to the frame layout for border visibility
-                target_frame.layout().setContentsMargins(0, 0, 15, 0)  # Extra right margin
+                # Add right margin for border visibility, shift left overall
+                target_frame.layout().setContentsMargins(0, 0, 20, 0)  # 20px right margin
                 target_frame.layout().addWidget(self.batch_module)
 
         if target_frame is not None:

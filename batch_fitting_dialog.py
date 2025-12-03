@@ -127,23 +127,24 @@ class BatchFittingDialog(QWidget):
             super().keyPressEvent(event)
         
     def paintEvent(self, event):
-        """Custom paint event to draw border manually"""
+        """Custom paint event to draw thin border manually"""
         super().paintEvent(event)
         
-        # Draw border manually to ensure visibility
+        # Draw thin border manually to ensure visibility on all sides
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
-        # Set pen for border
-        pen = QPen(QColor("#7E57C2"), 5)  # 5px thick purple border
+        # Set pen for border (2px thin purple)
+        pen = QPen(QColor("#7E57C2"), 2)
         pen.setStyle(Qt.PenStyle.SolidLine)
         painter.setPen(pen)
         
-        # Draw rectangle border (inset by pen width/2)
+        # Draw rectangle border with rounded corners
+        # Adjust inset to ensure right border is visible
         rect = self.rect()
         painter.drawRoundedRect(
-            rect.adjusted(3, 3, -3, -3),  # Inset to keep border inside widget
-            10, 10  # Border radius
+            rect.adjusted(1, 1, -2, -1),  # Less inset on right for visibility
+            6, 6  # Smaller border radius
         )
         
         painter.end()
@@ -158,8 +159,9 @@ class BatchFittingDialog(QWidget):
         """)
         
         # Main layout with margins for manual border
+        # Smaller left margin to shift content left, larger right for border visibility
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(8, 8, 8, 8)  # Space for painted border
+        main_layout.setContentsMargins(3, 3, 10, 3)  # Left:3px Right:10px for visibility
         main_layout.setSpacing(0)
         
         # Create content container
@@ -167,7 +169,7 @@ class BatchFittingDialog(QWidget):
         container.setStyleSheet("""
             QWidget {
                 background-color: #FAFAFA;
-                border-radius: 8px;
+                border-radius: 5px;
             }
         """)
         
@@ -175,20 +177,20 @@ class BatchFittingDialog(QWidget):
         
         # Inner layout for actual content
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setContentsMargins(8, 8, 8, 8)  # Reduced padding
         layout.setSpacing(5)
         
-        # Title and controls
+        # Title and controls (no border)
         header = QWidget()
         header.setStyleSheet("""
             QWidget {
                 background-color: #F3E5F5;
-                border: 1px solid #CE93D8;
+                border: none;
                 border-radius: 5px;
             }
         """)
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(8, 8, 8, 8)
+        header_layout.setContentsMargins(8, 5, 8, 5)
         
         title = QLabel("📊 Batch Peak Fitting - Interactive Mode")
         title.setFont(QFont('Arial', 13, QFont.Weight.Bold))
@@ -233,17 +235,17 @@ class BatchFittingDialog(QWidget):
         layout.addWidget(splitter)
         
     def create_left_panel(self):
-        """Create left panel with file list"""
+        """Create left panel with file list (no border)"""
         panel = QFrame()
-        panel.setFrameStyle(QFrame.Shape.StyledPanel)
-        panel.setStyleSheet("background-color: #F5F5F5; border: 2px solid #CCCCCC; border-radius: 5px;")
+        panel.setFrameStyle(QFrame.Shape.NoFrame)
+        panel.setStyleSheet("background-color: #F5F5F5; border: none; border-radius: 5px;")
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(8, 8, 8, 8)
         
-        # Title
-        title = QLabel("📄 File List")
-        title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        title.setStyleSheet("color: #333333; border: none;")
+        # Title (smaller, no emphasis)
+        title = QLabel("File List")
+        title.setFont(QFont('Arial', 9))
+        title.setStyleSheet("color: #666666; border: none;")
         layout.addWidget(title)
         
         # File list widget
