@@ -71,11 +71,18 @@ class BatchFittingDialog(QDialog):
         
         # Auto-fitting state
         self.auto_fitting = False
-        self.fit_tolerance = 0.80  # R-squared tolerance for auto-fitting (0.80 means 80%)
+        self.fit_tolerance = 0.92  # R-squared tolerance for auto-fitting (0.92 means 92%)
         
         # Zoom state
         self.xlim_original = None
         self.ylim_original = None
+        
+        # Fitting results for plotting
+        self.current_fit_curves = []  # List of (x, y) tuples for fitted curves
+        
+        # Overlap mode
+        self.overlap_mode = False
+        self.overlapped_data = []  # List of (filename, x, y, peaks, bg_points) for overlay
         
         self.setup_ui()
         
@@ -111,6 +118,10 @@ class BatchFittingDialog(QDialog):
         elif event.key() == Qt.Key.Key_R:
             # R - reset zoom
             self.reset_zoom()
+        elif event.key() == Qt.Key.Key_O:
+            # O - toggle overlap mode
+            self.overlap_btn.setChecked(not self.overlap_btn.isChecked())
+            self.toggle_overlap_mode()
         else:
             super().keyPressEvent(event)
         
@@ -392,10 +403,52 @@ class BatchFittingDialog(QDialog):
         auto_fit_btn.clicked.connect(self.start_auto_fitting)
         row2.addWidget(auto_fit_btn)
         
+        row2.addSpacing(10)
+        
+        # Overlap button
+        self.overlap_btn = QPushButton("📊 Overlap (O)")
+        self.overlap_btn.setFixedWidth(120)
+        self.overlap_btn.setFont(QFont('Arial', 9))
+        self.overlap_btn.setCheckable(True)
+        self.overlap_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #B9F2FF;
+                border: 2px solid #81D4FA;
+                border-radius: 4px;
+                padding: 5px;
+                color: black;
+            }
+            QPushButton:checked {
+                background-color: #00BCD4;
+                color: white;
+                font-weight: bold;
+            }
+            QPushButton:hover { background-color: #81D4FA; }
+        """)
+        self.overlap_btn.clicked.connect(self.toggle_overlap_mode)
+        row2.addWidget(self.overlap_btn)
+        
+        # Clear overlay button
+        clear_overlay_btn = QPushButton("Clear Overlay")
+        clear_overlay_btn.setFixedWidth(100)
+        clear_overlay_btn.setFont(QFont('Arial', 8))
+        clear_overlay_btn.setStyleSheet("""
+            QPushButton {
+                background-color: #FFEBEE;
+                border: 1px solid #EF5350;
+                border-radius: 4px;
+                padding: 5px;
+                color: #C62828;
+            }
+            QPushButton:hover { background-color: #FFCDD2; }
+        """)
+        clear_overlay_btn.clicked.connect(self.clear_overlap)
+        row2.addWidget(clear_overlay_btn)
+        
         row2.addStretch()
         
         # Instructions
-        info_label = QLabel("💡 Left: Add | Right: Delete | Scroll: Zoom | Enter: Auto-fit all")
+        info_label = QLabel("💡 Left: Add | Right: Delete | Scroll: Zoom | Enter: Auto-fit | O: Overlap")
         info_label.setFont(QFont('Arial', 8))
         info_label.setStyleSheet("color: #666666;")
         row2.addWidget(info_label)
@@ -765,38 +818,52 @@ class BatchFittingDialog(QDialog):
             y_range = y.max() - y.min()
             self.ylim_original = (y.min() - y_range * 0.05, y.max() + y_range * 0.1)
         
-        # Plot data
-        self.canvas.axes.plot(x, y, 'k-', linewidth=1.2, label='Data', zorder=1)
+        # Plot overlapped data if overlap mode is on
+        if self.overlap_mode and self.overlapped_data:
+            colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8']
+            for idx, (fname, ox, oy, opeaks, obg) in enumerate(self.overlapped_data):
+                color = colors[idx % len(colors)]
+                alpha = 0.5
+                self.canvas.axes.plot(ox, oy, '-', linewidth=1, alpha=alpha, 
+                                    color=color, label=fname, zorder=1)
+        
+        # Plot current data
+        self.canvas.axes.plot(x, y, 'k-', linewidth=1.5, label='Current', zorder=2)
+        
+        # Plot fitted curves
+        if self.current_fit_curves:
+            colors_fit = ['#BA68C8', '#9C27B0', '#7B1FA2', '#6A1B9A', '#4A148C']
+            for idx, (fit_x, fit_y) in enumerate(self.current_fit_curves):
+                color = colors_fit[idx % len(colors_fit)]
+                self.canvas.axes.plot(fit_x, fit_y, '--', linewidth=2, 
+                                     color=color, alpha=0.8, 
+                                     label=f'Fit Peak {idx+1}', zorder=4)
         
         # Plot peaks as red vertical lines
         for peak_x in self.peaks:
             self.canvas.axes.axvline(peak_x, color='#E57373', linestyle='--', 
-                                     alpha=0.8, linewidth=2, zorder=2)
+                                     alpha=0.8, linewidth=2, zorder=3)
             
-        # Plot background points as light blue squares
+        # Plot background points as smaller light blue squares
         if self.bg_points:
             bg_x = [p[0] for p in self.bg_points]
             bg_y = [p[1] for p in self.bg_points]
             
-            # Use small light blue squares
+            # Use smaller light blue squares (reduced from 6 to 4)
             self.canvas.axes.plot(bg_x, bg_y, marker='s', color='#90CAF9', 
-                                 markerfacecolor='#BBDEFB', markersize=6, 
-                                 linestyle='', markeredgewidth=1.5, 
-                                 label='BG Points', zorder=3)
+                                 markerfacecolor='#E3F2FD', markersize=4, 
+                                 linestyle='', markeredgewidth=1, 
+                                 label='BG', zorder=5)
             
             # Draw background line if >= 2 points
             if len(self.bg_points) >= 2:
                 self.canvas.axes.plot(bg_x, bg_y, color='#64B5F6', 
-                                     linestyle='--', alpha=0.5, linewidth=1.5, zorder=2)
-        
-        # Add peak count to legend
-        legend_items = [f'Data (Peaks: {len(self.peaks)})']
-        if self.bg_points:
-            legend_items.append(f'BG Points: {len(self.bg_points)}')
+                                     linestyle='--', alpha=0.4, linewidth=1, zorder=2)
             
         self.canvas.axes.set_xlabel('2θ (deg)', fontsize=10, fontweight='bold')
         self.canvas.axes.set_ylabel('Intensity', fontsize=10, fontweight='bold')
-        self.canvas.axes.legend(legend_items, loc='upper right', fontsize=9, framealpha=0.9)
+        self.canvas.axes.legend(loc='upper right', fontsize=8, framealpha=0.85, 
+                               ncol=2 if len(self.current_fit_curves) > 3 else 1)
         self.canvas.axes.grid(True, alpha=0.3, linestyle=':', linewidth=0.5)
         self.canvas.axes.set_facecolor('#FAFAFA')
         
@@ -828,6 +895,9 @@ class BatchFittingDialog(QDialog):
             y_corrected = y - background
             y_corrected = np.maximum(y_corrected, 0)  # Ensure non-negative
             
+            # Clear previous fit curves
+            self.current_fit_curves = []
+            
             # Fit each peak
             peak_results = []
             fit_quality = []
@@ -846,6 +916,9 @@ class BatchFittingDialog(QDialog):
                     continue
                     
                 try:
+                    # Generate fine x points for smooth curve
+                    x_fine = np.linspace(x_local.min(), x_local.max(), 500)
+                    
                     # Fit peak
                     if self.fit_method == "voigt":
                         p0 = [np.max(y_local), peak_pos, 0.1, 0.1]
@@ -854,6 +927,7 @@ class BatchFittingDialog(QDialog):
                         popt, _ = curve_fit(voigt, x_local, y_local, p0=p0, 
                                           bounds=bounds, maxfev=10000)
                         y_fit = voigt(x_local, *popt)
+                        y_fit_fine = voigt(x_fine, *popt)
                     else:  # pseudo-voigt
                         p0 = [np.max(y_local), peak_pos, 0.1, 0.1, 0.5]
                         bounds = ([0, x_local.min(), 0, 0, 0], 
@@ -861,6 +935,14 @@ class BatchFittingDialog(QDialog):
                         popt, _ = curve_fit(pseudo_voigt, x_local, y_local, p0=p0, 
                                           bounds=bounds, maxfev=10000)
                         y_fit = pseudo_voigt(x_local, *popt)
+                        y_fit_fine = pseudo_voigt(x_fine, *popt)
+                    
+                    # Add background back for display
+                    bg_fine = np.interp(x_fine, bg_x, bg_y) if len(self.bg_points) >= 2 else background
+                    y_fit_display = y_fit_fine + bg_fine
+                    
+                    # Store fit curve for plotting
+                    self.current_fit_curves.append((x_fine, y_fit_display))
                         
                     # Calculate R-squared
                     ss_res = np.sum((y_local - y_fit)**2)
@@ -897,27 +979,32 @@ class BatchFittingDialog(QDialog):
             }
             self.results.append(result)
             
-            # Show result
-            if avg_r_squared < 0.8:
-                QMessageBox.warning(
-                    self, 
-                    "Poor Fit Quality", 
-                    f"Fitted {len(self.peaks)} peaks for {filename}\n\n"
-                    f"⚠️ Average R² = {avg_r_squared:.3f} (< 0.8)\n"
-                    f"Consider adjusting peaks or background points."
-                )
-            else:
-                QMessageBox.information(
-                    self, 
-                    "Fit Successful", 
-                    f"✓ Fitted {len(self.peaks)} peaks for {filename}\n\n"
-                    f"Average R² = {avg_r_squared:.3f}"
-                )
+            # Redraw plot with fit curves
+            self.plot_data()
+            
+            # Show result only if not in auto-fitting mode
+            if not self.auto_fitting:
+                if avg_r_squared < self.fit_tolerance:
+                    QMessageBox.warning(
+                        self, 
+                        "Poor Fit Quality", 
+                        f"Fitted {len(self.peaks)} peaks for {filename}\n\n"
+                        f"⚠️ Average R² = {avg_r_squared:.3f} (< {self.fit_tolerance:.2f})\n"
+                        f"Consider adjusting peaks or background points."
+                    )
+                else:
+                    QMessageBox.information(
+                        self, 
+                        "Fit Successful", 
+                        f"✓ Fitted {len(self.peaks)} peaks for {filename}\n\n"
+                        f"Average R² = {avg_r_squared:.3f}"
+                    )
             
             return avg_r_squared
             
         except Exception as e:
-            QMessageBox.warning(self, "Fit Error", f"Fitting failed:\n{str(e)}")
+            if not self.auto_fitting:
+                QMessageBox.warning(self, "Fit Error", f"Fitting failed:\n{str(e)}")
             return 0
             
     def start_auto_fitting(self):
@@ -930,21 +1017,7 @@ class BatchFittingDialog(QDialog):
             QMessageBox.warning(self, "No Peaks", "Please add peaks to the current file first.")
             return
             
-        # Confirm
-        reply = QMessageBox.question(
-            self,
-            "Start Auto-Fitting",
-            f"Start automatic fitting from file {self.current_index + 1} to {len(self.file_list)}?\n\n"
-            f"The process will stop if:\n"
-            f"- Fitting fails\n"
-            f"- Average R² < {self.fit_tolerance:.0%} (quality threshold)\n\n"
-            f"You can then manually adjust and continue.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No
-        )
-        
-        if reply == QMessageBox.StandardButton.No:
-            return
-            
+        # Start auto-fitting directly without confirmation
         self.auto_fitting = True
         self.continue_auto_fitting()
         
@@ -988,6 +1061,10 @@ class BatchFittingDialog(QDialog):
     def go_previous(self):
         """Go to previous file"""
         if self.current_index > 0:
+            # Add current to overlay if overlap mode is on
+            if self.overlap_mode:
+                self.add_to_overlay()
+                
             self.current_index -= 1
             self.load_current_file()
             self.file_list_widget.setCurrentRow(self.current_index)
@@ -995,6 +1072,10 @@ class BatchFittingDialog(QDialog):
     def go_next(self):
         """Go to next file"""
         if self.current_index < len(self.file_list) - 1:
+            # Add current to overlay if overlap mode is on
+            if self.overlap_mode:
+                self.add_to_overlay()
+                
             self.current_index += 1
             self.load_current_file()
             self.file_list_widget.setCurrentRow(self.current_index)
@@ -1005,6 +1086,78 @@ class BatchFittingDialog(QDialog):
             self.fit_method = "voigt"
         else:
             self.fit_method = "pseudo"
+            
+    def toggle_overlap_mode(self):
+        """Toggle overlap mode"""
+        self.overlap_mode = self.overlap_btn.isChecked()
+        
+        if self.overlap_mode:
+            # Entering overlap mode - add current file to overlapped data
+            if self.current_data is not None:
+                filename = os.path.basename(self.file_list[self.current_index])
+                x, y = self.current_data[:, 0], self.current_data[:, 1]
+                self.overlapped_data.append((
+                    filename, 
+                    x.copy(), 
+                    y.copy(), 
+                    self.peaks.copy(),
+                    self.bg_points.copy()
+                ))
+                
+            # Update button text
+            self.overlap_btn.setText(f"📊 Overlap ({len(self.overlapped_data)})")
+            
+            # Update status label
+            self.current_file_label.setText(
+                f"[{self.current_index + 1}/{len(self.file_list)}] "
+                f"{os.path.basename(self.file_list[self.current_index])} "
+                f"[Overlap: {len(self.overlapped_data)} files]"
+            )
+        else:
+            # Exiting overlap mode - keep the data but update display
+            self.overlap_btn.setText("📊 Overlap (O)")
+            
+            # Restore normal status label
+            if self.file_list and self.current_index >= 0:
+                filename = os.path.basename(self.file_list[self.current_index])
+                self.current_file_label.setText(f"[{self.current_index + 1}/{len(self.file_list)}] {filename}")
+            
+        self.plot_data()
+        
+    def clear_overlap(self):
+        """Clear all overlapped data"""
+        self.overlapped_data = []
+        self.overlap_mode = False
+        self.overlap_btn.setChecked(False)
+        self.overlap_btn.setText("📊 Overlap (O)")
+        
+        # Restore normal status label
+        if self.file_list and self.current_index >= 0:
+            filename = os.path.basename(self.file_list[self.current_index])
+            self.current_file_label.setText(f"[{self.current_index + 1}/{len(self.file_list)}] {filename}")
+            
+        self.plot_data()
+        
+    def add_to_overlay(self):
+        """Add current file to overlay"""
+        if self.current_data is not None and self.overlap_mode:
+            filename = os.path.basename(self.file_list[self.current_index])
+            
+            # Check if already in overlay
+            existing_names = [name for name, _, _, _, _ in self.overlapped_data]
+            if filename in existing_names:
+                return
+                
+            x, y = self.current_data[:, 0], self.current_data[:, 1]
+            self.overlapped_data.append((
+                filename,
+                x.copy(),
+                y.copy(),
+                self.peaks.copy(),
+                self.bg_points.copy()
+            ))
+            self.overlap_btn.setText(f"📊 Overlap ({len(self.overlapped_data)})")
+            self.plot_data()
             
     def save_all_results(self):
         """Save all results to CSV"""
