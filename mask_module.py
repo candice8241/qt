@@ -218,13 +218,13 @@ class MaskModule(GUIBase):
                 border-radius: 4px;
                 margin-top: 2px;
                 font-weight: bold;
-                padding-top: 12px;
+                padding-top: 18px;
                 padding-bottom: 0px;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
                 subcontrol-position: top left;
-                top: 3px;
+                top: 5px;
                 left: 10px;
                 padding: 0 3px;
                 color: {self.colors['primary']};
@@ -233,7 +233,7 @@ class MaskModule(GUIBase):
 
         layout = QVBoxLayout(group)
         layout.setSpacing(0)
-        layout.setContentsMargins(10, 0, 10, 0)
+        layout.setContentsMargins(10, -8, 10, 0)
 
         # Main canvas layout - Image on left, Operations on right
         main_canvas_layout = QHBoxLayout()
