@@ -14,6 +14,7 @@ from PyQt6.QtGui import QFont
 import numpy as np
 import os
 from gui_base import GUIBase
+from collections import deque
 
 # Import matplotlib for image display
 try:
@@ -46,6 +47,10 @@ class MaskModule(GUIBase):
         self.current_mask = None
         self.mask_file_path = None
         self.image_data = None
+        
+        # Undo/Redo functionality (from Dioptas)
+        self._undo_deque = deque(maxlen=50)
+        self._redo_deque = deque(maxlen=50)
         
         # Drawing mode and state
         self.draw_mode = 'circle'  # 'circle', 'rectangle', 'polygon', 'point'
@@ -82,10 +87,10 @@ class MaskModule(GUIBase):
 
         # Content widget - Full width
         content_widget = QWidget()
-        content_widget.setStyleSheet(f"background-color: {self.colors['bg']};")
+        content_widget.setStyleSheet("background-color: white;")
         content_layout = QVBoxLayout(content_widget)
-        content_layout.setContentsMargins(10, 5, 10, 5)
-        content_layout.setSpacing(4)
+        content_layout.setContentsMargins(10, 2, 10, 2)
+        content_layout.setSpacing(1)
 
         # Control area (includes Save/Clear buttons now)
         control_group = self.create_control_group()
@@ -107,9 +112,9 @@ class MaskModule(GUIBase):
             QGroupBox {{
                 border: 2px solid {self.colors['border']};
                 border-radius: 4px;
-                margin-top: 5px;
+                margin-top: 3px;
                 font-weight: bold;
-                padding-top: 8px;
+                padding-top: 5px;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
@@ -120,7 +125,7 @@ class MaskModule(GUIBase):
 
         layout = QHBoxLayout(group)
         layout.setSpacing(5)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(10, 8, 10, 8)
         
         # Load Image button
         load_img_btn = QPushButton("📂 Load Image")
@@ -166,50 +171,40 @@ class MaskModule(GUIBase):
         # Separator
         layout.addWidget(QLabel("|"))
         
-        # Save Mask button
-        save_btn = QPushButton("💾 Save Mask")
-        save_btn.setFixedWidth(110)
-        save_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-                padding: 6px;
-                border-radius: 4px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: #45A049;
-            }}
-        """)
-        save_btn.clicked.connect(self.save_mask)
-        layout.addWidget(save_btn)
-        
-        # Clear All button
-        clear_btn = QPushButton("🗑️ Clear All")
-        clear_btn.setFixedWidth(110)
-        clear_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: #FF5252;
-                color: white;
-                border: none;
-                padding: 6px;
-                border-radius: 4px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: #FF1744;
-            }}
-        """)
-        clear_btn.clicked.connect(self.clear_mask)
-        layout.addWidget(clear_btn)
-
-        layout.addStretch()
-        
         # File info label
-        self.file_info_label = QLabel("No image loaded")
-        self.file_info_label.setStyleSheet("color: #666666; font-size: 9px;")
+        self.file_info_label = QLabel("Image: --")
+        self.file_info_label.setFont(QFont('Arial', 9))
+        self.file_info_label.setStyleSheet("color: #666666; padding: 3px;")
         layout.addWidget(self.file_info_label)
+        
+        # Separator
+        layout.addWidget(QLabel("|"))
+        
+        # Mask status label
+        self.mask_status_label = QLabel("Mask: Not loaded")
+        self.mask_status_label.setFont(QFont('Arial', 9))
+        self.mask_status_label.setStyleSheet("color: #FF5722; padding: 3px;")
+        layout.addWidget(self.mask_status_label)
+        
+        # Separator
+        layout.addWidget(QLabel("|"))
+        
+        # Total pixels label
+        self.total_pixels_label = QLabel("Total: --")
+        self.total_pixels_label.setFont(QFont('Arial', 9))
+        self.total_pixels_label.setStyleSheet("color: #666666; padding: 3px;")
+        layout.addWidget(self.total_pixels_label)
+        
+        # Separator
+        layout.addWidget(QLabel("|"))
+        
+        # Position label
+        self.position_label = QLabel("Position: --")
+        self.position_label.setFont(QFont('Arial', 9))
+        self.position_label.setStyleSheet("color: #333333; padding: 3px;")
+        layout.addWidget(self.position_label)
+        
+        layout.addStretch()
 
         return group
     
@@ -221,12 +216,16 @@ class MaskModule(GUIBase):
             QGroupBox {{
                 border: 2px solid {self.colors['border']};
                 border-radius: 4px;
-                margin-top: 5px;
+                margin-top: 2px;
                 font-weight: bold;
-                padding-top: 8px;
+                padding-top: 5px;
+                padding-bottom: 0px;
+                background-color: transparent;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
+                subcontrol-position: top left;
+                top: 0px;
                 left: 10px;
                 padding: 0 3px;
                 color: {self.colors['primary']};
@@ -234,36 +233,17 @@ class MaskModule(GUIBase):
         """)
 
         layout = QVBoxLayout(group)
-        layout.setSpacing(5)
-        layout.setContentsMargins(10, 10, 10, 10)
-
-        # Info row with position, mask status, and total pixels
-        info_row = QHBoxLayout()
-
-        self.position_label = QLabel("📍 Position: --")
-        self.position_label.setFont(QFont('Arial', 9))
-        self.position_label.setStyleSheet("color: #333333; padding: 3px;")
-        info_row.addWidget(self.position_label)
-
-        self.mask_status_label = QLabel("🔴 Mask: Not loaded")
-        self.mask_status_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        self.mask_status_label.setStyleSheet("color: #FF5722; padding: 3px;")
-        info_row.addWidget(self.mask_status_label)
-        
-        self.total_pixels_label = QLabel("Total: --")
-        self.total_pixels_label.setFont(QFont('Arial', 9))
-        self.total_pixels_label.setStyleSheet("color: #666666; padding: 3px;")
-        info_row.addWidget(self.total_pixels_label)
-
-        info_row.addStretch()
-        layout.addLayout(info_row)
+        layout.setSpacing(0)
+        layout.setContentsMargins(10, -10, 10, 0)
 
         # Main canvas layout - Image on left, Operations on right
         main_canvas_layout = QHBoxLayout()
         main_canvas_layout.setSpacing(10)
+        main_canvas_layout.setContentsMargins(0, 0, 0, 0)
         
         # Left side: Canvas and contrast slider - Fixed size container
         canvas_container = QWidget()
+        canvas_container.setStyleSheet("background-color: white;")
         canvas_container.setFixedSize(1050, 620)  # Fixed container size (reduced height)
         canvas_layout = QHBoxLayout(canvas_container)
         canvas_layout.setSpacing(5)
@@ -271,7 +251,7 @@ class MaskModule(GUIBase):
         
         # Matplotlib canvas - Fixed size for better display
         self.figure = Figure(figsize=(10, 6))
-        self.figure.subplots_adjust(left=0.07, right=0.98, top=0.97, bottom=0.07)
+        self.figure.subplots_adjust(left=0.07, right=0.98, top=0.99, bottom=0.10)
         self.canvas = FigureCanvas(self.figure)
         self.canvas.setFixedSize(1000, 600)  # Fixed canvas size (reduced height)
         canvas_layout.addWidget(self.canvas)
@@ -374,11 +354,15 @@ class MaskModule(GUIBase):
                 font-weight: bold;
                 padding-top: 8px;
                 background-color: {self.colors['bg']};
+                font-family: Arial;
+                color: #000000;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
                 left: 10px;
                 padding: 0 3px;
+                font-family: Arial;
+                color: #000000;
             }}
         """)
         panel.setFixedWidth(250)  # Fixed width
@@ -437,7 +421,7 @@ class MaskModule(GUIBase):
         self.tool_group = QButtonGroup(panel)
         
         # Row 0, Col 0 - Circle
-        self.circle_radio = QRadioButton("🔵 Circle")
+        self.circle_radio = QRadioButton("Circle")
         self.circle_radio.setChecked(True)
         self.circle_radio.setToolTip("Draw circular mask regions")
         self.circle_radio.setStyleSheet("font-size: 9pt;")
@@ -446,7 +430,7 @@ class MaskModule(GUIBase):
         tools_grid.addWidget(self.circle_radio, 0, 0)
         
         # Row 0, Col 1 - Rectangle
-        self.rect_radio = QRadioButton("▭ Rectangle")
+        self.rect_radio = QRadioButton("Rectangle")
         self.rect_radio.setToolTip("Draw rectangular mask regions")
         self.rect_radio.setStyleSheet("font-size: 9pt;")
         self.rect_radio.toggled.connect(lambda: self.on_tool_changed("rectangle"))
@@ -454,7 +438,7 @@ class MaskModule(GUIBase):
         tools_grid.addWidget(self.rect_radio, 0, 1)
         
         # Row 1, Col 0 - Polygon
-        self.polygon_radio = QRadioButton("⬡ Polygon")
+        self.polygon_radio = QRadioButton("Polygon")
         self.polygon_radio.setToolTip("Draw polygon mask (right-click or Enter to finish)")
         self.polygon_radio.setStyleSheet("font-size: 9pt;")
         self.polygon_radio.toggled.connect(lambda: self.on_tool_changed("polygon"))
@@ -462,7 +446,7 @@ class MaskModule(GUIBase):
         tools_grid.addWidget(self.polygon_radio, 1, 0)
         
         # Row 1, Col 1 - Point
-        self.point_radio = QRadioButton("⊙ Point")
+        self.point_radio = QRadioButton("Point")
         self.point_radio.setToolTip("Click to mask/unmask individual points")
         self.point_radio.setStyleSheet("font-size: 9pt;")
         self.point_radio.toggled.connect(lambda: self.on_tool_changed("point"))
@@ -566,8 +550,12 @@ class MaskModule(GUIBase):
         ops_title.setStyleSheet("font-size: 10pt; font-weight: bold; color: #333333;")
         layout.addWidget(ops_title)
         
-        # Invert button
-        invert_btn = QPushButton("↕️ Invert")
+        # Operations in 2x3 grid
+        ops_grid = QGridLayout()
+        ops_grid.setSpacing(5)
+        
+        # Row 0
+        invert_btn = QPushButton("Invert")
         invert_btn.setFixedHeight(32)
         invert_btn.setToolTip("Flip masked and unmasked regions")
         invert_btn.setStyleSheet(f"""
@@ -588,10 +576,9 @@ class MaskModule(GUIBase):
             }}
         """)
         invert_btn.clicked.connect(self.invert_mask)
-        layout.addWidget(invert_btn)
+        ops_grid.addWidget(invert_btn, 0, 0)
         
-        # Grow button
-        grow_btn = QPushButton("➕ Grow")
+        grow_btn = QPushButton("Grow")
         grow_btn.setFixedHeight(32)
         grow_btn.setToolTip("Expand mask regions by 1 pixel")
         grow_btn.setStyleSheet(f"""
@@ -612,10 +599,10 @@ class MaskModule(GUIBase):
             }}
         """)
         grow_btn.clicked.connect(self.grow_mask)
-        layout.addWidget(grow_btn)
+        ops_grid.addWidget(grow_btn, 0, 1)
         
-        # Shrink button
-        shrink_btn = QPushButton("➖ Shrink")
+        # Row 1
+        shrink_btn = QPushButton("Shrink")
         shrink_btn.setFixedHeight(32)
         shrink_btn.setToolTip("Shrink mask regions by 1 pixel")
         shrink_btn.setStyleSheet(f"""
@@ -636,13 +623,12 @@ class MaskModule(GUIBase):
             }}
         """)
         shrink_btn.clicked.connect(self.shrink_mask)
-        layout.addWidget(shrink_btn)
+        ops_grid.addWidget(shrink_btn, 1, 0)
         
-        # Fill holes button
-        fill_btn = QPushButton("🔧 Fill Holes")
-        fill_btn.setFixedHeight(32)
-        fill_btn.setToolTip("Fill enclosed holes in masked regions")
-        fill_btn.setStyleSheet(f"""
+        undo_btn = QPushButton("Undo")
+        undo_btn.setFixedHeight(32)
+        undo_btn.setToolTip("Undo last mask operation")
+        undo_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: #2196F3;
                 color: white;
@@ -659,12 +645,92 @@ class MaskModule(GUIBase):
                 background-color: #1976D2;
             }}
         """)
-        fill_btn.clicked.connect(self.fill_holes)
-        layout.addWidget(fill_btn)
+        undo_btn.clicked.connect(self.undo_mask)
+        ops_grid.addWidget(undo_btn, 1, 1)
+        
+        # Row 2
+        save_btn = QPushButton("Save Mask")
+        save_btn.setFixedHeight(32)
+        save_btn.setToolTip("Save current mask to file")
+        save_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 5px;
+                border-radius: 4px;
+                font-weight: bold;
+                font-size: 9pt;
+            }}
+            QPushButton:hover {{
+                background-color: #45A049;
+            }}
+            QPushButton:pressed {{
+                background-color: #388E3C;
+            }}
+        """)
+        save_btn.clicked.connect(self.save_mask)
+        ops_grid.addWidget(save_btn, 2, 0)
+        
+        clear_btn = QPushButton("Clear All")
+        clear_btn.setFixedHeight(32)
+        clear_btn.setToolTip("Clear all mask regions")
+        clear_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #FF5252;
+                color: white;
+                border: none;
+                padding: 5px;
+                border-radius: 4px;
+                font-weight: bold;
+                font-size: 9pt;
+            }}
+            QPushButton:hover {{
+                background-color: #FF1744;
+            }}
+            QPushButton:pressed {{
+                background-color: #D32F2F;
+            }}
+        """)
+        clear_btn.clicked.connect(self.clear_mask)
+        ops_grid.addWidget(clear_btn, 2, 1)
+        
+        layout.addLayout(ops_grid)
         
         layout.addStretch()
         
         return panel
+
+    def update_deque(self):
+        """
+        Saves the current mask data into a deque for undo/redo functionality
+        (From Dioptas implementation)
+        """
+        if self.current_mask is not None:
+            self._undo_deque.append(np.copy(self.current_mask))
+            self._redo_deque.clear()
+
+    def undo_mask(self):
+        """Undo last mask operation (from Dioptas)"""
+        try:
+            old_data = self._undo_deque.pop()
+            self._redo_deque.append(np.copy(self.current_mask))
+            self.current_mask = old_data
+            self.update_display()
+            self.update_mask_statistics()
+        except IndexError:
+            QMessageBox.information(self.root, "Info", "No more undo steps available")
+
+    def redo_mask(self):
+        """Redo last undone mask operation (from Dioptas)"""
+        try:
+            new_data = self._redo_deque.pop()
+            self._undo_deque.append(np.copy(self.current_mask))
+            self.current_mask = new_data
+            self.update_display()
+            self.update_mask_statistics()
+        except IndexError:
+            QMessageBox.information(self.root, "Info", "No more redo steps available")
 
     def load_image(self):
         """Load diffraction image for mask creation - Optimized for h5"""
@@ -720,6 +786,9 @@ class MaskModule(GUIBase):
             # Initialize mask if not exists
             if self.current_mask is None or self.current_mask.shape != self.image_data.shape:
                 self.current_mask = np.zeros(self.image_data.shape, dtype=bool)
+                # Reset undo/redo deques on new image
+                self._undo_deque.clear()
+                self._redo_deque.clear()
 
             # Clear cache on new image
             self.cached_image = None
@@ -727,7 +796,7 @@ class MaskModule(GUIBase):
 
             # Update info
             self.file_info_label.setText(
-                f"Image: {os.path.basename(file_path)} | Shape: {self.image_data.shape}"
+                f"Image: {os.path.basename(file_path)} ({self.image_data.shape[0]}x{self.image_data.shape[1]})"
             )
             
             # Update threshold range
@@ -736,8 +805,8 @@ class MaskModule(GUIBase):
             )
             
             # Update mask status
-            self.mask_status_label.setText("🟢 Mask: Active (empty)")
-            self.mask_status_label.setStyleSheet("color: #4CAF50; padding: 3px; font-weight: bold;")
+            self.mask_status_label.setText("Mask: Active (empty)")
+            self.mask_status_label.setStyleSheet("color: #4CAF50; padding: 3px;")
 
             # Display with caching
             self.update_display(force_recalc=True)
@@ -771,9 +840,13 @@ class MaskModule(GUIBase):
                 mask_img = fabio.open(file_path)
                 self.current_mask = mask_img.data.astype(bool)
 
+            # Reset undo/redo on mask load
+            self._undo_deque.clear()
+            self._redo_deque.clear()
+
             self.mask_file_path = file_path
-            self.mask_status_label.setText(f"🟢 Mask: {os.path.basename(file_path)}")
-            self.mask_status_label.setStyleSheet("color: #4CAF50; padding: 3px; font-weight: bold;")
+            self.mask_status_label.setText(f"Mask: {os.path.basename(file_path)}")
+            self.mask_status_label.setStyleSheet("color: #4CAF50; padding: 3px;")
             
             self.update_display()
             self.update_mask_statistics()
@@ -822,6 +895,7 @@ class MaskModule(GUIBase):
         
         if reply == QMessageBox.StandardButton.Yes:
             if self.image_data is not None:
+                self.update_deque()
                 self.current_mask = np.zeros(self.image_data.shape, dtype=bool)
                 self.update_display()
                 self.update_mask_statistics()
@@ -856,12 +930,13 @@ class MaskModule(GUIBase):
             QMessageBox.warning(self.root, "Warning", "No mask to invert")
             return
         
+        self.update_deque()
         self.current_mask = ~self.current_mask
         self.update_display()
         self.update_mask_statistics()
     
     def grow_mask(self):
-        """Grow (dilate) the mask"""
+        """Grow (dilate) the mask - Dioptas implementation"""
         if self.current_mask is None:
             QMessageBox.warning(self.root, "Warning", "No mask to grow")
             return
@@ -870,20 +945,22 @@ class MaskModule(GUIBase):
             QMessageBox.warning(self.root, "Warning", "Mask is empty. Nothing to grow.")
             return
         
-        try:
-            from scipy import ndimage
-            old_count = np.sum(self.current_mask)
-            self.current_mask = ndimage.binary_dilation(self.current_mask, iterations=1)
-            new_count = np.sum(self.current_mask)
-            self.update_display()
-            self.update_mask_statistics()
-            print(f"Mask grown: {old_count} → {new_count} pixels (+{new_count - old_count})")
-        except ImportError:
-            QMessageBox.warning(self.root, "Warning", 
-                              "scipy not available for mask operations.\nPlease install: pip install scipy")
+        self.update_deque()
+        old_count = np.sum(self.current_mask)
+        
+        # Dioptas grow algorithm - expand in 4 directions
+        self.current_mask[1:, :] = np.logical_or(self.current_mask[1:, :], self.current_mask[:-1, :])
+        self.current_mask[:-1, :] = np.logical_or(self.current_mask[:-1, :], self.current_mask[1:, :])
+        self.current_mask[:, 1:] = np.logical_or(self.current_mask[:, 1:], self.current_mask[:, :-1])
+        self.current_mask[:, :-1] = np.logical_or(self.current_mask[:, :-1], self.current_mask[:, 1:])
+        
+        new_count = np.sum(self.current_mask)
+        self.update_display()
+        self.update_mask_statistics()
+        print(f"Mask grown: {old_count} → {new_count} pixels (+{new_count - old_count})")
     
     def shrink_mask(self):
-        """Shrink (erode) the mask"""
+        """Shrink (erode) the mask - Dioptas implementation"""
         if self.current_mask is None:
             QMessageBox.warning(self.root, "Warning", "No mask to shrink")
             return
@@ -892,42 +969,19 @@ class MaskModule(GUIBase):
             QMessageBox.warning(self.root, "Warning", "Mask is empty. Nothing to shrink.")
             return
         
-        try:
-            from scipy import ndimage
-            old_count = np.sum(self.current_mask)
-            self.current_mask = ndimage.binary_erosion(self.current_mask, iterations=1)
-            new_count = np.sum(self.current_mask)
-            self.update_display()
-            self.update_mask_statistics()
-            print(f"Mask shrunk: {old_count} → {new_count} pixels (-{old_count - new_count})")
-        except ImportError:
-            QMessageBox.warning(self.root, "Warning", 
-                              "scipy not available for mask operations.\nPlease install: pip install scipy")
-    
-    def fill_holes(self):
-        """Fill holes in the mask"""
-        if self.current_mask is None:
-            QMessageBox.warning(self.root, "Warning", "No mask to fill")
-            return
+        self.update_deque()
+        old_count = np.sum(self.current_mask)
         
-        if not np.any(self.current_mask):
-            QMessageBox.warning(self.root, "Warning", "Mask is empty. Nothing to fill.")
-            return
+        # Dioptas shrink algorithm - shrink in 4 directions
+        self.current_mask[1:, :] = np.logical_and(self.current_mask[1:, :], self.current_mask[:-1, :])
+        self.current_mask[:-1, :] = np.logical_and(self.current_mask[:-1, :], self.current_mask[1:, :])
+        self.current_mask[:, 1:] = np.logical_and(self.current_mask[:, 1:], self.current_mask[:, :-1])
+        self.current_mask[:, :-1] = np.logical_and(self.current_mask[:, :-1], self.current_mask[:, 1:])
         
-        try:
-            from scipy import ndimage
-            old_count = np.sum(self.current_mask)
-            self.current_mask = ndimage.binary_fill_holes(self.current_mask)
-            new_count = np.sum(self.current_mask)
-            self.update_display()
-            self.update_mask_statistics()
-            if new_count > old_count:
-                print(f"Holes filled: {old_count} → {new_count} pixels (+{new_count - old_count})")
-            else:
-                print("No holes found to fill")
-        except ImportError:
-            QMessageBox.warning(self.root, "Warning", 
-                              "scipy not available for mask operations.\nPlease install: pip install scipy")
+        new_count = np.sum(self.current_mask)
+        self.update_display()
+        self.update_mask_statistics()
+        print(f"Mask shrunk: {old_count} → {new_count} pixels (-{old_count - new_count})")
 
     def on_contrast_changed(self, value):
         """Handle contrast slider change - with forced recalc"""
@@ -1076,8 +1130,9 @@ class MaskModule(GUIBase):
 
         self.ax.set_xlim(0, self.image_data.shape[1])
         self.ax.set_ylim(0, self.image_data.shape[0])
-        self.ax.set_xlabel('X (pixels)', fontsize=10)
-        self.ax.set_ylabel('Y (pixels)', fontsize=10)
+        self.ax.set_xlabel('X (pixels)', fontsize=8)
+        self.ax.set_ylabel('Y (pixels)', fontsize=8)
+        self.ax.tick_params(axis='both', which='major', labelsize=5)
         self.ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
 
         self.canvas.draw_idle()
@@ -1250,6 +1305,8 @@ class MaskModule(GUIBase):
         if self.current_mask is None:
             return
         
+        self.update_deque()
+        
         # Optimized: only check region around point
         y_min = max(0, int(y - radius - 1))
         y_max = min(self.current_mask.shape[0], int(y + radius + 2))
@@ -1276,6 +1333,8 @@ class MaskModule(GUIBase):
         if self.current_mask is None:
             return
         
+        self.update_deque()
+        
         cx, cy = start
         radius = np.sqrt((end[0] - start[0])**2 + (end[1] - start[1])**2)
         
@@ -1293,6 +1352,8 @@ class MaskModule(GUIBase):
         """Apply rectangular mask"""
         if self.current_mask is None:
             return
+        
+        self.update_deque()
         
         x1, y1 = start
         x2, y2 = end
@@ -1317,6 +1378,8 @@ class MaskModule(GUIBase):
         """Apply polygon mask"""
         if self.current_mask is None or len(self.polygon_points) < 3:
             return
+        
+        self.update_deque()
         
         from matplotlib.path import Path
         
@@ -1358,6 +1421,8 @@ class MaskModule(GUIBase):
             QMessageBox.warning(self.root, "Warning", 
                               f"Threshold must be between 0 and {self.image_data.max():.1f}")
             return
+        
+        self.update_deque()
         
         # Determine threshold mode (below or above)
         is_below_mode = self.threshold_below_radio.isChecked()
