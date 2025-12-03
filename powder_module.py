@@ -1422,7 +1422,33 @@ except Exception as e:
 
                 if "INTEGRATION_SUCCESS" in stdout:
                     self.log("✓ Integration completed successfully!")
-                    self.show_success("Success", "Batch integration completed!")
+                    
+                    # Check if stacked plot was generated
+                    stacked_plot_generated = False
+                    azimuthal_plot_count = 0
+                    
+                    if "Azimuthal stacked plot generation completed" in stdout:
+                        stacked_plot_generated = True
+                        # Try to extract the number of plots generated
+                        import re
+                        match = re.search(r'Total plots generated:\s*(\d+)', stdout)
+                        if match:
+                            azimuthal_plot_count = int(match.group(1))
+                    elif "Stacked plot generation completed" in stdout:
+                        stacked_plot_generated = True
+                    elif "Stacked plot saved:" in stdout:
+                        stacked_plot_generated = True
+                    
+                    # Show appropriate success message
+                    if stacked_plot_generated:
+                        if azimuthal_plot_count > 0:
+                            message = f"Batch integration completed!\n\n✓ {azimuthal_plot_count} azimuthal stacked plot(s) generated successfully."
+                        else:
+                            message = "Batch integration completed!\n\n✓ Stacked plot(s) generated successfully."
+                    else:
+                        message = "Batch integration completed!"
+                    
+                    self.show_success("Integration Complete", message)
                 else:
                     self.log("❌ Integration failed or was interrupted")
                     if stderr:
