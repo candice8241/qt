@@ -1580,7 +1580,12 @@ class InteractiveFittingGUI(QWidget):
             self.peak_params.append(None)
     
     def _fit_multi_peaks_group(self, peak_indices):
-        """Fit multiple overlapping peaks together"""
+        """
+        Fit multiple overlapping peaks together using improved strategy:
+        1. First fit each peak individually to get good initial parameters
+        2. Then fit all peaks together using single-fit results as initial guess
+        3. Store both single-peak and multi-peak parameters for flexible plotting
+        """
         try:
             # Define fitting region for entire group
             min_peak_idx = min(peak_indices)
@@ -1635,6 +1640,106 @@ class InteractiveFittingGUI(QWidget):
                 y_fit_input = y_local
                 background = np.zeros_like(y_local)
             
+            # ============ STEP 1: Fit each peak individually ============
+            print(f"\n=== Multi-peak fitting: {len(peak_indices)} overlapping peaks ===")
+            single_peak_params = []
+            
+            for idx, peak_idx in enumerate(peak_indices):
+                try:
+                    # Get narrower window for individual peak
+                    try:
+                        results_half = peak_widths(self.y_data, [peak_idx], rel_height=0.5)
+                        width_pts = results_half[0][0] if len(results_half[0]) > 0 else 40
+                    except:
+                        width_pts = 40
+                    
+                    single_window = int(width_pts * 2.0)  # Smaller window for individual fit
+                    single_window = max(20, min(single_window, 150))
+                    
+                    # Extract region for this peak only
+                    single_left = max(0, peak_idx - single_window)
+                    single_right = min(len(self.x_data), peak_idx + single_window)
+                    x_single = self.x_data[single_left:single_right]
+                    y_single = self.y_data[single_left:single_right]
+                    
+                    # Background for this region
+                    if self.background_cb.isChecked():
+                        single_split = max(1, int(len(y_single) * 0.05))
+                        s_left_y = y_single[:single_split]
+                        s_left_x = x_single[:single_split]
+                        N_s_left = max(1, int(len(s_left_y) * 0.1))
+                        s_low_left_idx = np.argsort(s_left_y)[:N_s_left]
+                        s_bg_left_y = np.mean(s_left_y[s_low_left_idx])
+                        s_bg_left_x = np.mean(s_left_x[s_low_left_idx])
+                        
+                        s_right_y = y_single[-single_split:]
+                        s_right_x = x_single[-single_split:]
+                        N_s_right = max(1, int(len(s_right_y) * 0.1))
+                        s_low_right_idx = np.argsort(s_right_y)[:N_s_right]
+                        s_bg_right_y = np.mean(s_right_y[s_low_right_idx])
+                        s_bg_right_x = np.mean(s_right_x[s_low_right_idx])
+                        
+                        s_slope = (s_bg_right_y - s_bg_left_y) / (s_bg_right_x - s_bg_left_x + 1e-10)
+                        single_bg = s_bg_left_y + s_slope * (x_single - s_bg_left_x)
+                        y_single_corrected = y_single - single_bg
+                    else:
+                        single_bg = np.zeros_like(y_single)
+                        y_single_corrected = y_single
+                    
+                    y_single_corrected = np.maximum(y_single_corrected, 0)
+                    
+                    # Initial guess for single peak
+                    amplitude_guess = np.max(y_single_corrected)
+                    center_guess = x_single[np.argmax(y_single_corrected)]
+                    sigma_guess = np.std(x_single) / 5
+                    gamma_guess = sigma_guess
+                    
+                    # Fit single peak
+                    if self.fit_method == "voigt":
+                        p0 = [amplitude_guess, center_guess, sigma_guess, gamma_guess]
+                        bounds = ([0, x_single.min(), 0, 0], [np.inf, x_single.max(), np.inf, np.inf])
+                        popt_single, _ = curve_fit(self.voigt, x_single, y_single_corrected, 
+                                                   p0=p0, bounds=bounds, maxfev=10000)
+                        single_peak_params.append({
+                            'amplitude': popt_single[0],
+                            'center': popt_single[1],
+                            'sigma': popt_single[2],
+                            'gamma': popt_single[3],
+                            'eta': None
+                        })
+                        print(f"  Peak {idx+1}: A={popt_single[0]:.1f}, C={popt_single[1]:.3f}, σ={popt_single[2]:.4f}")
+                    else:  # pseudo-voigt
+                        p0 = [amplitude_guess, center_guess, sigma_guess, gamma_guess, 0.5]
+                        bounds = ([0, x_single.min(), 0, 0, 0], [np.inf, x_single.max(), np.inf, np.inf, 1.0])
+                        popt_single, _ = curve_fit(self.pseudo_voigt, x_single, y_single_corrected,
+                                                   p0=p0, bounds=bounds, maxfev=10000)
+                        single_peak_params.append({
+                            'amplitude': popt_single[0],
+                            'center': popt_single[1],
+                            'sigma': popt_single[2],
+                            'gamma': popt_single[3],
+                            'eta': popt_single[4]
+                        })
+                        print(f"  Peak {idx+1}: A={popt_single[0]:.1f}, C={popt_single[1]:.3f}, σ={popt_single[2]:.4f}, η={popt_single[4]:.3f}")
+                    
+                except Exception as e:
+                    print(f"  Warning: Single fit failed for peak {idx+1}: {e}")
+                    # Use simple guess if single fit fails
+                    local_peak_idx = peak_idx - left
+                    if local_peak_idx < 0 or local_peak_idx >= len(y_fit_input):
+                        local_peak_idx = np.argmax(y_fit_input)
+                    
+                    single_peak_params.append({
+                        'amplitude': max(y_fit_input[local_peak_idx], np.max(y_fit_input) / len(peak_indices)),
+                        'center': x_local[local_peak_idx],
+                        'sigma': np.std(x_local) / (5 * len(peak_indices)),
+                        'gamma': np.std(x_local) / (5 * len(peak_indices)),
+                        'eta': 0.5
+                    })
+            
+            # ============ STEP 2: Multi-peak fitting using single-peak results ============
+            print(f"\n  Performing joint multi-peak fit...")
+            
             # Multi-peak fitting function
             def multi_peak_func(x, *params):
                 """Sum of multiple peaks"""
@@ -1661,28 +1766,20 @@ class InteractiveFittingGUI(QWidget):
                 
                 return result
             
-            # Initial guess for all peaks in group
+            # Use single-peak results as initial guess for multi-peak fit
             p0 = []
             bounds_lower = []
             bounds_upper = []
             
-            for peak_idx in peak_indices:
-                # Find local peak position in extracted region
-                local_peak_idx = peak_idx - left
-                if local_peak_idx < 0 or local_peak_idx >= len(y_fit_input):
-                    local_peak_idx = np.argmax(y_fit_input)
-                
-                amplitude_guess = max(y_fit_input[local_peak_idx], np.max(y_fit_input) / len(peak_indices))
-                center_guess = x_local[local_peak_idx]
-                sigma_guess = np.std(x_local) / (5 * len(peak_indices))
-                gamma_guess = sigma_guess
-                
+            for single_params in single_peak_params:
                 if self.fit_method == "voigt":
-                    p0.extend([amplitude_guess, center_guess, sigma_guess, gamma_guess])
+                    p0.extend([single_params['amplitude'], single_params['center'], 
+                              single_params['sigma'], single_params['gamma']])
                     bounds_lower.extend([0, x_local.min(), 0, 0])
                     bounds_upper.extend([np.inf, x_local.max(), np.inf, np.inf])
                 else:  # pseudo-voigt
-                    p0.extend([amplitude_guess, center_guess, sigma_guess, gamma_guess, 0.5])
+                    p0.extend([single_params['amplitude'], single_params['center'],
+                              single_params['sigma'], single_params['gamma'], single_params['eta']])
                     bounds_lower.extend([0, x_local.min(), 0, 0, 0])
                     bounds_upper.extend([np.inf, x_local.max(), np.inf, np.inf, 1.0])
             
@@ -1690,41 +1787,64 @@ class InteractiveFittingGUI(QWidget):
             popt, _ = curve_fit(multi_peak_func, x_local, y_fit_input, 
                                p0=p0, bounds=(bounds_lower, bounds_upper), maxfev=20000)
             
-            # Store parameters for each peak
+            print(f"  Multi-peak fit completed successfully!")
+            
+            # ============ STEP 3: Store both single and multi-peak parameters ============
             n_peaks = len(peak_indices)
             if self.fit_method == "voigt":
                 for i in range(n_peaks):
                     params = {
+                        # Multi-peak fit parameters (final optimized)
                         'amplitude': popt[i*4],
                         'center': popt[i*4 + 1],
                         'sigma': popt[i*4 + 2],
                         'gamma': popt[i*4 + 3],
                         'eta': None,
+                        # Additional info
                         'background': background,
                         'x_range': (x_local.min(), x_local.max()),
                         'x_local': x_local,
                         'y_local': y_local,
-                        'is_multi_peak': True
+                        'is_multi_peak': True,
+                        'group_size': n_peaks,
+                        # Single-peak fit parameters for reference/plotting
+                        'single_amplitude': single_peak_params[i]['amplitude'],
+                        'single_center': single_peak_params[i]['center'],
+                        'single_sigma': single_peak_params[i]['sigma'],
+                        'single_gamma': single_peak_params[i]['gamma']
                     }
                     self.peak_params.append(params)
             else:  # pseudo-voigt
                 for i in range(n_peaks):
                     params = {
+                        # Multi-peak fit parameters (final optimized)
                         'amplitude': popt[i*5],
                         'center': popt[i*5 + 1],
                         'sigma': popt[i*5 + 2],
                         'gamma': popt[i*5 + 3],
                         'eta': popt[i*5 + 4],
+                        # Additional info
                         'background': background,
                         'x_range': (x_local.min(), x_local.max()),
                         'x_local': x_local,
                         'y_local': y_local,
-                        'is_multi_peak': True
+                        'is_multi_peak': True,
+                        'group_size': n_peaks,
+                        # Single-peak fit parameters for reference/plotting
+                        'single_amplitude': single_peak_params[i]['amplitude'],
+                        'single_center': single_peak_params[i]['center'],
+                        'single_sigma': single_peak_params[i]['sigma'],
+                        'single_gamma': single_peak_params[i]['gamma'],
+                        'single_eta': single_peak_params[i]['eta']
                     }
                     self.peak_params.append(params)
             
+            print(f"=== Multi-peak fitting completed ===\n")
+            
         except Exception as e:
             print(f"Failed to fit multi-peak group: {e}")
+            import traceback
+            traceback.print_exc()
             # Add None for each peak in failed group
             for _ in peak_indices:
                 self.peak_params.append(None)
@@ -2006,7 +2126,7 @@ class InteractiveFittingGUI(QWidget):
             self.ax.plot(peak_x, peak_y, '+', color='red', markersize=7, markeredgewidth=1.2,
                         linestyle='', label=f'Detected Peaks ({len(self.peaks)})')
 
-        # Plot fitted curves - handle multi-peak groups specially
+        # Plot fitted curves - handle multi-peak groups specially with continuous red curve
         if self.peak_params:
             # Group peaks by their shared x_range to identify multi-peak groups
             plotted_groups = {}
@@ -2023,14 +2143,6 @@ class InteractiveFittingGUI(QWidget):
                 
                 x_smooth = np.linspace(x_local.min(), x_local.max(), 500)
                 
-                # Calculate individual peak fit
-                if self.fit_method == "voigt":
-                    y_fit = self.voigt(x_smooth, params['amplitude'], params['center'], 
-                                      params['sigma'], params['gamma'])
-                else:
-                    y_fit = self.pseudo_voigt(x_smooth, params['amplitude'], params['center'],
-                                             params['sigma'], params['gamma'], params['eta'])
-
                 # Calculate background for this region
                 if self.background_cb.isChecked():
                     bg_left_y = background[0]
@@ -2040,32 +2152,81 @@ class InteractiveFittingGUI(QWidget):
                 else:
                     bg_smooth = np.zeros_like(x_smooth)
                 
-                # For multi-peak groups, collect all components and plot sum
+                # For multi-peak groups: plot both single-peak and multi-peak fits
                 if is_multi:
                     group_key = (x_range[0], x_range[1])
+                    
+                    # Initialize group data if first peak in group
                     if group_key not in plotted_groups:
                         plotted_groups[group_key] = {
                             'x_smooth': x_smooth,
-                            'components': [],
+                            'multi_components': [],  # Multi-peak optimized components
+                            'single_components': [],  # Single-peak initial components
                             'bg': bg_smooth
                         }
-                    plotted_groups[group_key]['components'].append(y_fit)
                     
-                    # Plot individual peak component (without background, dashed)
-                    self.ax.plot(x_smooth, y_fit + bg_smooth, '--', color='#FF6B6B', linewidth=0.8, 
-                               alpha=0.5)
+                    # Calculate multi-peak optimized fit for this peak
+                    if self.fit_method == "voigt":
+                        y_multi_fit = self.voigt(x_smooth, params['amplitude'], params['center'], 
+                                                 params['sigma'], params['gamma'])
+                    else:
+                        y_multi_fit = self.pseudo_voigt(x_smooth, params['amplitude'], params['center'],
+                                                        params['sigma'], params['gamma'], params['eta'])
+                    
+                    plotted_groups[group_key]['multi_components'].append(y_multi_fit)
+                    
+                    # Calculate single-peak fit for comparison (if available)
+                    if 'single_amplitude' in params:
+                        if self.fit_method == "voigt":
+                            y_single_fit = self.voigt(x_smooth, params['single_amplitude'], 
+                                                     params['single_center'], params['single_sigma'], 
+                                                     params['single_gamma'])
+                        else:
+                            y_single_fit = self.pseudo_voigt(x_smooth, params['single_amplitude'],
+                                                            params['single_center'], params['single_sigma'],
+                                                            params['single_gamma'], params.get('single_eta', 0.5))
+                        
+                        plotted_groups[group_key]['single_components'].append(y_single_fit)
+                        
+                        # Plot individual single-peak component (dashed pink/light red)
+                        self.ax.plot(x_smooth, y_single_fit + bg_smooth, '--', 
+                                   color='#FFB6C1', linewidth=1.0, alpha=0.6, 
+                                   label='Single fit' if i == 0 else '')
+                    
+                    # Plot individual multi-peak component (dashed darker)
+                    self.ax.plot(x_smooth, y_multi_fit + bg_smooth, '--', 
+                               color='#FF6B6B', linewidth=0.8, alpha=0.7)
+                    
                 else:
-                    # Single peak - plot directly
+                    # Single isolated peak - plot directly with solid red line
+                    if self.fit_method == "voigt":
+                        y_fit = self.voigt(x_smooth, params['amplitude'], params['center'], 
+                                          params['sigma'], params['gamma'])
+                    else:
+                        y_fit = self.pseudo_voigt(x_smooth, params['amplitude'], params['center'],
+                                                 params['sigma'], params['gamma'], params['eta'])
+                    
                     y_full = y_fit + bg_smooth
-                    self.ax.plot(x_smooth, y_full, '-', color='red', linewidth=1.2, 
-                               alpha=0.8)
+                    self.ax.plot(x_smooth, y_full, '-', color='red', linewidth=1.5, 
+                               alpha=0.85, label='Single peak fit' if i == 0 else '')
             
-            # Plot sum of multi-peak groups
-            for group_key, group_data in plotted_groups.items():
+            # Plot sum of multi-peak groups (continuous solid red line)
+            for group_idx, (group_key, group_data) in enumerate(plotted_groups.items()):
                 x_smooth = group_data['x_smooth']
-                y_sum = np.sum(group_data['components'], axis=0) + group_data['bg']
-                self.ax.plot(x_smooth, y_sum, '-', color='red', linewidth=1.5, 
-                           label=f'Multi-peak fit', alpha=0.9)
+                
+                # Sum of all multi-peak optimized components
+                y_multi_sum = np.sum(group_data['multi_components'], axis=0) + group_data['bg']
+                
+                # Plot continuous solid red line for multi-peak sum
+                self.ax.plot(x_smooth, y_multi_sum, '-', color='red', linewidth=1.8, 
+                           alpha=0.9, label='Multi-peak fit sum' if group_idx == 0 else '')
+                
+                # Optionally also plot single-peak sum for comparison
+                if group_data['single_components']:
+                    y_single_sum = np.sum(group_data['single_components'], axis=0) + group_data['bg']
+                    # Plot as dotted line for reference
+                    self.ax.plot(x_smooth, y_single_sum, ':', color='#FF1493', linewidth=1.2,
+                               alpha=0.5, label='Initial single sum' if group_idx == 0 else '')
 
         # Apply consistent styling to axes (same for loaded and unloaded state)
         self.ax.set_facecolor('#FFFFFF')  # White plot area
