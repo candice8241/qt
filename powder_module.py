@@ -266,17 +266,18 @@ class PowderXRDModule(GUIBase):
         left_title.setStyleSheet(f"color: {self.colors['primary']}; background-color: {self.colors['card_bg']};")
         left_layout.addWidget(left_title)
 
-        self.create_file_input(left_layout, "PONI File:", "poni_path")
-        self.create_file_input(left_layout, "Mask File:", "mask_path")
-        self.create_file_input(left_layout, "Input Pattern:", "input_pattern")
-        self.create_folder_input(left_layout, "Output Directory:", "output_dir")
-        self.create_text_input(left_layout, "Dataset Directory:", "dataset_path", placeholder="entry/data/data", with_browse=True)
+        # Add Sector Integration and Azimuthal Binning in the same row
+        sector_bin_row = QWidget()
+        sector_bin_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
+        sector_bin_row_layout = QHBoxLayout(sector_bin_row)
+        sector_bin_row_layout.setContentsMargins(0, 0, 0, 8)
+        sector_bin_row_layout.setSpacing(15)
 
-        # Add H5 Preview and Sector Selection section
+        # Sector Integration section (left side of row)
         h5_sector_container = QWidget()
         h5_sector_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         h5_sector_layout = QVBoxLayout(h5_sector_container)
-        h5_sector_layout.setContentsMargins(0, 0, 0, 8)
+        h5_sector_layout.setContentsMargins(0, 0, 0, 0)
         h5_sector_layout.setSpacing(5)
 
         # Label and button row
@@ -286,38 +287,37 @@ class PowderXRDModule(GUIBase):
         h5_btn_row_layout.setContentsMargins(0, 0, 0, 0)
         h5_btn_row_layout.setSpacing(5)
 
-        h5_label = QLabel("Sector Integration (Optional):")
+        h5_label = QLabel("Sector Integration:")
         h5_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         h5_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
         h5_btn_row_layout.addWidget(h5_label)
 
         h5_preview_btn = ModernButton(
-            "🔍 H5 Preview & Select Region",
+            "🔍 H5 Preview",
             self.open_h5_preview,
             bg_color="#2196F3",
             hover_color="#1976D2",
-            width=200, height=28,
+            width=120, height=26,
             parent=h5_btn_row
         )
-        h5_preview_btn.setFont(QFont('Arial', 9))
+        h5_preview_btn.setFont(QFont('Arial', 8))
         h5_btn_row_layout.addWidget(h5_preview_btn)
-        h5_btn_row_layout.addStretch()
 
         h5_sector_layout.addWidget(h5_btn_row)
 
         # Info label to show selected sector parameters
-        self.sector_info_label = QLabel("No sector selected (full integration)")
-        self.sector_info_label.setFont(QFont('Arial', 8))
+        self.sector_info_label = QLabel("No sector selected")
+        self.sector_info_label.setFont(QFont('Arial', 7))
         self.sector_info_label.setStyleSheet(f"color: #666666; background-color: {self.colors['card_bg']}; padding-left: 2px;")
         h5_sector_layout.addWidget(self.sector_info_label)
 
-        left_layout.addWidget(h5_sector_container)
+        sector_bin_row_layout.addWidget(h5_sector_container)
 
-        # Add Bin Configuration section
+        # Azimuthal Binning section (right side of row)
         bin_config_container = QWidget()
         bin_config_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         bin_config_layout = QVBoxLayout(bin_config_container)
-        bin_config_layout.setContentsMargins(0, 0, 0, 8)
+        bin_config_layout.setContentsMargins(0, 0, 0, 0)
         bin_config_layout.setSpacing(5)
 
         # Label and button row
@@ -327,32 +327,41 @@ class PowderXRDModule(GUIBase):
         bin_btn_row_layout.setContentsMargins(0, 0, 0, 0)
         bin_btn_row_layout.setSpacing(5)
 
-        bin_label = QLabel("Azimuthal Binning (Optional):")
+        bin_label = QLabel("Azimuthal Binning:")
         bin_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         bin_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
         bin_btn_row_layout.addWidget(bin_label)
 
         bin_config_btn = ModernButton(
-            "⚙️ Configure Bins",
+            "⚙️ Configure",
             self.open_bin_config,
             bg_color="#FF6F00",
             hover_color="#E65100",
-            width=150, height=28,
+            width=120, height=26,
             parent=bin_btn_row
         )
-        bin_config_btn.setFont(QFont('Arial', 9))
+        bin_config_btn.setFont(QFont('Arial', 8))
         bin_btn_row_layout.addWidget(bin_config_btn)
-        bin_btn_row_layout.addStretch()
 
         bin_config_layout.addWidget(bin_btn_row)
 
         # Info label to show bin configuration
-        self.bin_info_label = QLabel("No bins configured (single integration)")
-        self.bin_info_label.setFont(QFont('Arial', 8))
+        self.bin_info_label = QLabel("No bins configured")
+        self.bin_info_label.setFont(QFont('Arial', 7))
         self.bin_info_label.setStyleSheet(f"color: #666666; background-color: {self.colors['card_bg']}; padding-left: 2px;")
         bin_config_layout.addWidget(self.bin_info_label)
 
-        left_layout.addWidget(bin_config_container)
+        sector_bin_row_layout.addWidget(bin_config_container)
+        sector_bin_row_layout.addStretch()
+
+        left_layout.addWidget(sector_bin_row)
+
+        # File inputs now come after sector integration and azimuthal binning
+        self.create_file_input(left_layout, "PONI File:", "poni_path")
+        self.create_file_input(left_layout, "Mask File:", "mask_path")
+        self.create_file_input(left_layout, "Input Pattern:", "input_pattern")
+        self.create_folder_input(left_layout, "Output Directory:", "output_dir")
+        self.create_text_input(left_layout, "Dataset Directory:", "dataset_path", placeholder="entry/data/data", with_browse=True)
 
         # Add Run Integration button centered
         run_int_btn_row = QWidget()
