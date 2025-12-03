@@ -282,7 +282,7 @@ class AutoFittingModule(QWidget):
         # Button style
         btn_style = """
             QPushButton {
-                background-color: #B19CD9;
+                background-color: #D4C5E8;
                 color: black;
                 border: none;
                 border-radius: 3px;
@@ -292,7 +292,7 @@ class AutoFittingModule(QWidget):
                 min-width: 85px;
                 min-height: 17px;
             }
-            QPushButton:hover { background-color: #9370DB; }
+            QPushButton:hover { background-color: #B19CD9; }
             QPushButton:disabled { background-color: #F4F6FB; color: #999999; border: 1px solid #E0E0E0; }
         """
         
@@ -319,35 +319,35 @@ class AutoFittingModule(QWidget):
         
         # Fit Peaks button (lines 719-722)
         self.btn_fit = QPushButton("Fit Peaks")
-        self.btn_fit.setStyleSheet(btn_style.replace('#B19CD9', '#CE93D8'))
+        self.btn_fit.setStyleSheet(btn_style.replace('#D4C5E8', '#E1D5F0'))
         self.btn_fit.clicked.connect(self.fit_peaks)
         self.btn_fit.setEnabled(False)  # state=tk.DISABLED
         control_layout.addWidget(self.btn_fit)
         
         # Reset button (lines 724-727)
         self.btn_reset = QPushButton("Reset")
-        self.btn_reset.setStyleSheet(btn_style.replace('#B19CD9', '#FFB6C1'))
+        self.btn_reset.setStyleSheet(btn_style.replace('#D4C5E8', '#FFD4DC'))
         self.btn_reset.clicked.connect(self.reset_peaks)
         self.btn_reset.setEnabled(False)  # state=tk.DISABLED
         control_layout.addWidget(self.btn_reset)
         
         # Save Results button (lines 729-732)
         self.btn_save = QPushButton("Save Results")
-        self.btn_save.setStyleSheet(btn_style.replace('#B19CD9', '#98FB98'))
+        self.btn_save.setStyleSheet(btn_style.replace('#D4C5E8', '#C5FDC5'))
         self.btn_save.clicked.connect(self.save_results)
         self.btn_save.setEnabled(False)  # state=tk.DISABLED
         control_layout.addWidget(self.btn_save)
         
         # Clear Fit button (lines 734-737)
         self.btn_clear_fit = QPushButton("Clear Fit")
-        self.btn_clear_fit.setStyleSheet(btn_style.replace('#B19CD9', '#FFA07A'))
+        self.btn_clear_fit.setStyleSheet(btn_style.replace('#D4C5E8', '#FFC4A8'))
         self.btn_clear_fit.clicked.connect(self.clear_fit)
         self.btn_clear_fit.setEnabled(False)  # state=tk.DISABLED
         control_layout.addWidget(self.btn_clear_fit)
         
         # Undo button (lines 739-742)
         self.btn_undo = QPushButton("Undo")
-        self.btn_undo.setStyleSheet(btn_style.replace('#B19CD9', '#DDA0DD'))
+        self.btn_undo.setStyleSheet(btn_style.replace('#D4C5E8', '#ECC5EC'))
         self.btn_undo.clicked.connect(self.undo_action)
         self.btn_undo.setEnabled(False)  # state=tk.DISABLED
         control_layout.addWidget(self.btn_undo)
@@ -361,7 +361,7 @@ class AutoFittingModule(QWidget):
         
         # Overlap button (lines 749-753)
         self.btn_overlap_mode = QPushButton("Overlap")
-        self.btn_overlap_mode.setStyleSheet(btn_style.replace('#B19CD9', '#D8BFD8'))
+        self.btn_overlap_mode.setStyleSheet(btn_style.replace('#D4C5E8', '#E9D9E9'))
         self.btn_overlap_mode.clicked.connect(self.toggle_overlap_mode)
         self.btn_overlap_mode.setEnabled(False)  # state=tk.DISABLED
         control_layout.addWidget(self.btn_overlap_mode)
@@ -369,14 +369,14 @@ class AutoFittingModule(QWidget):
         # Batch Auto Fit button (lines 755-758)
         # User says: "batch auto fit应该在最初就可以点"
         self.btn_batch_auto = QPushButton("Batch Auto Fit")
-        self.btn_batch_auto.setStyleSheet(btn_style.replace('#B19CD9', '#ADD8E6'))
+        self.btn_batch_auto.setStyleSheet(btn_style.replace('#D4C5E8', '#D1ECFA'))
         self.btn_batch_auto.clicked.connect(self.batch_auto_fit)
         self.btn_batch_auto.setEnabled(True)  # User wants this ENABLED initially!
         control_layout.addWidget(self.btn_batch_auto)
         
         # Batch Settings button (lines 760-766)
         self.btn_batch_settings = QPushButton("⚙")
-        self.btn_batch_settings.setStyleSheet(nav_btn_style.replace('#B19CD9', '#B0C4DE'))
+        self.btn_batch_settings.setStyleSheet(nav_btn_style.replace('#D4C5E8', '#D4E1EE'))
         self.btn_batch_settings.clicked.connect(self.show_batch_settings)
         self.btn_batch_settings.setEnabled(True)  # state=tk.NORMAL
         control_layout.addWidget(self.btn_batch_settings)
@@ -416,7 +416,7 @@ class AutoFittingModule(QWidget):
         # Button style
         btn_bg_style = """
             QPushButton {
-                background-color: #B19CD9;
+                background-color: #D4C5E8;
                 color: black;
                 border: none;
                 border-radius: 4px;
@@ -425,7 +425,7 @@ class AutoFittingModule(QWidget):
                 font-size: 7.5pt;
                 min-width: 100px;
             }
-            QPushButton:hover { background-color: #9370DB; }
+            QPushButton:hover { background-color: #B19CD9; }
             QPushButton:disabled { background-color: #F4F6FB; color: #999999; }
         """
         
@@ -438,21 +438,21 @@ class AutoFittingModule(QWidget):
         
         # Subtract BG button (lines 799-803)
         self.btn_subtract_bg = QPushButton("Subtract BG")
-        self.btn_subtract_bg.setStyleSheet(btn_bg_style.replace('#B19CD9', '#98FB98'))
+        self.btn_subtract_bg.setStyleSheet(btn_bg_style.replace('#D4C5E8', '#C5FDC5'))
         self.btn_subtract_bg.clicked.connect(self.subtract_background)
         self.btn_subtract_bg.setEnabled(False)
         bg_layout.addWidget(self.btn_subtract_bg)
         
         # Clear BG button (lines 805-809)
         self.btn_clear_bg = QPushButton("Clear BG")
-        self.btn_clear_bg.setStyleSheet(btn_bg_style.replace('#B19CD9', '#EF5350'))
+        self.btn_clear_bg.setStyleSheet(btn_bg_style.replace('#D4C5E8', '#F48982'))
         self.btn_clear_bg.clicked.connect(self.clear_background)
         self.btn_clear_bg.setEnabled(False)
         bg_layout.addWidget(self.btn_clear_bg)
         
         # Auto Select BG button (lines 811-815)
         self.btn_auto_bg = QPushButton("Auto Select BG")
-        self.btn_auto_bg.setStyleSheet(btn_bg_style.replace('#B19CD9', '#29B6F6'))
+        self.btn_auto_bg.setStyleSheet(btn_bg_style.replace('#D4C5E8', '#6CCFFA'))
         self.btn_auto_bg.clicked.connect(self.auto_select_background)
         self.btn_auto_bg.setEnabled(False)
         bg_layout.addWidget(self.btn_auto_bg)
@@ -554,7 +554,7 @@ class AutoFittingModule(QWidget):
         # Buttons style
         btn_smooth_style = """
             QPushButton {
-                background-color: #98FB98;
+                background-color: #C5FDC5;
                 color: black;
                 border: none;
                 border-radius: 4px;
@@ -563,7 +563,7 @@ class AutoFittingModule(QWidget):
                 font-size: 7.5pt;
                 min-width: 70px;
             }
-            QPushButton:hover { background-color: #7FD77F; }
+            QPushButton:hover { background-color: #98FB98; }
             QPushButton:disabled { background-color: #F4F6FB; color: #999999; }
         """
         
@@ -574,7 +574,7 @@ class AutoFittingModule(QWidget):
         smooth_layout.addWidget(self.btn_apply_smooth)
         
         self.btn_reset_smooth = QPushButton("Reset Data")
-        self.btn_reset_smooth.setStyleSheet(btn_smooth_style.replace('#98FB98', '#EF5350'))
+        self.btn_reset_smooth.setStyleSheet(btn_smooth_style.replace('#C5FDC5', '#F48982'))
         self.btn_reset_smooth.clicked.connect(self.reset_to_original_data)
         self.btn_reset_smooth.setEnabled(False)
         smooth_layout.addWidget(self.btn_reset_smooth)
@@ -984,12 +984,12 @@ class AutoFittingModule(QWidget):
         self.selecting_bg = not self.selecting_bg
         if self.selecting_bg:
             # Update button style for active state
-            self.btn_select_bg.setStyleSheet(self.btn_select_bg.styleSheet().replace('#B19CD9', '#FFA07A'))
+            self.btn_select_bg.setStyleSheet(self.btn_select_bg.styleSheet().replace('#D4C5E8', '#FFC4A8'))
             self.btn_select_bg.setText("Stop Selection")
             self.status_label.setText("Selecting background points...")
         else:
             # Restore normal state
-            self.btn_select_bg.setStyleSheet(self.btn_select_bg.styleSheet().replace('#FFA07A', '#B19CD9'))
+            self.btn_select_bg.setStyleSheet(self.btn_select_bg.styleSheet().replace('#FFC4A8', '#D4C5E8'))
             self.btn_select_bg.setText("Select BG Points")
             self.status_label.setText(f"{len(self.bg_points)} BG points selected")
     
@@ -1244,7 +1244,7 @@ class AutoFittingModule(QWidget):
         """Toggle overlap mode (lines 1574-1584)"""
         self.overlap_mode = not self.overlap_mode
         if self.overlap_mode:
-            self.btn_overlap_mode.setStyleSheet(self.btn_overlap_mode.styleSheet().replace('#D8BFD8', '#90EE90'))
+            self.btn_overlap_mode.setStyleSheet(self.btn_overlap_mode.styleSheet().replace('#E9D9E9', '#B8F5B8'))
             self.btn_overlap_mode.setText("Overlap ON")
             try:
                 self.overlap_threshold = float(self.overlap_threshold_entry.text())
@@ -1253,7 +1253,7 @@ class AutoFittingModule(QWidget):
             self.group_distance_threshold = self.overlap_threshold
             self.update_info(f"Overlap mode ON: Peaks within {self.group_distance_threshold}×FWHM will be grouped together\n")
         else:
-            self.btn_overlap_mode.setStyleSheet(self.btn_overlap_mode.styleSheet().replace('#90EE90', '#D8BFD8'))
+            self.btn_overlap_mode.setStyleSheet(self.btn_overlap_mode.styleSheet().replace('#B8F5B8', '#E9D9E9'))
             self.btn_overlap_mode.setText("Overlap")
             self.group_distance_threshold = 2.5
             self.update_info("Overlap mode OFF: Standard grouping (2.5×FWHM)\n")
@@ -1748,6 +1748,11 @@ class AutoFittingModule(QWidget):
         # Convert fit_results to DataFrame format for saving
         import pandas as pd
         df = pd.DataFrame(self.fit_results)
+        
+        # Rename 'center' to 'Center' for consistency
+        if 'center' in df.columns:
+            df.rename(columns={'center': 'Center'}, inplace=True)
+        
         df['File'] = self.filename
         
         csv_path = os.path.join(save_dir, f"{self.filename}_fit_results.csv")
@@ -2022,6 +2027,15 @@ class AutoFittingModule(QWidget):
             
             self.update_info("\n" + "="*50 + "\n")
             self.update_info("Batch processing complete!\n")
+            
+            # Merge all CSV files into one summary file
+            if self.batch_auto_save and len(self.batch_csv_paths) > 0:
+                try:
+                    self._merge_batch_csv_files()
+                except Exception as e:
+                    QMessageBox.warning(self, "CSV Merge Warning", 
+                                      f"Batch completed but CSV merge failed:\n{str(e)}")
+            
             self.status_label.setText("Batch complete")
             
             if self.batch_auto_save and len(self.batch_csv_paths) > 0:
@@ -2238,6 +2252,49 @@ class AutoFittingModule(QWidget):
         self._verification_dialog = None
         
         return user_action["action"]
+    
+    def _merge_batch_csv_files(self):
+        """Merge all batch CSV files into a single summary file"""
+        if not self.batch_csv_paths:
+            return
+        
+        import pandas as pd
+        
+        # Read all CSV files
+        all_dataframes = []
+        for csv_path in self.batch_csv_paths:
+            try:
+                df = pd.read_csv(csv_path)
+                # Add source filename column
+                df.insert(0, 'Source_File', os.path.basename(csv_path).replace('_peaks.csv', ''))
+                all_dataframes.append(df)
+            except Exception as e:
+                print(f"Warning: Failed to read {csv_path}: {e}")
+                continue
+        
+        if not all_dataframes:
+            return
+        
+        # Concatenate all dataframes
+        merged_df = pd.concat(all_dataframes, ignore_index=True)
+        
+        # Get output directory from first CSV file
+        output_dir = os.path.dirname(self.batch_csv_paths[0])
+        
+        # Generate summary filename with timestamp
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        summary_filename = f"batch_summary_{timestamp}.csv"
+        summary_path = os.path.join(output_dir, summary_filename)
+        
+        # Save merged CSV
+        merged_df.to_csv(summary_path, index=False)
+        
+        self.update_info(f"All CSV files merged into: {summary_filename}\n")
+        QMessageBox.information(self, "CSV Merged", 
+                              f"All batch results merged into:\n{summary_filename}\n\n"
+                              f"Location: {output_dir}\n"
+                              f"Total peaks: {len(merged_df)}")
     
     def _show_manual_adjustment_dialog(self):
         """Show dialog for manual adjustment during batch processing (lines 2399-2466)"""
