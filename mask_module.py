@@ -167,47 +167,6 @@ class MaskModule(GUIBase):
         """)
         load_mask_btn.clicked.connect(self.load_mask)
         layout.addWidget(load_mask_btn)
-        
-        # Separator
-        layout.addWidget(QLabel("|"))
-        
-        # Save Mask button
-        save_btn = QPushButton("💾 Save Mask")
-        save_btn.setFixedWidth(110)
-        save_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-                padding: 6px;
-                border-radius: 4px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: #45A049;
-            }}
-        """)
-        save_btn.clicked.connect(self.save_mask)
-        layout.addWidget(save_btn)
-        
-        # Clear All button
-        clear_btn = QPushButton("🗑️ Clear All")
-        clear_btn.setFixedWidth(110)
-        clear_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: #FF5252;
-                color: white;
-                border: none;
-                padding: 6px;
-                border-radius: 4px;
-                font-weight: bold;
-            }}
-            QPushButton:hover {{
-                background-color: #FF1744;
-            }}
-        """)
-        clear_btn.clicked.connect(self.clear_mask)
-        layout.addWidget(clear_btn)
 
         layout.addStretch()
         
@@ -215,6 +174,15 @@ class MaskModule(GUIBase):
         self.file_info_label = QLabel("No image loaded")
         self.file_info_label.setStyleSheet("color: #666666; font-size: 9px;")
         layout.addWidget(self.file_info_label)
+        
+        # Separator
+        layout.addWidget(QLabel("|"))
+        
+        # Position label
+        self.position_label = QLabel("📍 Position: --")
+        self.position_label.setFont(QFont('Arial', 9))
+        self.position_label.setStyleSheet("color: #333333; padding: 3px;")
+        layout.addWidget(self.position_label)
 
         return group
     
@@ -242,13 +210,8 @@ class MaskModule(GUIBase):
         layout.setSpacing(5)
         layout.setContentsMargins(10, 10, 10, 10)
 
-        # Info row with position, mask status, and total pixels
+        # Info row with mask status and total pixels
         info_row = QHBoxLayout()
-
-        self.position_label = QLabel("📍 Position: --")
-        self.position_label.setFont(QFont('Arial', 9))
-        self.position_label.setStyleSheet("color: #333333; padding: 3px;")
-        info_row.addWidget(self.position_label)
 
         self.mask_status_label = QLabel("🔴 Mask: Not loaded")
         self.mask_status_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
@@ -571,8 +534,12 @@ class MaskModule(GUIBase):
         ops_title.setStyleSheet("font-size: 10pt; font-weight: bold; color: #333333;")
         layout.addWidget(ops_title)
         
-        # Invert button
-        invert_btn = QPushButton("↕️ Invert")
+        # Operations in 2x3 grid
+        ops_grid = QGridLayout()
+        ops_grid.setSpacing(5)
+        
+        # Row 0
+        invert_btn = QPushButton("Invert")
         invert_btn.setFixedHeight(32)
         invert_btn.setToolTip("Flip masked and unmasked regions")
         invert_btn.setStyleSheet(f"""
@@ -593,10 +560,9 @@ class MaskModule(GUIBase):
             }}
         """)
         invert_btn.clicked.connect(self.invert_mask)
-        layout.addWidget(invert_btn)
+        ops_grid.addWidget(invert_btn, 0, 0)
         
-        # Grow button
-        grow_btn = QPushButton("➕ Grow")
+        grow_btn = QPushButton("Grow")
         grow_btn.setFixedHeight(32)
         grow_btn.setToolTip("Expand mask regions by 1 pixel")
         grow_btn.setStyleSheet(f"""
@@ -617,10 +583,10 @@ class MaskModule(GUIBase):
             }}
         """)
         grow_btn.clicked.connect(self.grow_mask)
-        layout.addWidget(grow_btn)
+        ops_grid.addWidget(grow_btn, 0, 1)
         
-        # Shrink button
-        shrink_btn = QPushButton("➖ Shrink")
+        # Row 1
+        shrink_btn = QPushButton("Shrink")
         shrink_btn.setFixedHeight(32)
         shrink_btn.setToolTip("Shrink mask regions by 1 pixel")
         shrink_btn.setStyleSheet(f"""
@@ -641,10 +607,9 @@ class MaskModule(GUIBase):
             }}
         """)
         shrink_btn.clicked.connect(self.shrink_mask)
-        layout.addWidget(shrink_btn)
+        ops_grid.addWidget(shrink_btn, 1, 0)
         
-        # Undo button (replaced Fill Holes)
-        undo_btn = QPushButton("↶ Undo")
+        undo_btn = QPushButton("Undo")
         undo_btn.setFixedHeight(32)
         undo_btn.setToolTip("Undo last mask operation")
         undo_btn.setStyleSheet(f"""
@@ -665,7 +630,56 @@ class MaskModule(GUIBase):
             }}
         """)
         undo_btn.clicked.connect(self.undo_mask)
-        layout.addWidget(undo_btn)
+        ops_grid.addWidget(undo_btn, 1, 1)
+        
+        # Row 2
+        save_btn = QPushButton("Save Mask")
+        save_btn.setFixedHeight(32)
+        save_btn.setToolTip("Save current mask to file")
+        save_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #4CAF50;
+                color: white;
+                border: none;
+                padding: 5px;
+                border-radius: 4px;
+                font-weight: bold;
+                font-size: 9pt;
+            }}
+            QPushButton:hover {{
+                background-color: #45A049;
+            }}
+            QPushButton:pressed {{
+                background-color: #388E3C;
+            }}
+        """)
+        save_btn.clicked.connect(self.save_mask)
+        ops_grid.addWidget(save_btn, 2, 0)
+        
+        clear_btn = QPushButton("Clear All")
+        clear_btn.setFixedHeight(32)
+        clear_btn.setToolTip("Clear all mask regions")
+        clear_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: #FF5252;
+                color: white;
+                border: none;
+                padding: 5px;
+                border-radius: 4px;
+                font-weight: bold;
+                font-size: 9pt;
+            }}
+            QPushButton:hover {{
+                background-color: #FF1744;
+            }}
+            QPushButton:pressed {{
+                background-color: #D32F2F;
+            }}
+        """)
+        clear_btn.clicked.connect(self.clear_mask)
+        ops_grid.addWidget(clear_btn, 2, 1)
+        
+        layout.addLayout(ops_grid)
         
         layout.addStretch()
         
@@ -1102,6 +1116,7 @@ class MaskModule(GUIBase):
         self.ax.set_ylim(0, self.image_data.shape[0])
         self.ax.set_xlabel('X (pixels)', fontsize=8)
         self.ax.set_ylabel('Y (pixels)', fontsize=8)
+        self.ax.tick_params(axis='both', which='major', labelsize=5)
         self.ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
 
         self.canvas.draw_idle()
