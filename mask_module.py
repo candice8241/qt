@@ -234,7 +234,7 @@ class MaskModule(GUIBase):
 
         layout = QVBoxLayout(group)
         layout.setSpacing(0)
-        layout.setContentsMargins(10, -30, 10, 0)
+        layout.setContentsMargins(10, -45, 10, 0)
 
         # Main canvas layout - Image on left, Operations on right
         main_canvas_layout = QHBoxLayout()
@@ -247,7 +247,7 @@ class MaskModule(GUIBase):
         canvas_container.setFixedSize(1050, 620)  # Fixed container size (reduced height)
         canvas_layout = QHBoxLayout(canvas_container)
         canvas_layout.setSpacing(5)
-        canvas_layout.setContentsMargins(0, -20, 0, 0)
+        canvas_layout.setContentsMargins(0, -35, 0, 0)
         
         # Matplotlib canvas - Fixed size for better display
         self.figure = Figure(figsize=(10, 6))
