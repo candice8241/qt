@@ -297,10 +297,10 @@ class PowderXRDModule(GUIBase):
             self.open_h5_preview,
             bg_color="#2196F3",
             hover_color="#1976D2",
-            width=120, height=26,
+            width=150, height=28,
             parent=h5_btn_row
         )
-        h5_preview_btn.setFont(QFont('Arial', 8))
+        h5_preview_btn.setFont(QFont('Arial', 9))
         h5_btn_row_layout.addWidget(h5_preview_btn)
 
         h5_sector_layout.addWidget(h5_btn_row)
@@ -337,10 +337,10 @@ class PowderXRDModule(GUIBase):
             self.open_bin_config,
             bg_color="#FF6F00",
             hover_color="#E65100",
-            width=120, height=26,
+            width=150, height=28,
             parent=bin_btn_row
         )
-        bin_config_btn.setFont(QFont('Arial', 8))
+        bin_config_btn.setFont(QFont('Arial', 9))
         bin_btn_row_layout.addWidget(bin_config_btn)
 
         bin_config_layout.addWidget(bin_btn_row)
