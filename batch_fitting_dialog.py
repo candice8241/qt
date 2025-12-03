@@ -845,17 +845,28 @@ class BatchFittingDialog(QDialog):
                 for result in self.results:
                     if result['file'] == fname and 'fit_curves' in result:
                         for fit_x, fit_y in result['fit_curves']:
-                            self.canvas.axes.plot(fit_x, fit_y, '-', linewidth=1.5, 
-                                                 color='#E53935', alpha=0.6, zorder=4)
+                            self.canvas.axes.plot(fit_x, fit_y, '-', linewidth=2, 
+                                                 color='#E53935', alpha=0.8, zorder=4)
         
         # Plot current data
         self.canvas.axes.plot(x, y, 'k-', linewidth=1.5, label='Current', zorder=2)
         
+        # Plot fitted curves for current file (always show if exists, regardless of overlap mode)
+        current_filename = os.path.basename(self.file_list[self.current_index]) if self.file_list and self.current_index >= 0 else None
+        fit_curves_to_plot = []
+        
+        if current_filename:
+            # Find fit curves from results
+            for result in self.results:
+                if result['file'] == current_filename and 'fit_curves' in result:
+                    fit_curves_to_plot = result['fit_curves']
+                    break
+        
         # Plot fitted curves in red
-        if self.current_fit_curves:
-            for idx, (fit_x, fit_y) in enumerate(self.current_fit_curves):
-                self.canvas.axes.plot(fit_x, fit_y, '-', linewidth=2, 
-                                     color='#E53935', alpha=0.85, 
+        if fit_curves_to_plot:
+            for idx, (fit_x, fit_y) in enumerate(fit_curves_to_plot):
+                self.canvas.axes.plot(fit_x, fit_y, '-', linewidth=2.5, 
+                                     color='#E53935', alpha=0.9, 
                                      label=f'Fit Peak {idx+1}', zorder=4)
         
         # Plot peaks as red vertical lines
@@ -881,8 +892,11 @@ class BatchFittingDialog(QDialog):
             
         self.canvas.axes.set_xlabel('2θ (deg)', fontsize=10, fontweight='bold')
         self.canvas.axes.set_ylabel('Intensity', fontsize=10, fontweight='bold')
+        
+        # Update legend based on number of fit curves
+        num_fit_curves = len(fit_curves_to_plot) if 'fit_curves_to_plot' in locals() else 0
         self.canvas.axes.legend(loc='upper right', fontsize=8, framealpha=0.85, 
-                               ncol=2 if len(self.current_fit_curves) > 3 else 1)
+                               ncol=2 if num_fit_curves > 3 else 1)
         self.canvas.axes.grid(True, alpha=0.3, linestyle=':', linewidth=0.5)
         self.canvas.axes.set_facecolor('#FAFAFA')
         
@@ -1269,21 +1283,37 @@ class BatchFittingDialog(QDialog):
             return
             
         # Prepare data for CSV output
-        # Format: each peak in each file gets its own row
+        # Format: each peak in each file gets its own row, blank rows between files
         rows = []
         
-        for result in self.results:
+        for file_idx, result in enumerate(self.results):
             filename = result['file']
+            # Remove .xy extension
+            filename_clean = filename.replace('.xy', '').replace('.dat', '')
+            
             peak_results = result.get('peak_results', [])
             
-            for peak_data in peak_results:
+            for peak_idx, peak_data in enumerate(peak_results, 1):
                 rows.append({
-                    'File': filename,
+                    'File': filename_clean,
+                    'Peak': f'Peak {peak_idx}',
                     'Center': peak_data.get('center', 0),
                     'FWHM': peak_data.get('fwhm', 0),
                     'Area': peak_data.get('area', 0),
                     'Intensity': peak_data.get('intensity', 0),
                     'R_squared': peak_data.get('r_squared', 0)
+                })
+            
+            # Add blank row between different files (except after last file)
+            if file_idx < len(self.results) - 1:
+                rows.append({
+                    'File': '',
+                    'Peak': '',
+                    'Center': '',
+                    'FWHM': '',
+                    'Area': '',
+                    'Intensity': '',
+                    'R_squared': ''
                 })
         
         if not rows:
@@ -1299,7 +1329,7 @@ class BatchFittingDialog(QDialog):
         
         # Count total files and peaks
         total_files = len(self.results)
-        total_peaks = len(rows)
+        total_peaks = sum(len(r.get('peak_results', [])) for r in self.results)
         
         QMessageBox.information(
             self,
