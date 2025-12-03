@@ -13,11 +13,12 @@ import pandas as pd
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                               QPushButton, QFileDialog, QMessageBox, 
                               QListWidget, QListWidgetItem, QSplitter, QWidget,
-                              QFrame, QComboBox)
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+                              QFrame, QComboBox, QLineEdit, QSizePolicy)
+from PyQt6.QtCore import Qt, QRect
+from PyQt6.QtGui import QFont, QPainter, QPen, QColor
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
+import matplotlib.pyplot as plt
 from scipy.signal import find_peaks, peak_widths
 from scipy.optimize import curve_fit
 from scipy.special import wofz
@@ -47,12 +48,13 @@ class MplCanvas(FigureCanvasQTAgg):
         self.setParent(parent)
 
 
-class BatchFittingDialog(QDialog):
-    """Interactive batch fitting dialog"""
+class BatchFittingDialog(QWidget):
+    """Interactive batch fitting widget (can be used as dialog or embedded widget)"""
     
     def __init__(self, parent=None):
         super().__init__(parent)
-        self.setWindowTitle("Batch Peak Fitting (Interactive)")
+        # Don't set window title when used as embedded widget
+        # self.setWindowTitle("Batch Peak Fitting (Interactive)")
         self.setMinimumWidth(1400)
         self.setMinimumHeight(800)
         
@@ -80,9 +82,12 @@ class BatchFittingDialog(QDialog):
         # Fitting results for plotting
         self.current_fit_curves = []  # List of (x, y) tuples for fitted curves
         
-        # Overlap mode
-        self.overlap_mode = False
-        self.overlapped_data = []  # List of (filename, x, y, peaks, bg_points) for overlay
+        # Peak grouping and fitting parameters (matching auto_fitting_module.py)
+        self.overlap_threshold = 1.5  # Overlap FWHM multiplier for grouping peaks (default mode)
+        self.overlap_threshold_normal = 1.5  # Normal mode threshold
+        self.overlap_threshold_overlap = 5.0  # Overlap mode threshold (like auto_fitting_module)
+        self.fitting_window_multiplier = 3.0  # Fit window multiplier for peak fitting
+        self.overlap_mode = False  # Overlap mode switch (like auto_fitting_module.py)
         
         self.setup_ui()
         
@@ -118,23 +123,91 @@ class BatchFittingDialog(QDialog):
         elif event.key() == Qt.Key.Key_R:
             # R - reset zoom
             self.reset_zoom()
-        elif event.key() == Qt.Key.Key_O:
-            # O - toggle overlap mode
-            self.overlap_btn.setChecked(not self.overlap_btn.isChecked())
-            self.toggle_overlap_mode()
         else:
             super().keyPressEvent(event)
         
+    def paintEvent(self, event):
+        """Custom paint event to draw border with explicit right and bottom lines"""
+        super().paintEvent(event)
+        
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        
+        rect = self.rect()
+        border_width = 2
+        
+        # Draw main border with enough inset
+        pen = QPen(QColor("#7E57C2"), border_width)
+        pen.setStyle(Qt.PenStyle.SolidLine)
+        painter.setPen(pen)
+        
+        # Draw rounded rectangle with proper insets
+        painter.drawRoundedRect(
+            rect.adjusted(1, 1, -8, -8),  # Larger inset on right and bottom
+            6, 6
+        )
+        
+        # Draw EXPLICIT right border line (guaranteed visible)
+        pen_thick = QPen(QColor("#7E57C2"), 3)
+        painter.setPen(pen_thick)
+        
+        # Right vertical line
+        right_x = rect.width() - 6  # 6px from right edge
+        painter.drawLine(right_x, 5, right_x, rect.height() - 5)
+        
+        # Bottom horizontal line on the right side
+        bottom_y = rect.height() - 6  # 6px from bottom edge
+        painter.drawLine(rect.width() - 100, bottom_y, right_x, bottom_y)
+        
+        painter.end()
+    
     def setup_ui(self):
         """Setup the user interface"""
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
+        # Set background with padding for border
+        self.setStyleSheet("""
+            BatchFittingDialog {
+                background-color: #E8E8E8;
+                min-width: 1400px;
+                min-height: 800px;
+            }
+        """)
+        
+        # Main layout with margins for manual border
+        # Extra margins on right and bottom for border visibility
+        main_layout = QVBoxLayout(self)
+        main_layout.setContentsMargins(3, 3, 12, 12)  # Right:12px Bottom:12px for visibility
+        main_layout.setSpacing(0)
+        
+        # Create content container
+        container = QWidget()
+        container.setStyleSheet("""
+            QWidget {
+                background-color: #FAFAFA;
+                border-radius: 5px;
+            }
+        """)
+        
+        # Force container to not expand beyond available space
+        container.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
+        
+        main_layout.addWidget(container)
+        
+        # Inner layout for actual content
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(5)
         
-        # Title and controls
+        # Title and controls (no border)
         header = QWidget()
+        header.setStyleSheet("""
+            QWidget {
+                background-color: #F3E5F5;
+                border: none;
+                border-radius: 5px;
+            }
+        """)
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(5, 5, 5, 5)
+        header_layout.setContentsMargins(8, 5, 8, 5)
         
         title = QLabel("📊 Batch Peak Fitting - Interactive Mode")
         title.setFont(QFont('Arial', 13, QFont.Weight.Bold))
@@ -179,17 +252,17 @@ class BatchFittingDialog(QDialog):
         layout.addWidget(splitter)
         
     def create_left_panel(self):
-        """Create left panel with file list"""
+        """Create left panel with file list (no border)"""
         panel = QFrame()
-        panel.setFrameStyle(QFrame.Shape.StyledPanel)
-        panel.setStyleSheet("background-color: #F5F5F5; border: 2px solid #CCCCCC; border-radius: 5px;")
+        panel.setFrameStyle(QFrame.Shape.NoFrame)
+        panel.setStyleSheet("background-color: #F5F5F5; border: none; border-radius: 5px;")
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(8, 8, 8, 8)
         
-        # Title
-        title = QLabel("📄 File List")
-        title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        title.setStyleSheet("color: #333333; border: none;")
+        # Title (smaller, no emphasis)
+        title = QLabel("File List")
+        title.setFont(QFont('Arial', 9))
+        title.setStyleSheet("color: #666666; border: none;")
         layout.addWidget(title)
         
         # File list widget
@@ -209,10 +282,17 @@ class BatchFittingDialog(QDialog):
         self.file_list_widget.itemClicked.connect(self.on_file_selected)
         layout.addWidget(self.file_list_widget)
         
-        # Progress label
+        # Progress label (no border)
         self.progress_label = QLabel("No files loaded")
         self.progress_label.setFont(QFont('Arial', 8))
-        self.progress_label.setStyleSheet("color: #666666; border: none;")
+        self.progress_label.setStyleSheet("""
+            QLabel {
+                color: #666666;
+                border: none;
+                background: transparent;
+                padding: 2px;
+            }
+        """)
         layout.addWidget(self.progress_label)
         
         return panel
@@ -244,7 +324,13 @@ class BatchFittingDialog(QDialog):
         """Create control bar with buttons and settings"""
         bar = QWidget()
         bar.setFixedHeight(90)
-        bar.setStyleSheet("background-color: #E3F2FF; border-radius: 5px;")
+        bar.setStyleSheet("""
+            QWidget {
+                background-color: #E3F2FF;
+                border: 2px solid #90CAF9;
+                border-radius: 6px;
+            }
+        """)
         main_layout = QVBoxLayout(bar)
         main_layout.setContentsMargins(10, 5, 10, 5)
         main_layout.setSpacing(5)
@@ -253,7 +339,7 @@ class BatchFittingDialog(QDialog):
         row1 = QHBoxLayout()
         
         # Add mode selector
-        mode_label = QLabel("Add Mode:")
+        mode_label = QLabel("Mode:")
         mode_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         row1.addWidget(mode_label)
         
@@ -312,6 +398,36 @@ class BatchFittingDialog(QDialog):
         self.method_combo.setFont(QFont('Arial', 9))
         self.method_combo.currentTextChanged.connect(self.on_method_changed)
         row1.addWidget(self.method_combo)
+        
+        row1.addSpacing(20)
+        
+        # Overlap FWHM parameter
+        overlap_label = QLabel("Overlap FWHM×:")
+        overlap_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        overlap_label.setToolTip("Peaks within this multiplier of FWHM will be grouped together")
+        row1.addWidget(overlap_label)
+        
+        self.overlap_entry = QLineEdit(str(self.overlap_threshold))
+        self.overlap_entry.setFixedWidth(50)
+        self.overlap_entry.setFont(QFont('Arial', 9))
+        self.overlap_entry.setStyleSheet("padding: 3px;")
+        self.overlap_entry.textChanged.connect(self.on_overlap_changed)
+        row1.addWidget(self.overlap_entry)
+        
+        row1.addSpacing(20)
+        
+        # Fit window parameter
+        fit_window_label = QLabel("Fit Window×:")
+        fit_window_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        fit_window_label.setToolTip("Fitting window size as multiplier of peak FWHM")
+        row1.addWidget(fit_window_label)
+        
+        self.fit_window_entry = QLineEdit(str(self.fitting_window_multiplier))
+        self.fit_window_entry.setFixedWidth(50)
+        self.fit_window_entry.setFont(QFont('Arial', 9))
+        self.fit_window_entry.setStyleSheet("padding: 3px;")
+        self.fit_window_entry.textChanged.connect(self.on_fit_window_changed)
+        row1.addWidget(self.fit_window_entry)
         
         row1.addStretch()
         
@@ -405,50 +521,34 @@ class BatchFittingDialog(QDialog):
         
         row2.addSpacing(10)
         
-        # Overlap button
-        self.overlap_btn = QPushButton("📊 Overlap (O)")
+        # Overlap mode button (like auto_fitting_module.py)
+        self.overlap_btn = QPushButton("Overlap Mode")
         self.overlap_btn.setFixedWidth(120)
         self.overlap_btn.setFont(QFont('Arial', 9))
         self.overlap_btn.setCheckable(True)
         self.overlap_btn.setStyleSheet("""
             QPushButton {
-                background-color: #B9F2FF;
-                border: 2px solid #81D4FA;
+                background-color: #E9D9E9;
+                border: 2px solid #BA68C8;
                 border-radius: 4px;
                 padding: 5px;
                 color: black;
             }
             QPushButton:checked {
-                background-color: #00BCD4;
-                color: white;
+                background-color: #B8F5B8;
+                color: black;
                 font-weight: bold;
             }
-            QPushButton:hover { background-color: #81D4FA; }
+            QPushButton:hover { background-color: #CE93D8; }
         """)
+        self.overlap_btn.setToolTip("Enable overlap mode: use larger threshold for peak grouping")
         self.overlap_btn.clicked.connect(self.toggle_overlap_mode)
         row2.addWidget(self.overlap_btn)
-        
-        # Clear overlay button
-        clear_overlay_btn = QPushButton("Clear Overlay")
-        clear_overlay_btn.setFixedWidth(100)
-        clear_overlay_btn.setFont(QFont('Arial', 8))
-        clear_overlay_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #FFEBEE;
-                border: 1px solid #EF5350;
-                border-radius: 4px;
-                padding: 5px;
-                color: #C62828;
-            }
-            QPushButton:hover { background-color: #FFCDD2; }
-        """)
-        clear_overlay_btn.clicked.connect(self.clear_overlap)
-        row2.addWidget(clear_overlay_btn)
         
         row2.addStretch()
         
         # Instructions
-        info_label = QLabel("💡 Left: Add | Right: Delete | Scroll: Zoom | Enter: Auto-fit | O: Overlap")
+        info_label = QLabel("💡 Left: Add | Right: Delete | Scroll: Zoom | Enter: Auto-fit")
         info_label.setFont(QFont('Arial', 8))
         info_label.setStyleSheet("color: #666666;")
         row2.addWidget(info_label)
@@ -461,7 +561,13 @@ class BatchFittingDialog(QDialog):
         """Create navigation bar with prev/next/save buttons"""
         bar = QWidget()
         bar.setFixedHeight(55)
-        bar.setStyleSheet("background-color: #FFF9C4; border-radius: 5px;")
+        bar.setStyleSheet("""
+            QWidget {
+                background-color: #FFF9C4;
+                border: 2px solid #FFD54F;
+                border-radius: 6px;
+            }
+        """)
         layout = QHBoxLayout(bar)
         layout.setContentsMargins(10, 5, 10, 5)
         
@@ -648,10 +754,17 @@ class BatchFittingDialog(QDialog):
         self.plot_data(preserve_zoom=True)
         
     def clear_all(self):
-        """Clear all peaks and background points"""
+        """Clear all peaks, background points, and fitted curves"""
         self.peaks = []
         self.bg_points = []
         self.current_fit_curves = []
+        
+        # Also clear fit results for current file
+        if self.file_list and self.current_index >= 0 and self.current_index < len(self.file_list):
+            current_filename = os.path.basename(self.file_list[self.current_index])
+            # Remove results for current file
+            self.results = [r for r in self.results if r['file'] != current_filename]
+        
         self.plot_data(preserve_zoom=True)
         
     def set_mode(self, mode):
@@ -832,44 +945,75 @@ class BatchFittingDialog(QDialog):
             y_range = y.max() - y.min()
             self.ylim_original = (y.min() - y_range * 0.05, y.max() + y_range * 0.1)
         
-        # Plot overlapped data if overlap mode is on
-        if self.overlap_mode and self.overlapped_data:
-            colors = ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A', '#98D8C8']
-            for idx, (fname, ox, oy, opeaks, obg) in enumerate(self.overlapped_data):
-                color = colors[idx % len(colors)]
-                alpha = 0.5
-                self.canvas.axes.plot(ox, oy, '-', linewidth=1, alpha=alpha, 
-                                    color=color, label=fname, zorder=1)
-                
-                # Plot fit curves for this overlapped file if available
-                for result in self.results:
-                    if result['file'] == fname and 'fit_curves' in result:
-                        for fit_x, fit_y in result['fit_curves']:
-                            self.canvas.axes.plot(fit_x, fit_y, '-', linewidth=2, 
-                                                 color='#E53935', alpha=0.8, zorder=4)
-        
         # Plot current data
-        self.canvas.axes.plot(x, y, 'k-', linewidth=1.5, label='Current', zorder=2)
+        self.canvas.axes.plot(x, y, 'k-', linewidth=1.5, label='Data', zorder=2)
         
-        # Plot fitted curves for current file (always show if exists, regardless of overlap mode)
+        # Plot fitted curves for current file (matching auto_fitting_module.py style)
         current_filename = os.path.basename(self.file_list[self.current_index]) if self.file_list and self.current_index >= 0 else None
-        fit_curves_to_plot = []
         
         if current_filename:
-            # Find fit curves from results
+            # Find fit results from results list
             for result in self.results:
                 if result['file'] == current_filename and 'fit_curves' in result:
-                    fit_curves_to_plot = result['fit_curves']
+                    fit_curves = result['fit_curves']
+                    
+                    # Plot background line if available (darker blue for visibility)
+                    if self.bg_points and len(self.bg_points) >= 2:
+                        bg_x = [p[0] for p in self.bg_points]
+                        bg_y = [p[1] for p in self.bg_points]
+                        self.canvas.axes.plot(bg_x, bg_y, 's', color='#1E3A8A',
+                                            markersize=4, alpha=0.9, label='BG Points', zorder=3)
+                        # Interpolate background line (darker blue, more opaque)
+                        bg_line_y = np.interp(x, bg_x, bg_y)
+                        self.canvas.axes.plot(x, bg_line_y, '-', color='#1E3A8A',
+                                            linewidth=2.0, alpha=0.6, label='Background', zorder=3)
+                    
+                    # Plot individual peak components (dashed lines, different colors)
+                    colors = plt.cm.tab10(np.linspace(0, 1, len(fit_curves)))
+                    
+                    for idx, (fit_x, fit_y) in enumerate(fit_curves):
+                        label = f'Peak {idx+1}' if idx < 3 else None  # Only label first 3
+                        self.canvas.axes.plot(fit_x, fit_y, '--', linewidth=1.5, 
+                                            color=colors[idx], alpha=0.7, 
+                                            label=label, zorder=4)
+                    
+                    # Calculate and plot total fit (red solid line)
+                    if len(fit_curves) > 0:
+                        # Find common x range
+                        x_min = min(fit_x.min() for fit_x, _ in fit_curves)
+                        x_max = max(fit_x.max() for fit_x, _ in fit_curves)
+                        x_total = np.linspace(x_min, x_max, 500)
+                        
+                        # Add background
+                        if self.bg_points and len(self.bg_points) >= 2:
+                            bg_x = [p[0] for p in self.bg_points]
+                            bg_y = [p[1] for p in self.bg_points]
+                            y_total = np.interp(x_total, bg_x, bg_y)
+                        else:
+                            y_total = np.zeros_like(x_total)
+                        
+                        # Sum all peak components (without background, as they already include it)
+                        for fit_x, fit_y in fit_curves:
+                            # Subtract background first, then add to total
+                            if self.bg_points and len(self.bg_points) >= 2:
+                                bg_x = [p[0] for p in self.bg_points]
+                                bg_y = [p[1] for p in self.bg_points]
+                                bg_interp = np.interp(fit_x, bg_x, bg_y)
+                                peak_only = fit_y - bg_interp
+                            else:
+                                peak_only = fit_y
+                            # Interpolate to common x grid and add
+                            peak_interp = np.interp(x_total, fit_x, peak_only, left=0, right=0)
+                            y_total += peak_interp
+                        
+                        # Plot total fit
+                        self.canvas.axes.plot(x_total, y_total, '-', linewidth=2.0, 
+                                            color='#FF0000', alpha=0.6, 
+                                            label='Total Fit', zorder=5)
+                    
                     break
         
-        # Plot fitted curves in red
-        if fit_curves_to_plot:
-            for idx, (fit_x, fit_y) in enumerate(fit_curves_to_plot):
-                self.canvas.axes.plot(fit_x, fit_y, '-', linewidth=2.5, 
-                                     color='#E53935', alpha=0.9, 
-                                     label=f'Fit Peak {idx+1}', zorder=4)
-        
-        # Plot peaks as red vertical lines
+        # Plot peaks as vertical lines
         for peak_x in self.peaks:
             self.canvas.axes.axvline(peak_x, color='#E57373', linestyle='--', 
                                      alpha=0.8, linewidth=2, zorder=3)
@@ -930,7 +1074,24 @@ class BatchFittingDialog(QDialog):
             return 0.5  # Default fallback
     
     def _group_overlapping_peaks(self, peak_positions, x, y):
-        """Group overlapping peaks based on their positions and FWHM"""
+        """
+        Group overlapping peaks based on their positions and FWHM.
+        Uses configurable overlap_threshold for grouping decision.
+        
+        Parameters:
+        -----------
+        peak_positions : list
+            List of peak center positions
+        x : array
+            X-axis data
+        y : array
+            Y-axis data
+            
+        Returns:
+        --------
+        groups : list of lists
+            Each group contains tuples of (position, index) for peaks that should be fitted together
+        """
         if len(peak_positions) == 0:
             return []
         
@@ -938,8 +1099,8 @@ class BatchFittingDialog(QDialog):
         peak_indices = [np.argmin(np.abs(x - pos)) for pos in peak_positions]
         peak_fwhms = [self._estimate_peak_fwhm(x, y, idx) for idx in peak_indices]
         
-        # Overlap threshold multiplier (1.5 means peaks overlap if distance < 1.5*FWHM)
-        overlap_mult = 1.5
+        # Use configurable overlap threshold
+        overlap_mult = self.overlap_threshold
         
         # Convert to sorted list with positions
         peak_data = [(pos, idx, fwhm) for pos, idx, fwhm in zip(peak_positions, peak_indices, peak_fwhms)]
@@ -972,14 +1133,42 @@ class BatchFittingDialog(QDialog):
         return groups
     
     def _fit_single_peak(self, x, y, peak_idx, peak_pos):
-        """Fit a single peak independently using improved background subtraction"""
+        """
+        Fit a single peak independently using improved background subtraction.
+        Uses configurable fitting_window_multiplier and overlap_mode adjustments.
+        Matches auto_fitting_module.py behavior.
+        
+        Parameters:
+        -----------
+        x : array
+            X-axis data
+        y : array
+            Y-axis data
+        peak_idx : int
+            Index of peak in data array
+        peak_pos : float
+            Position of peak center
+            
+        Returns:
+        --------
+        result : dict or None
+            Dictionary containing fit results or None if fitting failed
+        """
         try:
             # Get peak width for window estimation
             results_half = peak_widths(y, [peak_idx], rel_height=0.5)
             width_pts = results_half[0][0] if len(results_half[0]) > 0 else 40
             
-            # Fit window multiplier (3.0 is standard)
-            fit_window_mult = 3.0
+            # Calculate FWHM estimate
+            dx = np.mean(np.diff(x)) if len(x) > 1 else 1.0
+            fwhm_est = width_pts * dx
+            
+            # Use configurable fit window multiplier
+            # If overlap mode is on, use larger window (like auto_fitting_module)
+            fit_window_mult = self.fitting_window_multiplier
+            if self.overlap_mode:
+                fit_window_mult += 1.0  # Increase window for overlap mode
+            
             window = int(width_pts * fit_window_mult)
             window = max(20, min(window, 200))
             
@@ -1021,24 +1210,48 @@ class BatchFittingDialog(QDialog):
             y_fit_input = y_local - background
             y_fit_input = np.maximum(y_fit_input, 0)  # Ensure non-negative
             
-            # Initial guess
-            amplitude_guess = np.max(y_fit_input)
+            # Initial guess (matching auto_fitting_module.py)
+            peak_height = np.max(y_fit_input)
             center_guess = x_local[np.argmax(y_fit_input)]
-            sigma_guess = np.std(x_local) / 5
-            gamma_guess = sigma_guess
+            
+            # FWHM-based sigma and gamma estimates
+            sigma_guess = fwhm_est / 2.355
+            gamma_guess = fwhm_est / 2
+            amplitude_guess = peak_height * sigma_guess * np.sqrt(2 * np.pi)
+            
+            # Center tolerance (larger if overlap mode is on)
+            center_tolerance = fwhm_est * 0.8 if self.overlap_mode else fwhm_est * 0.5
+            
+            # Bounds (matching auto_fitting_module.py)
+            y_range = np.max(y_fit_input) - np.min(y_fit_input)
+            amp_lower = 0
+            amp_upper = y_range * sigma_guess * np.sqrt(2 * np.pi) * 10
+            sig_lower = dx * 0.5
+            sig_upper = fwhm_est * 3
+            gam_lower = dx * 0.5
+            gam_upper = fwhm_est * 3
+            
+            # Max iterations and tolerances (higher for overlap mode)
+            max_iter = 30000 if self.overlap_mode else 10000
+            ftol = 1e-9 if self.overlap_mode else 1e-8
+            xtol = 1e-9 if self.overlap_mode else 1e-8
             
             # Fit peak
             if self.fit_method == "voigt":
                 p0 = [amplitude_guess, center_guess, sigma_guess, gamma_guess]
-                bounds = ([0, x_local.min(), 0, 0], [np.inf, x_local.max(), np.inf, np.inf])
-                popt, _ = curve_fit(voigt, x_local, y_fit_input, p0=p0, bounds=bounds, maxfev=10000)
+                bounds = ([amp_lower, center_guess - center_tolerance, sig_lower, gam_lower],
+                         [amp_upper, center_guess + center_tolerance, sig_upper, gam_upper])
+                popt, _ = curve_fit(voigt, x_local, y_fit_input, p0=p0, bounds=bounds, 
+                                   maxfev=max_iter, ftol=ftol, xtol=xtol)
                 sigma = popt[2]
                 gamma = popt[3]
                 eta = None
             else:  # pseudo-voigt
                 p0 = [amplitude_guess, center_guess, sigma_guess, gamma_guess, 0.5]
-                bounds = ([0, x_local.min(), 0, 0, 0], [np.inf, x_local.max(), np.inf, np.inf, 1.0])
-                popt, _ = curve_fit(pseudo_voigt, x_local, y_fit_input, p0=p0, bounds=bounds, maxfev=10000)
+                bounds = ([amp_lower, center_guess - center_tolerance, sig_lower, gam_lower, 0],
+                         [amp_upper, center_guess + center_tolerance, sig_upper, gam_upper, 1.0])
+                popt, _ = curve_fit(pseudo_voigt, x_local, y_fit_input, p0=p0, bounds=bounds,
+                                   maxfev=max_iter, ftol=ftol, xtol=xtol)
                 sigma = popt[2]
                 gamma = popt[3]
                 eta = popt[4]
@@ -1090,7 +1303,24 @@ class BatchFittingDialog(QDialog):
             return None
     
     def _fit_multi_peaks_group(self, x, y, group):
-        """Fit multiple overlapping peaks together"""
+        """
+        Fit multiple overlapping peaks together.
+        Uses configurable fitting_window_multiplier.
+        
+        Parameters:
+        -----------
+        x : array
+            X-axis data
+        y : array
+            Y-axis data
+        group : list of tuples
+            List of (position, index) tuples for peaks in the group
+            
+        Returns:
+        --------
+        results : list of dicts or list of None
+            List of fit results for each peak, or None values if fitting failed
+        """
         try:
             peak_positions = [pos for pos, idx in group]
             peak_indices = [idx for pos, idx in group]
@@ -1108,9 +1338,18 @@ class BatchFittingDialog(QDialog):
             except:
                 pass
             
-            fit_window_mult = 3.0
+            # Use configurable fit window multiplier
+            # If overlap mode is on, use larger window (like auto_fitting_module)
+            fit_window_mult = self.fitting_window_multiplier
+            if self.overlap_mode:
+                fit_window_mult += 1.0
+            
             window = int(avg_width * fit_window_mult * 0.8)  # Slightly smaller for multi-peak
             window = max(40, min(window, 250))
+            
+            # Calculate FWHM estimate for tolerance calculations
+            dx = np.mean(np.diff(x)) if len(x) > 1 else 1.0
+            avg_fwhm = avg_width * dx
             
             # Extract local region covering all peaks in group
             left = max(0, min_peak_idx - window)
@@ -1175,10 +1414,12 @@ class BatchFittingDialog(QDialog):
                 
                 return result
             
-            # Initial guess for all peaks in group
+            # Initial guess for all peaks in group (matching auto_fitting_module.py)
             p0 = []
             bounds_lower = []
             bounds_upper = []
+            
+            y_range = np.max(y_fit_input) - np.min(y_fit_input)
             
             for pos, peak_idx in group:
                 # Find local peak position in extracted region
@@ -1186,23 +1427,54 @@ class BatchFittingDialog(QDialog):
                 if local_peak_idx < 0 or local_peak_idx >= len(y_fit_input):
                     local_peak_idx = np.argmax(y_fit_input)
                 
-                amplitude_guess = max(y_fit_input[local_peak_idx], np.max(y_fit_input) / len(group))
+                # Estimate FWHM for this peak
+                fwhm_est = avg_fwhm
+                try:
+                    widths = peak_widths(y, [peak_idx], rel_height=0.5)
+                    if len(widths[0]) > 0:
+                        fwhm_est = widths[0][0] * dx
+                except:
+                    pass
+                
+                # Initial guesses (matching auto_fitting_module.py)
+                peak_height = y_fit_input[local_peak_idx] if (0 <= local_peak_idx < len(y_fit_input)) else np.max(y_fit_input)
+                if peak_height <= 0:
+                    peak_height = np.max(y_fit_input) * 0.5
+                
                 center_guess = x_local[local_peak_idx]
-                sigma_guess = np.std(x_local) / (5 * len(group))
-                gamma_guess = sigma_guess
+                sigma_guess = fwhm_est / 2.355
+                gamma_guess = fwhm_est / 2
+                amplitude_guess = peak_height * sigma_guess * np.sqrt(2 * np.pi)
+                
+                # Center tolerance (larger if overlap mode is on)
+                center_tolerance = fwhm_est * 0.8 if self.overlap_mode else fwhm_est * 0.5
+                
+                # Bounds
+                amp_lower = 0
+                amp_upper = y_range * sigma_guess * np.sqrt(2 * np.pi) * 10
+                sig_lower = dx * 0.5
+                sig_upper = fwhm_est * 3
+                gam_lower = dx * 0.5
+                gam_upper = fwhm_est * 3
                 
                 if self.fit_method == "voigt":
                     p0.extend([amplitude_guess, center_guess, sigma_guess, gamma_guess])
-                    bounds_lower.extend([0, x_local.min(), 0, 0])
-                    bounds_upper.extend([np.inf, x_local.max(), np.inf, np.inf])
+                    bounds_lower.extend([amp_lower, center_guess - center_tolerance, sig_lower, gam_lower])
+                    bounds_upper.extend([amp_upper, center_guess + center_tolerance, sig_upper, gam_upper])
                 else:  # pseudo-voigt
                     p0.extend([amplitude_guess, center_guess, sigma_guess, gamma_guess, 0.5])
-                    bounds_lower.extend([0, x_local.min(), 0, 0, 0])
-                    bounds_upper.extend([np.inf, x_local.max(), np.inf, np.inf, 1.0])
+                    bounds_lower.extend([amp_lower, center_guess - center_tolerance, sig_lower, gam_lower, 0])
+                    bounds_upper.extend([amp_upper, center_guess + center_tolerance, sig_upper, gam_upper, 1.0])
+            
+            # Max iterations and tolerances (higher for multi-peak or overlap mode)
+            max_iter = 30000 if self.overlap_mode else 20000
+            ftol = 1e-9 if self.overlap_mode else 1e-8
+            xtol = 1e-9 if self.overlap_mode else 1e-8
             
             # Fit all peaks together
             popt, _ = curve_fit(multi_peak_func, x_local, y_fit_input, 
-                               p0=p0, bounds=(bounds_lower, bounds_upper), maxfev=20000)
+                               p0=p0, bounds=(bounds_lower, bounds_upper), 
+                               maxfev=max_iter, ftol=ftol, xtol=xtol)
             
             # Calculate fitted curve
             y_fit = multi_peak_func(x_local, *popt)
@@ -1406,55 +1678,10 @@ class BatchFittingDialog(QDialog):
             QMessageBox.warning(self, "No Peaks", "Please add peaks to the current file first.")
             return
         
-        # If in overlap mode, fit all overlapped files
-        if self.overlap_mode and self.overlapped_data:
-            self.fit_all_overlapped()
-        else:
-            # Start auto-fitting from current file onwards
-            self.auto_fitting = True
-            self.continue_auto_fitting()
+        # Start auto-fitting from current file onwards
+        self.auto_fitting = True
+        self.continue_auto_fitting()
             
-    def fit_all_overlapped(self):
-        """Fit all files in overlap mode"""
-        if not self.overlapped_data:
-            QMessageBox.warning(self, "No Overlapped Data", "No files in overlay to fit.")
-            return
-            
-        total_files = len(self.overlapped_data)
-        success_count = 0
-        failed_count = 0
-        
-        # Store current peaks and bg_points as template
-        template_peaks = self.peaks.copy()
-        template_bg_points = self.bg_points.copy()
-        
-        for idx, (fname, ox, oy, opeaks, obg) in enumerate(self.overlapped_data):
-            # Temporarily set data to this overlapped file
-            self.current_data = np.column_stack((ox, oy))
-            self.peaks = template_peaks.copy()  # Use template peaks
-            self.bg_points = template_bg_points.copy()  # Use template bg
-            
-            # Perform fitting
-            r_squared = self.fit_current()
-            
-            if r_squared >= self.fit_tolerance:
-                success_count += 1
-            else:
-                failed_count += 1
-                
-        # Restore original current file
-        if self.file_list and self.current_index >= 0:
-            self.load_current_file()
-            
-        # Show summary
-        QMessageBox.information(
-            self,
-            "Overlap Fitting Complete",
-            f"✓ Fitting completed for {total_files} overlapped files!\n\n"
-            f"Success: {success_count}\n"
-            f"Failed (R² < {self.fit_tolerance:.2f}): {failed_count}\n\n"
-            f"Click 'Save All Results' to save."
-        )
         
     def continue_auto_fitting(self):
         """Continue auto-fitting to next file"""
@@ -1496,10 +1723,6 @@ class BatchFittingDialog(QDialog):
     def go_previous(self):
         """Go to previous file"""
         if self.current_index > 0:
-            # Add current to overlay if overlap mode is on
-            if self.overlap_mode:
-                self.add_to_overlay()
-                
             self.current_index -= 1
             self.load_current_file()
             self.file_list_widget.setCurrentRow(self.current_index)
@@ -1507,10 +1730,6 @@ class BatchFittingDialog(QDialog):
     def go_next(self):
         """Go to next file"""
         if self.current_index < len(self.file_list) - 1:
-            # Add current to overlay if overlap mode is on
-            if self.overlap_mode:
-                self.add_to_overlay()
-                
             self.current_index += 1
             self.load_current_file()
             self.file_list_widget.setCurrentRow(self.current_index)
@@ -1521,78 +1740,60 @@ class BatchFittingDialog(QDialog):
             self.fit_method = "voigt"
         else:
             self.fit_method = "pseudo"
+    
+    def on_overlap_changed(self):
+        """Handle overlap FWHM multiplier change"""
+        try:
+            value = float(self.overlap_entry.text())
+            if value > 0:
+                self.overlap_threshold = value
+        except ValueError:
+            pass
+    
+    def on_fit_window_changed(self):
+        """Handle fit window multiplier change"""
+        try:
+            value = float(self.fit_window_entry.text())
+            if value > 0:
+                self.fitting_window_multiplier = value
+        except ValueError:
+            pass
             
     def toggle_overlap_mode(self):
-        """Toggle overlap mode"""
+        """
+        Toggle overlap mode (matching auto_fitting_module.py behavior).
+        When enabled, uses larger threshold for peak grouping and adjusted fitting parameters.
+        """
         self.overlap_mode = self.overlap_btn.isChecked()
         
         if self.overlap_mode:
-            # Entering overlap mode - add current file to overlapped data
-            if self.current_data is not None:
-                filename = os.path.basename(self.file_list[self.current_index])
-                x, y = self.current_data[:, 0], self.current_data[:, 1]
-                self.overlapped_data.append((
-                    filename, 
-                    x.copy(), 
-                    y.copy(), 
-                    self.peaks.copy(),
-                    self.bg_points.copy()
-                ))
-                
-            # Update button text
-            self.overlap_btn.setText(f"📊 Overlap ({len(self.overlapped_data)})")
+            # Enable overlap mode - use larger threshold for peak grouping
+            self.overlap_btn.setText("Overlap ON")
+            # Use larger threshold value from the entry field, or default to 5.0
+            try:
+                self.overlap_threshold = float(self.overlap_entry.text())
+                if self.overlap_threshold < self.overlap_threshold_normal:
+                    self.overlap_threshold = self.overlap_threshold_overlap  # Use default overlap value
+            except:
+                self.overlap_threshold = self.overlap_threshold_overlap
             
-            # Update status label
-            self.current_file_label.setText(
-                f"[{self.current_index + 1}/{len(self.file_list)}] "
-                f"{os.path.basename(self.file_list[self.current_index])} "
-                f"[Overlap: {len(self.overlapped_data)} files]"
+            # Update the entry field to show current threshold
+            self.overlap_entry.setText(str(self.overlap_threshold))
+            
+            # Show info message
+            QMessageBox.information(
+                self, 
+                "Overlap Mode ON", 
+                f"Overlap mode enabled.\n\n"
+                f"Peaks within {self.overlap_threshold}×FWHM will be grouped together.\n"
+                f"This allows better fitting of closely overlapping peaks."
             )
         else:
-            # Exiting overlap mode - keep the data but update display
-            self.overlap_btn.setText("📊 Overlap (O)")
-            
-            # Restore normal status label
-            if self.file_list and self.current_index >= 0:
-                filename = os.path.basename(self.file_list[self.current_index])
-                self.current_file_label.setText(f"[{self.current_index + 1}/{len(self.file_list)}] {filename}")
-            
-        self.plot_data(preserve_zoom=True)
+            # Disable overlap mode - revert to normal threshold
+            self.overlap_btn.setText("Overlap Mode")
+            self.overlap_threshold = self.overlap_threshold_normal
+            self.overlap_entry.setText(str(self.overlap_threshold))
         
-    def clear_overlap(self):
-        """Clear all overlapped data"""
-        self.overlapped_data = []
-        self.overlap_mode = False
-        self.overlap_btn.setChecked(False)
-        self.overlap_btn.setText("📊 Overlap (O)")
-        
-        # Restore normal status label
-        if self.file_list and self.current_index >= 0:
-            filename = os.path.basename(self.file_list[self.current_index])
-            self.current_file_label.setText(f"[{self.current_index + 1}/{len(self.file_list)}] {filename}")
-            
-        self.plot_data(preserve_zoom=True)
-        
-    def add_to_overlay(self):
-        """Add current file to overlay"""
-        if self.current_data is not None and self.overlap_mode:
-            filename = os.path.basename(self.file_list[self.current_index])
-            
-            # Check if already in overlay
-            existing_names = [name for name, _, _, _, _ in self.overlapped_data]
-            if filename in existing_names:
-                return
-                
-            x, y = self.current_data[:, 0], self.current_data[:, 1]
-            self.overlapped_data.append((
-                filename,
-                x.copy(),
-                y.copy(),
-                self.peaks.copy(),
-                self.bg_points.copy()
-            ))
-            self.overlap_btn.setText(f"📊 Overlap ({len(self.overlapped_data)})")
-            self.plot_data(preserve_zoom=True)
             
     def save_all_results(self):
         """Save all results to CSV"""
@@ -1663,8 +1864,18 @@ class BatchFittingDialog(QDialog):
 
 
 if __name__ == "__main__":
-    from PyQt6.QtWidgets import QApplication
+    from PyQt6.QtWidgets import QApplication, QMainWindow
     app = QApplication(sys.argv)
-    dialog = BatchFittingDialog()
-    dialog.show()
+    
+    # Create a main window to hold the batch widget
+    main_window = QMainWindow()
+    main_window.setWindowTitle("Batch Peak Fitting")
+    main_window.setMinimumWidth(1600)
+    main_window.setMinimumHeight(900)
+    
+    # Create batch widget
+    batch_widget = BatchFittingDialog()
+    main_window.setCentralWidget(batch_widget)
+    
+    main_window.show()
     sys.exit(app.exec())
