@@ -457,7 +457,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         
         auto_fitting_frame = self._ensure_frame("auto_fitting")
         if self.auto_fitting_module is None:
-            self.auto_fitting_module = AutoFittingModule(auto_fitting_frame)
+            self.auto_fitting_module = AutoFittingModule()
             auto_fitting_frame.layout().addWidget(self.auto_fitting_module)
         auto_fitting_frame.hide()  # Ensure hidden after prebuild
     
@@ -546,7 +546,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         elif tab_name == "auto_fitting":
             target_frame = self._ensure_frame("auto_fitting")
             if self.auto_fitting_module is None:
-                self.auto_fitting_module = AutoFittingModule(target_frame)
+                self.auto_fitting_module = AutoFittingModule()
                 target_frame.layout().addWidget(self.auto_fitting_module)
 
         if target_frame is not None:
