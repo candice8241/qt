@@ -265,6 +265,9 @@ class AutoFittingModule(QWidget):
         self._create_plot_area(main_layout)
         
         # Info panel removed as per user request
+        
+        # Initialize hidden info text for logging
+        self._init_hidden_info_text()
     
     def _create_control_panel(self, parent_layout):
         """Create top control panel (lines 685-773)"""
@@ -384,7 +387,7 @@ class AutoFittingModule(QWidget):
             QLabel {
                 color: #9370DB;
                 font-weight: bold;
-                font-size: 8.5pt;
+                font-size: 9.5pt;
                 background-color: #E6D5F5;
                 padding: 2px;
             }
@@ -407,7 +410,7 @@ class AutoFittingModule(QWidget):
         
         # Background label
         bg_label = QLabel("Background:")
-        bg_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 7.5pt;")
+        bg_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 8.5pt;")
         bg_layout.addWidget(bg_label)
         
         # Button style
@@ -419,11 +422,11 @@ class AutoFittingModule(QWidget):
                 border-radius: 4px;
                 padding: 6px 10px;
                 font-weight: bold;
-                font-size: 6.5pt;
+                font-size: 7.5pt;
                 min-width: 100px;
             }
             QPushButton:hover { background-color: #9370DB; }
-            QPushButton:disabled { background-color: #CCCCCC; color: #666666; }
+            QPushButton:disabled { background-color: #F4F6FB; color: #999999; }
         """
         
         # Select BG Points button (lines 793-797)
@@ -456,7 +459,7 @@ class AutoFittingModule(QWidget):
         
         # Fit Method
         fit_method_label = QLabel("Fit Method:")
-        fit_method_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 6.5pt; margin-left: 20px;")
+        fit_method_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 7.5pt; margin-left: 20px;")
         bg_layout.addWidget(fit_method_label)
         
         self.fit_method_combo = QComboBox()
@@ -464,32 +467,32 @@ class AutoFittingModule(QWidget):
         self.fit_method_combo.setCurrentIndex(0)
         self.fit_method_combo.currentTextChanged.connect(self.on_fit_method_changed)
         self.fit_method_combo.setMaximumWidth(110)
-        self.fit_method_combo.setStyleSheet("font-size: 6.5pt;")
+        self.fit_method_combo.setStyleSheet("font-size: 7.5pt;")
         bg_layout.addWidget(self.fit_method_combo)
         
         # Overlap threshold
         overlap_label = QLabel("Overlap FWHM×:")
-        overlap_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 6.5pt; margin-left: 20px;")
+        overlap_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 7.5pt; margin-left: 20px;")
         bg_layout.addWidget(overlap_label)
         
         self.overlap_threshold_entry = QLineEdit(str(self.overlap_threshold))
         self.overlap_threshold_entry.setMaximumWidth(45)
-        self.overlap_threshold_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 6.5pt;")
+        self.overlap_threshold_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 7.5pt;")
         bg_layout.addWidget(self.overlap_threshold_entry)
         
         # Fitting window
         window_label = QLabel("Fit Window×:")
-        window_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 6.5pt; margin-left: 20px;")
+        window_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 7.5pt; margin-left: 20px;")
         bg_layout.addWidget(window_label)
         
         self.fitting_window_entry = QLineEdit(str(self.fitting_window_multiplier))
         self.fitting_window_entry.setMaximumWidth(45)
-        self.fitting_window_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 6.5pt;")
+        self.fitting_window_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 7.5pt;")
         bg_layout.addWidget(self.fitting_window_entry)
         
         # Coordinate label
         self.coord_label = QLabel("")
-        self.coord_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 6.5pt;")
+        self.coord_label.setStyleSheet("color: #9370DB; font-weight: bold; font-size: 7.5pt;")
         bg_layout.addWidget(self.coord_label)
         
         bg_layout.addStretch()
@@ -507,45 +510,45 @@ class AutoFittingModule(QWidget):
         
         # Smoothing label
         smooth_label = QLabel("Smoothing:")
-        smooth_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 7.5pt;")
+        smooth_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 8.5pt;")
         smooth_layout.addWidget(smooth_label)
         
         # Enable checkbox
         self.chk_smooth = QCheckBox("Enable")
-        self.chk_smooth.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 6.5pt;")
+        self.chk_smooth.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 7.5pt;")
         self.chk_smooth.setChecked(self.smoothing_enabled)
         smooth_layout.addWidget(self.chk_smooth)
         
         # Method
         method_label = QLabel("Method:")
-        method_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 6.5pt; margin-left: 10px;")
+        method_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 7.5pt; margin-left: 10px;")
         smooth_layout.addWidget(method_label)
         
         self.smooth_method_combo = QComboBox()
         self.smooth_method_combo.addItems(["gaussian", "savgol"])
         self.smooth_method_combo.setCurrentText(self.smoothing_method)
         self.smooth_method_combo.setMaximumWidth(90)
-        self.smooth_method_combo.setStyleSheet("font-size: 6.5pt;")
+        self.smooth_method_combo.setStyleSheet("font-size: 7.5pt;")
         smooth_layout.addWidget(self.smooth_method_combo)
         
         # Sigma
         sigma_label = QLabel("Sigma:")
-        sigma_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 6.5pt; margin-left: 10px;")
+        sigma_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 7.5pt; margin-left: 10px;")
         smooth_layout.addWidget(sigma_label)
         
         self.smooth_sigma_entry = QLineEdit(str(self.smoothing_sigma))
         self.smooth_sigma_entry.setMaximumWidth(45)
-        self.smooth_sigma_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 6.5pt;")
+        self.smooth_sigma_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 7.5pt;")
         smooth_layout.addWidget(self.smooth_sigma_entry)
         
         # Window
         window_label = QLabel("Window:")
-        window_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 6.5pt; margin-left: 10px;")
+        window_label.setStyleSheet("color: #0078D7; font-weight: bold; font-size: 7.5pt; margin-left: 10px;")
         smooth_layout.addWidget(window_label)
         
         self.smooth_window_entry = QLineEdit(str(self.smoothing_window))
         self.smooth_window_entry.setMaximumWidth(45)
-        self.smooth_window_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 6.5pt;")
+        self.smooth_window_entry.setStyleSheet("padding: 4px; font-weight: bold; font-size: 7.5pt;")
         smooth_layout.addWidget(self.smooth_window_entry)
         
         # Buttons style
@@ -557,11 +560,11 @@ class AutoFittingModule(QWidget):
                 border-radius: 4px;
                 padding: 6px 10px;
                 font-weight: bold;
-                font-size: 6.5pt;
+                font-size: 7.5pt;
                 min-width: 70px;
             }
             QPushButton:hover { background-color: #7FD77F; }
-            QPushButton:disabled { background-color: #CCCCCC; color: #666666; }
+            QPushButton:disabled { background-color: #F4F6FB; color: #999999; }
         """
         
         self.btn_apply_smooth = QPushButton("Apply")
@@ -590,7 +593,7 @@ class AutoFittingModule(QWidget):
                 border-radius: 5px;
                 margin-top: 10px;
                 font-weight: bold;
-                font-size: 7.5pt;
+                font-size: 8.5pt;
                 color: #FF6B9D;
             }
             QGroupBox::title {
@@ -621,14 +624,14 @@ class AutoFittingModule(QWidget):
                 background-color: #FFFBF0;
                 gridline-color: #E0E0E0;
                 font-weight: bold;
-                font-size: 6.5pt;
+                font-size: 7.5pt;
             }
             QHeaderView::section {
                 background-color: #FFE4E1;
                 padding: 4px;
                 border: 1px solid #E0E0E0;
                 font-weight: bold;
-                font-size: 6.5pt;
+                font-size: 7.5pt;
             }
         """)
         
@@ -656,23 +659,28 @@ class AutoFittingModule(QWidget):
         self.ax.grid(True, alpha=0.3, linestyle='--', color='#D4A5D4')
         
         # Set labels with Arial font and black color
-        self.ax.set_xlabel('2theta (degree)', fontsize=11, color='black', fontname='Arial')
-        self.ax.set_ylabel('Intensity', fontsize=11, color='black', fontname='Arial')
+        self.ax.set_xlabel('2theta (degree)', fontsize=13, color='black', fontname='Arial')
+        self.ax.set_ylabel('Intensity', fontsize=13, color='black', fontname='Arial')
         self.ax.set_title('Click on peaks to select | Use toolbar or scroll to zoom/pan',
-                         fontsize=9, color='black', fontname='Arial')
+                         fontsize=11, color='black', fontname='Arial')
         
         # Set tick labels to Arial and black
         for label in self.ax.get_xticklabels() + self.ax.get_yticklabels():
             label.set_fontname('Arial')
             label.set_color('black')
-            label.set_fontsize(9)
+            label.set_fontsize(11)
         
-        # Embed canvas (lines 956-958)
+        # Embed canvas
         self.canvas = FigureCanvas(self.fig)
         self.canvas.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
         plot_layout.addWidget(self.canvas)
         
-        # Toolbar removed as per user request
+        # Add bottom border line
+        bottom_line = QFrame()
+        bottom_line.setFrameShape(QFrame.Shape.HLine)
+        bottom_line.setFrameShadow(QFrame.Shadow.Sunken)
+        bottom_line.setStyleSheet("QFrame { color: #CCCCCC; }")
+        plot_layout.addWidget(bottom_line)
         
         # Connect events (lines 966-969)
         self.canvas.mpl_connect('button_press_event', self.on_click)
@@ -682,11 +690,13 @@ class AutoFittingModule(QWidget):
         parent_layout.addWidget(plot_frame, stretch=1)
     
     def _create_info_panel(self, parent_layout):
-        """Create info panel - REMOVED as per user request"""
-        # Info panel removed, but keep update_info method working
-        # Create a hidden text widget for logging (not displayed)
+        """Info panel removed, create hidden text widget for logging"""
+        pass
+    
+    def _init_hidden_info_text(self):
+        """Initialize hidden info text widget for logging"""
         self.info_text = QTextEdit()
-        self.info_text.setVisible(False)  # Hidden
+        self.info_text.setVisible(False)
     
     # ==================== Event Handlers (lines 986-1152) ====================
     
@@ -913,10 +923,10 @@ class AutoFittingModule(QWidget):
             self.ax.plot(self.x, self.y, '-', color='#9370DB', linewidth=0.8, label='Data')
             self.ax.set_facecolor('#F4F6FB')
             self.ax.grid(True, alpha=0.3, linestyle='--', color='#D4A5D4')
-            self.ax.set_xlabel('2theta (degree)', fontsize=11, color='black', fontname='Arial')
-            self.ax.set_ylabel('Intensity', fontsize=11, color='black', fontname='Arial')
+            self.ax.set_xlabel('2theta (degree)', fontsize=13, color='black', fontname='Arial')
+            self.ax.set_ylabel('Intensity', fontsize=13, color='black', fontname='Arial')
             self.ax.set_title(f'{self.filename} | Click on peaks to select',
-                            fontsize=9, color='black', fontname='Arial')
+                            fontsize=11, color='black', fontname='Arial')
             # Set tick labels to Arial and black
             for label in self.ax.get_xticklabels() + self.ax.get_yticklabels():
                 label.set_fontname('Arial')
@@ -1059,7 +1069,7 @@ class AutoFittingModule(QWidget):
             self.ax.set_xlabel('2theta (degree)', fontsize=13, color='#9370DB')
             self.ax.set_ylabel('Intensity', fontsize=13, color='#9370DB')
             self.ax.set_title(f'{self.filename} (BG Subtracted)',
-                            fontsize=9, color='black', fontname='Arial')
+                            fontsize=11, color='black', fontname='Arial')
             
             # Re-add peak markers
             for i, idx in enumerate(self.selected_peaks):
@@ -1316,7 +1326,7 @@ class AutoFittingModule(QWidget):
         
         if self.x is not None:
             self.ax.set_title(f'{self.filename} | Click on peaks to select',
-                            fontsize=9, color='black', fontname='Arial')
+                            fontsize=11, color='black', fontname='Arial')
             self.canvas.draw()
             self.update_info("All peaks and fits cleared\n")
             self.status_label.setText("Ready to select peaks")
@@ -1678,7 +1688,7 @@ class AutoFittingModule(QWidget):
             self.results_tree.setItem(row_idx, 7, QTableWidgetItem(eta_str))
         
         self.ax.set_title(f'{self.filename} - Fit Complete ({fit_method})',
-                        fontsize=9, fontweight='bold', color='black', fontname='Arial')
+                        fontsize=11, fontweight='bold', color='black', fontname='Arial')
         self.canvas.draw()
         
         self.update_info(info_msg)
@@ -1758,10 +1768,10 @@ class AutoFittingModule(QWidget):
         self.ax.plot(self.x, self.y, '-', color='#9370DB', linewidth=0.8, label='Data')
         self.ax.set_facecolor('#F4F6FB')
         self.ax.grid(True, alpha=0.3, linestyle='--', color='#D4A5D4')
-        self.ax.set_xlabel('2theta (degree)', fontsize=11, color='black', fontname='Arial')
-        self.ax.set_ylabel('Intensity', fontsize=11, color='black', fontname='Arial')
+        self.ax.set_xlabel('2theta (degree)', fontsize=13, color='black', fontname='Arial')
+        self.ax.set_ylabel('Intensity', fontsize=13, color='black', fontname='Arial')
         self.ax.set_title(f'{self.filename} | Click on peaks to select',
-                        fontsize=9, color='black', fontname='Arial')
+                        fontsize=11, color='black', fontname='Arial')
         # Set tick labels
         for label in self.ax.get_xticklabels() + self.ax.get_yticklabels():
             label.set_fontname('Arial')
@@ -2114,7 +2124,7 @@ class AutoFittingModule(QWidget):
                 background-color: #E6F3FF;
                 color: #2C5282;
                 font-weight: bold;
-                font-size: 7.5pt;
+                font-size: 8.5pt;
                 padding: 5px;
             }
         """)
@@ -2148,7 +2158,7 @@ class AutoFittingModule(QWidget):
                 background-color: #10B981;
                 color: white;
                 font-weight: bold;
-                font-size: 7.5pt;
+                font-size: 8.5pt;
                 padding: 8px;
                 border-radius: 4px;
             }
@@ -2163,7 +2173,7 @@ class AutoFittingModule(QWidget):
                 background-color: #F59E0B;
                 color: white;
                 font-weight: bold;
-                font-size: 7.5pt;
+                font-size: 8.5pt;
                 padding: 8px;
                 border-radius: 4px;
             }
@@ -2178,7 +2188,7 @@ class AutoFittingModule(QWidget):
                 background-color: #EF4444;
                 color: white;
                 font-weight: bold;
-                font-size: 7.5pt;
+                font-size: 8.5pt;
                 padding: 8px;
                 border-radius: 4px;
             }
