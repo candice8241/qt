@@ -13,7 +13,7 @@ import pandas as pd
 from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel, 
                               QPushButton, QFileDialog, QMessageBox, 
                               QListWidget, QListWidgetItem, QSplitter, QWidget,
-                              QFrame, QComboBox)
+                              QFrame, QComboBox, QLineEdit)
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
