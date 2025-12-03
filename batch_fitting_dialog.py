@@ -127,10 +127,9 @@ class BatchFittingDialog(QWidget):
             super().keyPressEvent(event)
         
     def paintEvent(self, event):
-        """Custom paint event to draw thin border manually"""
+        """Custom paint event to draw thin border manually with explicit right line"""
         super().paintEvent(event)
         
-        # Draw thin border manually to ensure visibility on all sides
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
@@ -139,13 +138,21 @@ class BatchFittingDialog(QWidget):
         pen.setStyle(Qt.PenStyle.SolidLine)
         painter.setPen(pen)
         
-        # Draw rectangle border with rounded corners
-        # Adjust inset to ensure right border is visible
+        # Draw main rectangle border
         rect = self.rect()
         painter.drawRoundedRect(
-            rect.adjusted(1, 1, -2, -1),  # Less inset on right for visibility
-            6, 6  # Smaller border radius
+            rect.adjusted(1, 1, -3, -1),
+            6, 6
         )
+        
+        # Draw explicit right border line to ensure visibility
+        pen_right = QPen(QColor("#7E57C2"), 3)  # Slightly thicker for visibility
+        pen_right.setStyle(Qt.PenStyle.SolidLine)
+        painter.setPen(pen_right)
+        
+        # Draw vertical line on the right edge
+        right_x = rect.width() - 5  # 5px from right edge
+        painter.drawLine(right_x, 10, right_x, rect.height() - 10)
         
         painter.end()
     
@@ -265,10 +272,17 @@ class BatchFittingDialog(QWidget):
         self.file_list_widget.itemClicked.connect(self.on_file_selected)
         layout.addWidget(self.file_list_widget)
         
-        # Progress label
+        # Progress label (no border)
         self.progress_label = QLabel("No files loaded")
         self.progress_label.setFont(QFont('Arial', 8))
-        self.progress_label.setStyleSheet("color: #666666; border: none;")
+        self.progress_label.setStyleSheet("""
+            QLabel {
+                color: #666666;
+                border: none;
+                background: transparent;
+                padding: 2px;
+            }
+        """)
         layout.addWidget(self.progress_label)
         
         return panel
@@ -933,16 +947,16 @@ class BatchFittingDialog(QWidget):
                 if result['file'] == current_filename and 'fit_curves' in result:
                     fit_curves = result['fit_curves']
                     
-                    # Plot background line if available
+                    # Plot background line if available (darker blue for visibility)
                     if self.bg_points and len(self.bg_points) >= 2:
                         bg_x = [p[0] for p in self.bg_points]
                         bg_y = [p[1] for p in self.bg_points]
-                        self.canvas.axes.plot(bg_x, bg_y, 's', color='#4169E1',
-                                            markersize=4, alpha=0.8, label='BG Points', zorder=3)
-                        # Interpolate background line
+                        self.canvas.axes.plot(bg_x, bg_y, 's', color='#1E3A8A',
+                                            markersize=4, alpha=0.9, label='BG Points', zorder=3)
+                        # Interpolate background line (darker blue, more opaque)
                         bg_line_y = np.interp(x, bg_x, bg_y)
-                        self.canvas.axes.plot(x, bg_line_y, '-', color='#4169E1',
-                                            linewidth=1.5, alpha=0.4, label='Background', zorder=3)
+                        self.canvas.axes.plot(x, bg_line_y, '-', color='#1E3A8A',
+                                            linewidth=2.0, alpha=0.6, label='Background', zorder=3)
                     
                     # Plot individual peak components (dashed lines, different colors)
                     colors = plt.cm.tab10(np.linspace(0, 1, len(fit_curves)))
