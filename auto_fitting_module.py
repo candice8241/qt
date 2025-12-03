@@ -501,6 +501,7 @@ class AutoFittingModule(QWidget):
         # Connect events
         self.canvas.mpl_connect('button_press_event', self.on_click)
         self.canvas.mpl_connect('scroll_event', self.on_scroll)
+        self.canvas.mpl_connect('motion_notify_event', self.on_mouse_move)
         
         parent_layout.addWidget(plot_frame, stretch=3)
     
@@ -573,6 +574,13 @@ class AutoFittingModule(QWidget):
     
     # ==================== Event Handlers ====================
     
+    def on_mouse_move(self, event):
+        """Display mouse coordinates"""
+        if event.inaxes == self.ax and event.xdata is not None:
+            self.coord_label.setText(f"2theta: {event.xdata:.4f}  Intensity: {event.ydata:.2f}")
+        else:
+            self.coord_label.setText("")
+    
     def on_scroll(self, event):
         """Handle mouse scroll for zooming"""
         if event.inaxes != self.ax or self.x is None:
@@ -620,45 +628,94 @@ class AutoFittingModule(QWidget):
         """Handle background point selection"""
         if event.button == 1:  # Left click - add
             marker, = self.ax.plot(point_x, point_y, 's', color='#4169E1',
-                                  markersize=8, markeredgecolor='#FFD700',
-                                  markeredgewidth=2, zorder=10)
+                                  markersize=5, markeredgecolor='#FFD700',
+                                  markeredgewidth=1.5, zorder=10)
+            text = self.ax.text(point_x, point_y * 0.97, f'BG{len(self.bg_points)+1}',
+                               ha='center', fontsize=5, color='#4169E1',
+                               fontweight='bold', zorder=11)
             self.bg_points.append((point_x, point_y))
-            self.bg_markers.append(marker)
+            self.bg_markers.append((marker, text))
+            self.update_bg_connect_line()
             self.canvas.draw()
             self.update_info(f"BG point {len(self.bg_points)} added at 2theta = {point_x:.4f}")
             
             # Add to undo stack
             self.undo_stack.append(('bg_point', len(self.bg_points) - 1))
             self.btn_undo.setEnabled(True)
+            
+            if len(self.bg_points) >= 2:
+                self.btn_subtract_bg.setEnabled(True)
         
         elif event.button == 3:  # Right click - remove
             if len(self.bg_points) > 0:
+                x_click = event.xdata
                 distances = [abs(x_click - p[0]) for p in self.bg_points]
                 delete_idx = np.argmin(distances)
-                self.bg_markers[delete_idx].remove()
-                del self.bg_points[delete_idx]
-                del self.bg_markers[delete_idx]
+                
+                removed_point = self.bg_points.pop(delete_idx)
+                marker_tuple = self.bg_markers.pop(delete_idx)
+                
+                try:
+                    marker_tuple[0].remove()
+                    marker_tuple[1].remove()
+                except:
+                    pass
+                
+                # Update labels
+                for i, (marker, text) in enumerate(self.bg_markers):
+                    text.set_text(f'BG{i+1}')
+                
+                self.update_bg_connect_line()
                 self.canvas.draw()
-                self.update_info(f"Removed BG point at index {delete_idx + 1}")
+                self.update_info(f"BG point removed at 2theta = {removed_point[0]:.4f}")
+                
+                if len(self.bg_points) < 2:
+                    self.btn_subtract_bg.setEnabled(False)
     
     def handle_peak_click(self, event, idx, point_x, point_y):
         """Handle peak selection"""
+        x_click = event.xdata
+        
         if event.button == 1:  # Left click - add peak
-            if idx not in self.selected_peaks:
-                self.selected_peaks.append(idx)
-                marker, = self.ax.plot(point_x, point_y, 'r^', markersize=10,
-                                      markeredgecolor='black', markeredgewidth=1,
-                                      zorder=5)
-                text = self.ax.text(point_x, point_y * 1.05, f'P{len(self.selected_peaks)}',
-                                   ha='center', fontsize=9, color='red',
-                                   fontweight='bold', zorder=6)
+            # Auto-adjust to local maximum
+            search_window = max(5, min(10, len(self.y) // 20))
+            left_idx = max(0, idx - search_window)
+            right_idx = min(len(self.y), idx + search_window + 1)
+            
+            local_y = self.y[left_idx:right_idx]
+            local_max_idx = np.argmax(local_y)
+            peak_idx = left_idx + local_max_idx
+            
+            dx = np.mean(np.diff(self.x))
+            distance_to_click = abs(self.x[peak_idx] - x_click)
+            max_allowed_distance = dx * search_window * 0.7
+            
+            if distance_to_click > max_allowed_distance:
+                peak_idx = idx
+                peak_x = point_x
+                peak_y = point_y
+                adjustment_note = "(using click position)"
+            else:
+                peak_x = self.x[peak_idx]
+                peak_y = self.y[peak_idx]
+                adjustment_note = "(auto-adjusted to local max)" if peak_idx != idx else ""
+            
+            if peak_idx not in self.selected_peaks:
+                self.selected_peaks.append(peak_idx)
+                marker, = self.ax.plot(peak_x, peak_y, '*', color='#FF1493',
+                                      markersize=10, markeredgecolor='#FFD700',
+                                      markeredgewidth=1.5, zorder=10)
+                text = self.ax.text(peak_x, peak_y * 1.03, f'P{len(self.selected_peaks)}',
+                                   ha='center', fontsize=6, color='#FF1493',
+                                   fontweight='bold', zorder=11)
                 self.peak_markers.append(marker)
                 self.peak_texts.append(text)
                 self.canvas.draw()
-                self.update_info(f"Peak {len(self.selected_peaks)} added at 2theta = {point_x:.4f}")
+                self.update_info(f"Peak {len(self.selected_peaks)} at 2theta = {peak_x:.4f} {adjustment_note}")
+                self.status_label.setText(f"{len(self.selected_peaks)} peak(s) selected")
                 
                 # Add to undo stack
-                self.undo_stack.append(('peak', idx))
+                self.undo_stack.append(('peak', peak_idx))
                 self.btn_undo.setEnabled(True)
                 
                 if len(self.selected_peaks) >= 1:
@@ -666,20 +723,29 @@ class AutoFittingModule(QWidget):
                     self.btn_reset.setEnabled(True)
         
         elif event.button == 3:  # Right click - remove peak
-            if idx in self.selected_peaks:
-                peak_idx = self.selected_peaks.index(idx)
-                self.peak_markers[peak_idx].remove()
-                self.peak_texts[peak_idx].remove()
-                del self.selected_peaks[peak_idx]
-                del self.peak_markers[peak_idx]
-                del self.peak_texts[peak_idx]
+            if len(self.selected_peaks) > 0:
+                peak_positions = [self.x[peak_idx] for peak_idx in self.selected_peaks]
+                distances = [abs(x_click - pos) for pos in peak_positions]
+                nearest_idx = np.argmin(distances)
+                
+                removed_peak_idx = self.selected_peaks.pop(nearest_idx)
+                removed_peak_x = self.x[removed_peak_idx]
+                
+                marker = self.peak_markers.pop(nearest_idx)
+                text = self.peak_texts.pop(nearest_idx)
+                try:
+                    marker.remove()
+                    text.remove()
+                except:
+                    pass
                 
                 # Renumber remaining peaks
-                for i, text in enumerate(self.peak_texts):
-                    text.set_text(f'P{i+1}')
+                for i, text_obj in enumerate(self.peak_texts):
+                    text_obj.set_text(f'P{i+1}')
                 
                 self.canvas.draw()
-                self.update_info(f"Removed peak at 2theta = {point_x:.4f}")
+                self.update_info(f"Peak removed at 2theta = {removed_peak_x:.4f}")
+                self.status_label.setText(f"{len(self.selected_peaks)} peak(s) selected")
                 
                 if len(self.selected_peaks) == 0:
                     self.btn_fit.setEnabled(False)
@@ -877,17 +943,22 @@ class AutoFittingModule(QWidget):
         """Reset all peaks and fits"""
         # Clear peak markers
         for marker in self.peak_markers:
-            marker.remove()
+            try:
+                marker.remove()
+            except:
+                pass
         for text in self.peak_texts:
-            text.remove()
+            try:
+                text.remove()
+            except:
+                pass
         
         # Clear fit lines
         for line in self.fit_lines:
-            line.remove()
-        
-        # Clear background
-        for marker in self.bg_markers:
-            marker.remove()
+            try:
+                line.remove()
+            except:
+                pass
         
         self.selected_peaks = []
         self.peak_markers = []
@@ -895,18 +966,25 @@ class AutoFittingModule(QWidget):
         self.fit_lines = []
         self.fit_results = None
         self.fitted = False
-        self.bg_points = []
-        self.bg_markers = []
+        
+        # Clear undo stack for peaks
+        self.undo_stack = [item for item in self.undo_stack if item[0] != 'peak']
+        if not self.undo_stack:
+            self.btn_undo.setEnabled(False)
         
         self.results_table.setRowCount(0)
         
         if self.x is not None:
-            self.plot_data()
+            self.ax.set_title(f'{self.filename} | Click on peaks to select',
+                            fontsize=10, color='#9370DB')
+            self.canvas.draw()
+            self.update_info("All peaks and fits cleared")
+            self.status_label.setText("Ready to select peaks")
         
         self.btn_fit.setEnabled(False)
         self.btn_reset.setEnabled(False)
         self.btn_save.setEnabled(False)
-        self.update_info("Reset all selections")
+        self.btn_clear_fit.setEnabled(False)
     
     def save_results(self):
         """Save fitting results"""
@@ -1061,27 +1139,39 @@ class AutoFittingModule(QWidget):
         if not self.undo_stack:
             return
         
-        action_type, data = self.undo_stack.pop()
+        action_type, index = self.undo_stack.pop()
         
         if action_type == 'peak':
             # Undo peak addition
-            if len(self.selected_peaks) > 0:
-                idx = self.selected_peaks.pop()
-                self.peak_markers[-1].remove()
-                self.peak_texts[-1].remove()
-                self.peak_markers.pop()
-                self.peak_texts.pop()
+            if self.selected_peaks and index == len(self.selected_peaks) - 1:
+                self.selected_peaks.pop()
+                marker = self.peak_markers.pop()
+                text = self.peak_texts.pop()
+                try:
+                    marker.remove()
+                    text.remove()
+                except:
+                    pass
                 self.canvas.draw()
                 self.update_info(f"Undid peak selection")
+                self.status_label.setText(f"{len(self.selected_peaks)} peak(s) selected")
         
         elif action_type == 'bg_point':
             # Undo background point
-            if len(self.bg_points) > 0:
+            if self.bg_points and index == len(self.bg_points) - 1:
                 self.bg_points.pop()
-                self.bg_markers[-1].remove()
-                self.bg_markers.pop()
+                marker_tuple = self.bg_markers.pop()
+                try:
+                    marker_tuple[0].remove()
+                    marker_tuple[1].remove()
+                except:
+                    pass
+                self.update_bg_connect_line()
                 self.canvas.draw()
                 self.update_info(f"Undid background point")
+                
+                if len(self.bg_points) < 2:
+                    self.btn_subtract_bg.setEnabled(False)
         
         if not self.undo_stack:
             self.btn_undo.setEnabled(False)
@@ -1108,8 +1198,11 @@ class AutoFittingModule(QWidget):
                 marker, = self.ax.plot(point_x, point_y, 's', color='#4169E1',
                                      markersize=5, markeredgecolor='#FFD700',
                                      markeredgewidth=1.5, zorder=10)
+                text = self.ax.text(point_x, point_y * 0.97, f'BG{len(self.bg_points)+1}',
+                                   ha='center', fontsize=5, color='#4169E1',
+                                   fontweight='bold', zorder=11)
                 self.bg_points.append((point_x, point_y))
-                self.bg_markers.append(marker)
+                self.bg_markers.append((marker, text))
             
             self.update_bg_connect_line()
             self.canvas.draw()
@@ -1171,9 +1264,10 @@ class AutoFittingModule(QWidget):
     
     def clear_background(self):
         """Clear background selection"""
-        for marker in self.bg_markers:
+        for marker_tuple in self.bg_markers:
             try:
-                marker.remove()
+                marker_tuple[0].remove()
+                marker_tuple[1].remove()
             except:
                 pass
         
@@ -1200,7 +1294,6 @@ class AutoFittingModule(QWidget):
             self.btn_undo.setEnabled(False)
         
         self.btn_select_bg.setText("Select BG Points")
-        self.btn_select_bg.setStyleSheet(self.btn_select_bg.styleSheet())
         self.btn_subtract_bg.setEnabled(False)
         
         if self.x is not None:
