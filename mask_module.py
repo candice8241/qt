@@ -87,7 +87,7 @@ class MaskModule(GUIBase):
 
         # Content widget - Full width
         content_widget = QWidget()
-        content_widget.setStyleSheet(f"background-color: {self.colors['bg']};")
+        content_widget.setStyleSheet("background-color: white;")
         content_layout = QVBoxLayout(content_widget)
         content_layout.setContentsMargins(10, 2, 10, 2)
         content_layout.setSpacing(1)
@@ -220,6 +220,7 @@ class MaskModule(GUIBase):
                 font-weight: bold;
                 padding-top: 18px;
                 padding-bottom: 0px;
+                background-color: transparent;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
@@ -242,6 +243,7 @@ class MaskModule(GUIBase):
         
         # Left side: Canvas and contrast slider - Fixed size container
         canvas_container = QWidget()
+        canvas_container.setStyleSheet("background-color: transparent;")
         canvas_container.setFixedSize(1050, 620)  # Fixed container size (reduced height)
         canvas_layout = QHBoxLayout(canvas_container)
         canvas_layout.setSpacing(5)
