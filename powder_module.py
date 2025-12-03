@@ -402,7 +402,7 @@ class PowderXRDModule(GUIBase):
             }}
         """)
         output_layout = QVBoxLayout(output_card)
-        output_layout.setContentsMargins(15, 12, 15, 12)
+        output_layout.setContentsMargins(15, 2, 15, 12)
         output_layout.setSpacing(8)
 
         # Number of Points - horizontal layout
