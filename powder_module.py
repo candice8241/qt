@@ -670,9 +670,11 @@ class PowderXRDModule(GUIBase):
         output_card_container_layout.addStretch()
 
         # Add vertical centering for output card to align with left panel file inputs
-        right_layout.addStretch(1)
+        from PyQt6.QtWidgets import QSpacerItem
+        top_spacer = QSpacerItem(0, 90, QSizePolicy.Policy.Minimum, QSizePolicy.Policy.Fixed)
+        right_layout.addItem(top_spacer)
         right_layout.addWidget(output_card_container)
-        right_layout.addStretch(2)
+        right_layout.addStretch()
 
         columns.addWidget(left_panel, stretch=2)
         columns.addWidget(right_panel, stretch=1)
