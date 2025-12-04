@@ -468,46 +468,59 @@ class CalibrationCanvas(FigureCanvas):
     """Canvas for displaying calibration results"""
     
     def __init__(self, parent=None, width=6, height=6, dpi=100):
-        self.fig = Figure(figsize=(width, height), dpi=dpi)
-        self.axes = self.fig.add_subplot(111)
-        super().__init__(self.fig)
-        self.setParent(parent)
-        
-        # Zoom and contrast settings
-        self.zoom_level = 1.0
-        self.contrast_min = None
-        self.contrast_max = None
-        self.base_xlim = None
-        self.base_ylim = None
-        
-        # Tool modes
-        self.peak_picking_mode = False
-        self.mask_editing_mode = False
-        self.manual_peaks = []  # List of (x, y, ring_num)
-        self.peak_markers = []  # List of matplotlib artists
-        
-        # Mask editing state
-        self.mask_data = None
-        self.image_data = None
-        self.mask_mode = 'rectangle'  # rectangle, circle
-        self.mask_value = True  # True = mask, False = unmask
-        self.drawing = False
-        self.start_point = None
-        self.preview_patch = None
-        self._last_mouse_pos = None
-        
-        # Ring display control properties
-        self.show_rings = True  # Show/hide rings
-        self.num_rings_display = 10  # Number of rings to display
-        self.ring_alpha = 0.8  # Ring opacity (0.0-1.0)
-        self.ring_color = 'red'  # Ring color
-        self.calibration_points = None  # Store calibration points
-        
-        # Connect events
-        self.mpl_connect('scroll_event', self.on_scroll)
-        self.mpl_connect('button_press_event', self.on_unified_click)
-        self.mpl_connect('button_release_event', self.on_mouse_release)
-        self.mpl_connect('motion_notify_event', self.on_mouse_move)
+        try:
+            # Use smaller DPI to reduce memory usage
+            actual_dpi = min(dpi, 80)
+            
+            self.fig = Figure(figsize=(width, height), dpi=actual_dpi)
+            self.axes = self.fig.add_subplot(111)
+            super().__init__(self.fig)
+            self.setParent(parent)
+            
+            # Zoom and contrast settings
+            self.zoom_level = 1.0
+            self.contrast_min = None
+            self.contrast_max = None
+            self.base_xlim = None
+            self.base_ylim = None
+            
+            # Tool modes
+            self.peak_picking_mode = False
+            self.mask_editing_mode = False
+            self.manual_peaks = []  # List of (x, y, ring_num)
+            self.peak_markers = []  # List of matplotlib artists
+            
+            # Mask editing state
+            self.mask_data = None
+            self.image_data = None
+            self.mask_mode = 'rectangle'  # rectangle, circle
+            self.mask_value = True  # True = mask, False = unmask
+            self.drawing = False
+            self.start_point = None
+            self.preview_patch = None
+            self._last_mouse_pos = None
+            
+            # Ring display control properties
+            self.show_rings = True  # Show/hide rings
+            self.num_rings_display = 10  # Number of rings to display
+            self.ring_alpha = 0.8  # Ring opacity (0.0-1.0)
+            self.ring_color = 'red'  # Ring color
+            self.calibration_points = None  # Store calibration points
+            
+            # Connect events with error handling
+            try:
+                self.mpl_connect('scroll_event', self.on_scroll)
+                self.mpl_connect('button_press_event', self.on_unified_click)
+                self.mpl_connect('button_release_event', self.on_mouse_release)
+                self.mpl_connect('motion_notify_event', self.on_mouse_move)
+            except Exception as e:
+                print(f"Warning: Could not connect canvas events: {e}")
+                
+        except Exception as e:
+            print(f"ERROR creating CalibrationCanvas: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
         
     def display_calibration_image(self, image_data, calibration_points=None):
         """Display calibration image with detected points"""
@@ -1083,16 +1096,26 @@ class CalibrateModule(GUIBase):
         if hasattr(self, '_ui_initialized') and self._ui_initialized:
             return
         
+        # Mark as initializing to prevent re-entry
+        if hasattr(self, '_ui_initializing') and self._ui_initializing:
+            print("WARNING: setup_ui already initializing, skipping...")
+            return
+        
+        self._ui_initializing = True
+        
         layout = self.parent.layout()
         if layout is None:
             layout = QVBoxLayout(self.parent)
             layout.setContentsMargins(0, 0, 0, 0)
         else:
-            # Clear existing items
+            # Clear existing items carefully
             while layout.count():
                 item = layout.takeAt(0)
                 if item.widget():
-                    item.widget().deleteLater()
+                    try:
+                        item.widget().deleteLater()
+                    except:
+                        pass
 
         # Main horizontal splitter: Display (left) + Control (right)
         main_splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -1117,8 +1140,21 @@ class CalibrateModule(GUIBase):
             canvas_layout.setContentsMargins(0, 0, 0, 0)
             canvas_layout.setSpacing(5)
             
-            self.unified_canvas = CalibrationCanvas(canvas_container, width=10, height=8, dpi=100)
-            canvas_layout.addWidget(self.unified_canvas)
+            try:
+                # Create canvas with reduced size to prevent memory issues
+                # Using smaller dimensions and DPI
+                self.unified_canvas = CalibrationCanvas(canvas_container, width=8, height=6, dpi=80)
+                canvas_layout.addWidget(self.unified_canvas)
+                print("✅ CalibrationCanvas created successfully")
+            except Exception as e:
+                print(f"❌ Error creating CalibrationCanvas: {e}")
+                import traceback
+                traceback.print_exc()
+                # Create placeholder
+                placeholder = QLabel("Canvas initialization error.\nPlease restart or check console.")
+                placeholder.setStyleSheet("color: red; padding: 20px;")
+                canvas_layout.addWidget(placeholder)
+                self.unified_canvas = None
             
             # Vertical contrast slider on right side (limited height)
             contrast_widget = QWidget()
@@ -1484,6 +1520,9 @@ class CalibrateModule(GUIBase):
         
         # Mark UI as initialized
         self._ui_initialized = True
+        self._ui_initializing = False
+        
+        print("✅ Calibrate UI initialized successfully")
 
     def setup_detector_groupbox(self, parent_layout):
         """Setup Detector GroupBox (Dioptas style)"""
