@@ -126,21 +126,21 @@ class LatticeParamsModule(QWidget, GUIBase):
         header.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
         card_layout.addWidget(header)
         
-        # Columns layout
+        # Columns layout with more spacing
         columns = QHBoxLayout()
-        columns.setSpacing(16)
+        columns.setSpacing(40)  # Increased from 16 to 40 for more space between left and right
         
-        # Left column: file inputs
+        # Left column: file inputs (enlarged)
         left_panel = QWidget()
-        left_panel.setMinimumWidth(550)
+        left_panel.setMinimumWidth(600)  # Increased from 550
         left_panel.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Minimum)
         left_panel.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(0, 4, 0, 4)
-        left_layout.setSpacing(10)
+        left_layout.setSpacing(12)  # Increased from 10 to 12
         
         left_title = QLabel("")
-        left_title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
+        left_title.setFont(QFont('Arial', 11, QFont.Weight.Bold))  # Increased from 10 to 11
         left_title.setStyleSheet(f"color: {self.colors['primary']}; background-color: {self.colors['card_bg']};")
         left_layout.addWidget(left_title)
         
@@ -179,11 +179,17 @@ class LatticeParamsModule(QWidget, GUIBase):
         right_layout.setSpacing(10)
         right_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
         
-        # Create container for crystal system and wavelength (no border frame)
-        combined_container = QWidget()
-        combined_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
+        # Create framed container for crystal system and wavelength
+        combined_container = QFrame()
+        combined_container.setStyleSheet(f"""
+            QFrame {{
+                background-color: {self.colors['card_bg']};
+                border: 2px solid #888888;
+                border-radius: 6px;
+            }}
+        """)
         combined_container_layout = QVBoxLayout(combined_container)
-        combined_container_layout.setContentsMargins(0, 0, 0, 0)
+        combined_container_layout.setContentsMargins(10, 8, 10, 8)
         combined_container_layout.setSpacing(15)
         
         # Crystal System title
@@ -225,7 +231,8 @@ class LatticeParamsModule(QWidget, GUIBase):
             
             # First crystal system in this row
             label1, value1, min_peaks1 = systems[i]
-            radio1 = QRadioButton(f"{label1} (≥{min_peaks1})")
+            peak_text1 = f"≥{min_peaks1} peak{'s' if min_peaks1 > 1 else ''}"
+            radio1 = QRadioButton(f"{label1} ({peak_text1})")
             radio1.setChecked(value1 == self.phase_volume_system)
             radio1.setFont(QFont('Arial', 8))
             radio1.setStyleSheet(f"""
@@ -254,7 +261,8 @@ class LatticeParamsModule(QWidget, GUIBase):
             # Second crystal system in this row (if exists)
             if i + 1 < len(systems):
                 label2, value2, min_peaks2 = systems[i + 1]
-                radio2 = QRadioButton(f"{label2} (≥{min_peaks2})")
+                peak_text2 = f"≥{min_peaks2} peak{'s' if min_peaks2 > 1 else ''}"
+                radio2 = QRadioButton(f"{label2} ({peak_text2})")
                 radio2.setChecked(value2 == self.phase_volume_system)
                 radio2.setFont(QFont('Arial', 8))
                 radio2.setStyleSheet(f"""
@@ -375,7 +383,7 @@ class LatticeParamsModule(QWidget, GUIBase):
         layout.setContentsMargins(0, 0, 0, 8)
 
         label = QLabel(label_text)
-        label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        label.setFont(QFont('Arial', 10, QFont.Weight.Bold))  # Increased from 9 to 10
         label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
         layout.addWidget(label)
 
@@ -383,7 +391,8 @@ class LatticeParamsModule(QWidget, GUIBase):
         input_layout.setSpacing(5)
 
         entry = QLineEdit()
-        entry.setFont(QFont('Arial', 9))
+        entry.setFont(QFont('Arial', 10))  # Increased from 9 to 10
+        entry.setFixedHeight(32)  # Added fixed height for larger appearance
         entry.setStyleSheet(f"""
             QLineEdit {{
                 background-color: white;
@@ -400,10 +409,10 @@ class LatticeParamsModule(QWidget, GUIBase):
             lambda: self.browse_file(var_name),
             bg_color=self.colors['secondary'],
             hover_color=self.colors['primary'],
-            width=75, height=28,
+            width=75, height=32,  # Increased height from 28 to 32
             parent=container
         )
-        browse_btn.setFont(QFont('Arial', 9))
+        browse_btn.setFont(QFont('Arial', 10))  # Increased from 9 to 10
         input_layout.addWidget(browse_btn, stretch=0)  # Keep button fixed size
 
         layout.addLayout(input_layout)
@@ -420,7 +429,7 @@ class LatticeParamsModule(QWidget, GUIBase):
         layout.setContentsMargins(0, 0, 0, 8)
 
         label = QLabel(label_text)
-        label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        label.setFont(QFont('Arial', 10, QFont.Weight.Bold))  # Increased from 9 to 10
         label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
         layout.addWidget(label)
 
@@ -428,7 +437,8 @@ class LatticeParamsModule(QWidget, GUIBase):
         input_layout.setSpacing(5)
 
         entry = QLineEdit()
-        entry.setFont(QFont('Arial', 9))
+        entry.setFont(QFont('Arial', 10))  # Increased from 9 to 10
+        entry.setFixedHeight(32)  # Added fixed height for larger appearance
         entry.setStyleSheet(f"""
             QLineEdit {{
                 background-color: white;
@@ -445,10 +455,10 @@ class LatticeParamsModule(QWidget, GUIBase):
             lambda: self.browse_folder(var_name),
             bg_color=self.colors['secondary'],
             hover_color=self.colors['primary'],
-            width=75, height=28,
+            width=75, height=32,  # Increased height from 28 to 32
             parent=container
         )
-        browse_btn.setFont(QFont('Arial', 9))
+        browse_btn.setFont(QFont('Arial', 10))  # Increased from 9 to 10
         input_layout.addWidget(browse_btn, stretch=0)  # Keep button fixed size
 
         layout.addLayout(input_layout)
