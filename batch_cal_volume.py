@@ -54,15 +54,16 @@ class LatticeParameterCalculator:
                 (4,3,1), (5,2,1), (4,4,0), (5,3,0), (6,0,0)
             ]
         },
-        'cubic_SC': {
-            'name': 'SC',
-            'min_peaks': 1,
+        'Trigonal': {
+            'name': 'Trigonal',
+            'min_peaks': 2,
             'atoms_per_cell': 1,
             'hkl_list': [
-                (1,0,0), (1,1,0), (1,1,1), (2,0,0), (2,1,0),
-                (2,1,1), (2,2,0), (2,2,1), (3,0,0), (3,1,0),
-                (3,1,1), (2,2,2), (3,2,0), (3,2,1), (4,0,0),
-                (4,1,0), (3,3,0), (4,1,1), (3,3,1), (4,2,0)
+                (1,0,0), (0,1,0), (1,0,1), (0,1,1), (1,1,0),
+                (1,1,1), (2,0,0), (0,2,0), (1,0,2), (0,1,2),
+                (2,1,0), (1,2,0), (2,0,1), (0,2,1), (2,1,1),
+                (1,2,1), (3,0,0), (0,3,0), (2,0,2), (0,2,2),
+                (3,1,0), (1,3,0), (2,1,2), (1,2,2), (3,0,1)
             ]
         },
         'Hexagonal': {
@@ -374,6 +375,60 @@ class LatticeParameterCalculator:
         
         return results
 
+    def fit_lattice_parameters_trigonal(self, peak_dataset, crystal_system_key):
+        """Fit lattice parameters for trigonal crystal systems (hexagonal setting)"""
+        results = {}
+        hkl_list = self.CRYSTAL_SYSTEMS[crystal_system_key]['hkl_list']
+        atoms_per_cell = self.CRYSTAL_SYSTEMS[crystal_system_key]['atoms_per_cell']
+        
+        for pressure, peaks in peak_dataset.items():
+            if isinstance(peaks, dict):
+                peaks = peaks.get('peaks', [])
+            
+            if len(peaks) < 2:
+                continue
+            
+            d_obs = [self.two_theta_to_d(peak, self.wavelength) for peak in peaks]
+            
+            num_peaks = min(len(peaks), len(hkl_list))
+            matched_hkl = hkl_list[:num_peaks]
+            
+            def residuals(params):
+                a, c = params
+                errors = []
+                for i, hkl in enumerate(matched_hkl):
+                    d_calc = self.calculate_d_hexagonal(hkl, a, c)
+                    errors.append(d_obs[i] - d_calc)
+                return errors
+            
+            a_init = 3.0
+            c_init = 5.0
+            
+            result = least_squares(residuals, [a_init, c_init],
+                                  bounds=([0, 0], [np.inf, np.inf]))
+            a_fitted, c_fitted = result.x
+            
+            V_cell = self.calculate_cell_volume_hexagonal(a_fitted, c_fitted)
+            V_atomic = V_cell / atoms_per_cell
+            
+            results[pressure] = {
+                'a': a_fitted,
+                'c': c_fitted,
+                'c/a': c_fitted / a_fitted,
+                'V_cell': V_cell,
+                'V_atomic': V_atomic,
+                'num_peaks_used': num_peaks
+            }
+            
+            print(f"Pressure: {pressure:.2f} GPa")
+            print(f"  Lattice parameter a = {a_fitted:.6f} Å")
+            print(f"  Lattice parameter c = {c_fitted:.6f} Å")
+            print(f"  c/a ratio = {c_fitted/a_fitted:.6f}")
+            print(f"  Unit cell volume V = {V_cell:.6f} Å³")
+            print(f"  Average atomic volume = {V_atomic:.6f} Å³/atom")
+        
+        return results
+
     def fit_lattice_parameters_tetragonal(self, peak_dataset, crystal_system_key):
         """Fit lattice parameters for tetragonal crystal systems"""
         results = {}
@@ -504,6 +559,8 @@ class LatticeParameterCalculator:
             return self.fit_lattice_parameters_cubic(peak_dataset, crystal_system_key)
         elif crystal_system_key == 'Hexagonal':
             return self.fit_lattice_parameters_hexagonal(peak_dataset, crystal_system_key)
+        elif crystal_system_key == 'Trigonal':
+            return self.fit_lattice_parameters_trigonal(peak_dataset, crystal_system_key)
         elif crystal_system_key == 'Tetragonal':
             return self.fit_lattice_parameters_tetragonal(peak_dataset, crystal_system_key)
         elif crystal_system_key == 'Orthorhombic':
@@ -520,7 +577,7 @@ class LatticeParameterCalculator:
         print("\nSelect crystal system:")
         print("[1] Face-Centered Cubic (FCC)")
         print("[2] Body-Centered Cubic (BCC)")
-        print("[3] Simple Cubic (SC)")
+        print("[3] Trigonal")
         print("[4] Hexagonal Close-Packed (HCP)")
         print("[5] Tetragonal")
         print("[6] Orthorhombic")
@@ -532,7 +589,7 @@ class LatticeParameterCalculator:
         mapping = {
             "1": "cubic_FCC",
             "2": "cubic_BCC",
-            "3": "cubic_SC",
+            "3": "Trigonal",
             "4": "Hexagonal",
             "5": "Tetragonal",
             "6": "Orthorhombic",

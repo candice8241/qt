@@ -56,7 +56,7 @@ results = calculator.calculate('your_peaks.csv', crystal_system_key='cubic_FCC')
 |---------|------|---------|---------|
 | 面心立方 (FCC) | `cubic_FCC` | 1 | a |
 | 体心立方 (BCC) | `cubic_BCC` | 1 | a |
-| 简单立方 (SC) | `cubic_SC` | 1 | a |
+| 三方 (Trigonal) | `Trigonal` | 2 | a, c |
 | 六方密排 (HCP) | `Hexagonal` | 2 | a, c |
 | 四方 | `Tetragonal` | 2 | a, c |
 | 正交 | `Orthorhombic` | 3 | a, b, c |

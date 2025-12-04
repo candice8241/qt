@@ -115,7 +115,7 @@ Pressure (GPa),a,V_cell,V_atomic,num_peaks_used
 |------|------|---------|------|
 | `cubic_FCC` | FCC | 1 | a |
 | `cubic_BCC` | BCC | 1 | a |
-| `cubic_SC` | SC | 1 | a |
+| `Trigonal` | 三方 | 2 | a, c |
 | `Hexagonal` | HCP | 2 | a, c |
 | `Tetragonal` | 四方 | 2 | a, c |
 | `Orthorhombic` | 正交 | 3 | a, b, c |

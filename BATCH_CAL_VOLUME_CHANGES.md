@@ -102,7 +102,7 @@ File,Center
 |------|------|----------|------|
 | FCC | `cubic_FCC` | 1 | a |
 | BCC | `cubic_BCC` | 1 | a |
-| SC | `cubic_SC` | 1 | a |
+| Trigonal | `Trigonal` | 2 | a, c |
 | HCP | `Hexagonal` | 2 | a, c |
 | Tetragonal | `Tetragonal` | 2 | a, c |
 | Orthorhombic | `Orthorhombic` | 3 | a, b, c |

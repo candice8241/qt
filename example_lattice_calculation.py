@@ -39,7 +39,7 @@ def example_2_programmatic():
     
     # Specify crystal system directly
     csv_path = 'your_peaks.csv'  # Replace with your actual CSV file
-    crystal_system = 'cubic_FCC'  # Options: cubic_FCC, cubic_BCC, cubic_SC, 
+    crystal_system = 'cubic_FCC'  # Options: cubic_FCC, cubic_BCC, Trigonal,
                                    #          Hexagonal, Tetragonal, Orthorhombic
     
     # Uncomment to run:
@@ -118,7 +118,7 @@ def show_available_crystal_systems():
     systems = {
         'cubic_FCC': 'Face-Centered Cubic (FCC) - min 1 peak',
         'cubic_BCC': 'Body-Centered Cubic (BCC) - min 1 peak',
-        'cubic_SC': 'Simple Cubic (SC) - min 1 peak',
+        'Trigonal': 'Trigonal - min 2 peaks',
         'Hexagonal': 'Hexagonal Close-Packed (HCP) - min 2 peaks',
         'Tetragonal': 'Tetragonal - min 2 peaks',
         'Orthorhombic': 'Orthorhombic - min 3 peaks',
