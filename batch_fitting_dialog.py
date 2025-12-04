@@ -68,6 +68,10 @@ class BatchFittingDialog(QWidget):
         self.results = []  # Store all fitting results
         self.output_folder = None
         
+        # Store peaks and background points for each file
+        self.file_peaks = {}  # filename -> list of peak positions
+        self.file_bg_points = {}  # filename -> list of (x, y) tuples
+        
         # Mode: 'peak' or 'background'
         self.add_mode = 'peak'
         
@@ -621,6 +625,10 @@ class BatchFittingDialog(QWidget):
         self.output_folder = os.path.join(folder, "fit_output")
         os.makedirs(self.output_folder, exist_ok=True)
         
+        # Clear saved peaks and background points for new folder
+        self.file_peaks = {}
+        self.file_bg_points = {}
+        
         # Populate list widget
         self.file_list_widget.clear()
         for fname in xy_files:
@@ -640,6 +648,12 @@ class BatchFittingDialog(QWidget):
         """Handle file selection from list"""
         index = self.file_list_widget.row(item)
         if index != self.current_index:
+            # Save current file's peaks and background points before switching
+            if self.file_list and self.current_index >= 0 and self.current_index < len(self.file_list):
+                current_filename = os.path.basename(self.file_list[self.current_index])
+                self.file_peaks[current_filename] = self.peaks.copy()
+                self.file_bg_points[current_filename] = self.bg_points.copy()
+            
             self.current_index = index
             self.load_current_file()
             
@@ -649,6 +663,7 @@ class BatchFittingDialog(QWidget):
             return
             
         filepath = self.file_list[self.current_index]
+        filename = os.path.basename(filepath)
         
         try:
             # Load data
@@ -657,10 +672,17 @@ class BatchFittingDialog(QWidget):
             
             self.current_data = data
             
-            # Only clear peaks and background points if NOT in auto-fitting mode
-            if not self.auto_fitting:
-                self.peaks = []
-                self.bg_points = []
+            # Check if this file already has saved peaks and background points
+            if filename in self.file_peaks:
+                # Restore saved peaks and background points
+                self.peaks = self.file_peaks[filename].copy()
+                self.bg_points = self.file_bg_points[filename].copy()
+            else:
+                # Only clear peaks and background points if NOT in auto-fitting mode
+                if not self.auto_fitting:
+                    self.peaks = []
+                    self.bg_points = []
+                # else: keep current peaks and bg_points for auto-fitting
             
             self.current_fit_curves = []  # Clear fit curves for new file
             
@@ -669,11 +691,10 @@ class BatchFittingDialog(QWidget):
             self.ylim_original = None
             
             # Update display
-            filename = os.path.basename(filepath)
             self.current_file_label.setText(f"[{self.current_index + 1}/{len(self.file_list)}] {filename}")
             
-            # Auto detect peaks only if NOT in auto-fitting mode
-            if not self.auto_fitting:
+            # Auto detect peaks only if this file has no saved peaks and NOT in auto-fitting mode
+            if filename not in self.file_peaks and not self.auto_fitting:
                 self.auto_detect_peaks()
             else:
                 # Just plot with existing peaks and background
@@ -712,17 +733,35 @@ class BatchFittingDialog(QWidget):
                 (x[right_idx], right_y)
             ]
         
+        # Save current file's peaks and background points after auto detection
+        if self.file_list and self.current_index >= 0 and self.current_index < len(self.file_list):
+            current_filename = os.path.basename(self.file_list[self.current_index])
+            self.file_peaks[current_filename] = self.peaks.copy()
+            self.file_bg_points[current_filename] = self.bg_points.copy()
+        
         # Don't preserve zoom when auto-detecting peaks on new file
         self.plot_data(preserve_zoom=False)
         
     def clear_peaks(self):
         """Clear all peaks"""
         self.peaks = []
+        
+        # Save current file's peaks after clearing
+        if self.file_list and self.current_index >= 0 and self.current_index < len(self.file_list):
+            current_filename = os.path.basename(self.file_list[self.current_index])
+            self.file_peaks[current_filename] = self.peaks.copy()
+        
         self.plot_data(preserve_zoom=True)
         
     def clear_background(self):
         """Clear all background points"""
         self.bg_points = []
+        
+        # Save current file's background points after clearing
+        if self.file_list and self.current_index >= 0 and self.current_index < len(self.file_list):
+            current_filename = os.path.basename(self.file_list[self.current_index])
+            self.file_bg_points[current_filename] = self.bg_points.copy()
+        
         self.plot_data(preserve_zoom=True)
         
     def clear_all(self):
@@ -736,6 +775,9 @@ class BatchFittingDialog(QWidget):
             current_filename = os.path.basename(self.file_list[self.current_index])
             # Remove results for current file
             self.results = [r for r in self.results if r['file'] != current_filename]
+            # Update saved peaks and background points for this file
+            self.file_peaks[current_filename] = self.peaks.copy()
+            self.file_bg_points[current_filename] = self.bg_points.copy()
         
         self.plot_data(preserve_zoom=True)
         
@@ -861,6 +903,12 @@ class BatchFittingDialog(QWidget):
                 idx = self.find_nearest_bg_point(x_click, y_click)
                 if idx is not None:
                     del self.bg_points[idx]
+        
+        # Save current file's peaks and background points after modification
+        if self.file_list and self.current_index >= 0 and self.current_index < len(self.file_list):
+            current_filename = os.path.basename(self.file_list[self.current_index])
+            self.file_peaks[current_filename] = self.peaks.copy()
+            self.file_bg_points[current_filename] = self.bg_points.copy()
             
         # Preserve zoom when adding/removing peaks
         self.plot_data(preserve_zoom=True)
@@ -1620,6 +1668,11 @@ class BatchFittingDialog(QWidget):
             }
             self.results.append(result)
             
+            # Save current file's peaks and background points after fitting
+            if self.file_list and self.current_index >= 0 and self.current_index < len(self.file_list):
+                self.file_peaks[filename] = self.peaks.copy()
+                self.file_bg_points[filename] = self.bg_points.copy()
+            
             # Redraw plot with fit curves
             self.plot_data()
             
@@ -1707,6 +1760,12 @@ class BatchFittingDialog(QWidget):
     def go_previous(self):
         """Go to previous file"""
         if self.current_index > 0:
+            # Save current file's peaks and background points before switching
+            if self.file_list and self.current_index < len(self.file_list):
+                current_filename = os.path.basename(self.file_list[self.current_index])
+                self.file_peaks[current_filename] = self.peaks.copy()
+                self.file_bg_points[current_filename] = self.bg_points.copy()
+            
             self.current_index -= 1
             self.load_current_file()
             self.file_list_widget.setCurrentRow(self.current_index)
@@ -1714,6 +1773,12 @@ class BatchFittingDialog(QWidget):
     def go_next(self):
         """Go to next file"""
         if self.current_index < len(self.file_list) - 1:
+            # Save current file's peaks and background points before switching
+            if self.file_list and self.current_index < len(self.file_list):
+                current_filename = os.path.basename(self.file_list[self.current_index])
+                self.file_peaks[current_filename] = self.peaks.copy()
+                self.file_bg_points[current_filename] = self.bg_points.copy()
+            
             self.current_index += 1
             self.load_current_file()
             self.file_list_widget.setCurrentRow(self.current_index)
