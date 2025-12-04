@@ -3435,13 +3435,14 @@ class CalibrateModule(GUIBase):
             # Fix everything else for initial convergence
             self.log("\n  Stage 1: Refining distance only...")
             geo_ref.refine2(fix=["wavelength", "poni1", "poni2", "rot1", "rot2", "rot3"])
-            self.log(f"    Distance: {geo_ref.dist*1000:.2f} mm")
+            stage1_distance = geo_ref.dist
+            self.log(f"    Distance: {stage1_distance*1000:.2f} mm")
             
-            # Stage 2: Refine distance and beam center
-            # Keep rotations fixed at zero (assume perpendicular detector)
-            self.log("\n  Stage 2: Refining distance and beam center...")
-            geo_ref.refine2(fix=["wavelength", "rot1", "rot2", "rot3"])
-            self.log(f"    Distance: {geo_ref.dist*1000:.2f} mm")
+            # Stage 2: Refine beam center ONLY (keep distance from Stage 1)
+            # Distance is already correct from Stage 1, only optimize beam center
+            self.log("\n  Stage 2: Refining beam center only (keeping Stage 1 distance)...")
+            geo_ref.refine2(fix=["wavelength", "dist", "rot1", "rot2", "rot3"])
+            self.log(f"    Distance: {geo_ref.dist*1000:.2f} mm (unchanged)")
             self.log(f"    Beam center: ({geo_ref.poni2*1000:.2f}, {geo_ref.poni1*1000:.2f}) mm")
             
             # Stage 3: SKIP rotation refinement by default
