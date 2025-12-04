@@ -749,7 +749,7 @@ class BatchFittingDialog(QWidget):
         x, y = self.current_data[:, 0], self.current_data[:, 1]
         
         # Find data points within search window
-        search_window = (x.max() - x.min()) * 0.02  # 2% of x range
+        search_window = (x.max() - x.min()) * 0.005  # 0.5% of x range (reduced from 2%)
         mask = np.abs(x - x_click) < search_window
         
         if not np.any(mask):
@@ -769,11 +769,23 @@ class BatchFittingDialog(QWidget):
             
         x, y = self.current_data[:, 0], self.current_data[:, 1]
         
-        # Find nearest point
-        distances = np.sqrt((x - x_click)**2 + ((y - y_click) / np.max(y) * (x.max() - x.min()))**2)
+        # Find nearest point within smaller window
+        search_window = (x.max() - x.min()) * 0.01  # 1% of x range
+        mask = np.abs(x - x_click) < search_window
+        
+        if not np.any(mask):
+            # If no points in window, use closest point
+            distances = np.sqrt((x - x_click)**2 + ((y - y_click) / np.max(y) * (x.max() - x.min()))**2)
+            min_idx = np.argmin(distances)
+            return x[min_idx], y[min_idx]
+        
+        # Find nearest point in window
+        x_window = x[mask]
+        y_window = y[mask]
+        distances = np.sqrt((x_window - x_click)**2 + ((y_window - y_click) / np.max(y) * (x.max() - x.min()))**2)
         min_idx = np.argmin(distances)
         
-        return x[min_idx], y[min_idx]
+        return x_window[min_idx], y_window[min_idx]
         
     def find_nearest_peak(self, x_click, threshold=None):
         """Find nearest peak to click position"""
@@ -782,7 +794,7 @@ class BatchFittingDialog(QWidget):
             
         if threshold is None:
             x_range = self.canvas.axes.get_xlim()
-            threshold = (x_range[1] - x_range[0]) * 0.02
+            threshold = (x_range[1] - x_range[0]) * 0.008  # Reduced from 0.02 to 0.008
             
         distances = [abs(p - x_click) for p in self.peaks]
         min_dist = min(distances)
@@ -799,8 +811,8 @@ class BatchFittingDialog(QWidget):
         if threshold is None:
             x_range = self.canvas.axes.get_xlim()
             y_range = self.canvas.axes.get_ylim()
-            threshold_x = (x_range[1] - x_range[0]) * 0.02
-            threshold_y = (y_range[1] - y_range[0]) * 0.05
+            threshold_x = (x_range[1] - x_range[0]) * 0.01  # Reduced from 0.02 to 0.01
+            threshold_y = (y_range[1] - y_range[0]) * 0.03  # Reduced from 0.05 to 0.03
         else:
             threshold_x = threshold
             threshold_y = threshold
@@ -929,8 +941,8 @@ class BatchFittingDialog(QWidget):
                                             markersize=4, alpha=0.9, label='BG Points', zorder=3)
                         # Interpolate background line (darker blue, more opaque)
                         bg_line_y = np.interp(x, bg_x, bg_y)
-                        self.canvas.axes.plot(x, bg_line_y, '-', color='#1E3A8A',
-                                            linewidth=2.0, alpha=0.6, label='Background', zorder=3)
+                        self.canvas.axes.plot(x, bg_line_y, '-', color='#0D47A1',
+                                            linewidth=2.5, alpha=0.8, label='Background', zorder=3)
                     
                     # Plot individual peak components (dashed lines, different colors)
                     colors = plt.cm.tab10(np.linspace(0, 1, len(fit_curves)))
@@ -982,21 +994,21 @@ class BatchFittingDialog(QWidget):
             self.canvas.axes.axvline(peak_x, color='#E57373', linestyle='--', 
                                      alpha=0.8, linewidth=2, zorder=3)
             
-        # Plot background points as smaller light blue squares
+        # Plot background points as smaller blue squares
         if self.bg_points:
             bg_x = [p[0] for p in self.bg_points]
             bg_y = [p[1] for p in self.bg_points]
             
-            # Use smaller light blue squares (reduced from 6 to 4)
-            self.canvas.axes.plot(bg_x, bg_y, marker='s', color='#90CAF9', 
-                                 markerfacecolor='#E3F2FD', markersize=4, 
-                                 linestyle='', markeredgewidth=1, 
+            # Use blue squares with darker edge
+            self.canvas.axes.plot(bg_x, bg_y, marker='s', color='#1976D2', 
+                                 markerfacecolor='#90CAF9', markersize=5, 
+                                 linestyle='', markeredgewidth=1.5, 
                                  label='BG', zorder=5)
             
             # Draw background line if >= 2 points
             if len(self.bg_points) >= 2:
-                self.canvas.axes.plot(bg_x, bg_y, color='#64B5F6', 
-                                     linestyle='--', alpha=0.4, linewidth=1, zorder=2)
+                self.canvas.axes.plot(bg_x, bg_y, color='#1976D2', 
+                                     linestyle='--', alpha=0.7, linewidth=1.5, zorder=2)
             
         self.canvas.axes.set_xlabel('2θ (deg)', fontsize=10, fontweight='bold')
         self.canvas.axes.set_ylabel('Intensity', fontsize=10, fontweight='bold')
