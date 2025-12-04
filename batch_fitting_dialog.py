@@ -139,7 +139,7 @@ class BatchFittingDialog(QWidget):
 
         # Main layout - content fills entire space
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(5, 8, 15, 10)  # Reduced left margin from 8 to 5
+        layout.setContentsMargins(2, 8, 20, 10)  # Left: 2px (shift left), Right: 20px (show border)
         layout.setSpacing(5)
         
         # Title and controls
@@ -153,7 +153,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(10, 6, 17, 6)  # Align right margin with right panel
+        header_layout.setContentsMargins(10, 6, 22, 6)  # Align right margin with right panel
         
         title = QLabel("📊 Batch Peak Fitting - Interactive Mode")
         title.setFont(QFont('Arial', 11, QFont.Weight.Bold))
@@ -272,7 +272,7 @@ class BatchFittingDialog(QWidget):
         """)
 
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(8, 8, 15, 10)  # More right and bottom margin for border visibility
+        layout.setContentsMargins(8, 8, 18, 10)  # Increased right margin for border visibility
         layout.setSpacing(4)
 
         # Control bar
@@ -318,7 +318,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         main_layout = QVBoxLayout(bar)
-        main_layout.setContentsMargins(10, 4, 15, 4)  # Reduced vertical, more right margin
+        main_layout.setContentsMargins(10, 4, 18, 4)  # Increased right margin
         main_layout.setSpacing(4)
         
         # First row: mode and method
@@ -556,7 +556,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(10, 5, 15, 5)  # More right margin
+        layout.setContentsMargins(10, 5, 18, 5)  # Increased right margin
         
         # Current file label
         self.current_file_label = QLabel("No file loaded")
