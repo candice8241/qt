@@ -4031,43 +4031,52 @@ class CalibrateModule(GUIBase):
             return
         
         try:
-            from cake_pattern_utils import create_cake_image, plot_cake_with_rings
+            self.log("Generating Cake view (polar transformation)...")
             
-            self.log("Generating Cake view...")
-            
-            # Create cake image
-            cake, tth_array, chi_array = create_cake_image(
-                self.ai, 
+            # Use pyFAI's integrate2d for cake/polar transformation
+            # num_chi: number of azimuthal bins (360 for 1 degree resolution)
+            # num_2theta: number of radial bins
+            result = self.ai.integrate2d(
                 self.current_image,
-                num_chi=360,
-                num_2theta=500
+                npt_rad=500,      # Number of radial bins (2theta)
+                npt_azim=360,     # Number of azimuthal bins (chi/azimuth)
+                unit="2th_deg",   # Use 2theta in degrees
+                method="splitpixel"
             )
             
-            if cake is not None:
-                # Get calibrant for ring overlay
-                calibrant = None
-                wavelength = None
-                if hasattr(self, 'calibrant_name'):
-                    try:
-                        calibrant = ALL_CALIBRANTS[self.calibrant_name]
-                        wavelength = self.ai.wavelength
-                    except:
-                        pass
-                
-                # Plot cake with rings
-                plot_cake_with_rings(
-                    self.cake_axes,
-                    cake,
-                    tth_array,
-                    chi_array,
-                    calibrant=calibrant,
-                    wavelength=wavelength
-                )
-                
-                self.cake_canvas.draw()
-                self.log("Cake view updated successfully")
+            # Result is (cake_image, 2theta_array, chi_array)
+            cake = result[0]
+            tth_rad = result[1]  # Radial axis (2theta)
+            chi_azim = result[2]  # Azimuthal axis (chi)
+            
+            # Clear and plot
+            self.cake_axes.clear()
+            
+            # Display cake image with proper extent
+            # extent: [left, right, bottom, top]
+            extent = [tth_rad.min(), tth_rad.max(), chi_azim.min(), chi_azim.max()]
+            
+            im = self.cake_axes.imshow(
+                cake,
+                aspect='auto',
+                origin='lower',
+                extent=extent,
+                cmap='viridis',
+                interpolation='nearest'
+            )
+            
+            self.cake_axes.set_xlabel('2θ (degrees)', fontsize=10)
+            self.cake_axes.set_ylabel('χ (degrees)', fontsize=10)
+            self.cake_axes.set_title('Cake/Polar View', fontsize=11, fontweight='bold')
+            
+            # Add colorbar if not exists
+            if not hasattr(self, 'cake_colorbar') or self.cake_colorbar is None:
+                self.cake_colorbar = self.cake_canvas.figure.colorbar(im, ax=self.cake_axes)
             else:
-                self.log("Failed to generate Cake view")
+                self.cake_colorbar.update_normal(im)
+            
+            self.cake_canvas.draw()
+            self.log(f"Cake view updated: {cake.shape[1]}x{cake.shape[0]} (2θ × χ)")
                 
         except Exception as e:
             import traceback
@@ -4080,42 +4089,57 @@ class CalibrateModule(GUIBase):
             return
         
         try:
-            from cake_pattern_utils import create_pattern, plot_pattern_with_peaks
+            self.log("Generating 1D integrated pattern...")
             
-            self.log("Generating 1D pattern...")
-            
-            # Create 1D integrated pattern
-            tth, intensity = create_pattern(
-                self.ai,
+            # Use pyFAI's integrate1d for azimuthal integration
+            result = self.ai.integrate1d(
                 self.current_image,
-                num_points=2048,
-                unit="2th_deg"
+                npt=2048,         # Number of points in output
+                unit="2th_deg",   # Use 2theta in degrees
+                method="splitpixel"
             )
             
-            if tth is not None and intensity is not None:
-                # Get calibrant for peak overlay
-                calibrant = None
-                wavelength = None
-                if hasattr(self, 'calibrant_name'):
-                    try:
-                        calibrant = ALL_CALIBRANTS[self.calibrant_name]
-                        wavelength = self.ai.wavelength
-                    except:
-                        pass
-                
-                # Plot pattern with peaks
-                plot_pattern_with_peaks(
-                    self.pattern_axes,
-                    tth,
-                    intensity,
-                    calibrant=calibrant,
-                    wavelength=wavelength
-                )
-                
-                self.pattern_canvas.draw()
-                self.log("Pattern view updated successfully")
-            else:
-                self.log("Failed to generate Pattern view")
+            # Result is (2theta_array, intensity_array)
+            tth = result[0]      # 2theta values
+            intensity = result[1] # Integrated intensity
+            
+            # Clear and plot
+            self.pattern_axes.clear()
+            
+            # Plot 1D pattern
+            self.pattern_axes.plot(tth, intensity, 'b-', linewidth=1)
+            self.pattern_axes.set_xlabel('2θ (degrees)', fontsize=10)
+            self.pattern_axes.set_ylabel('Intensity (a.u.)', fontsize=10)
+            self.pattern_axes.set_title('1D Integrated Pattern', fontsize=11, fontweight='bold')
+            self.pattern_axes.grid(True, alpha=0.3)
+            
+            # Add calibrant peak positions if available
+            if hasattr(self, 'calibrant_name') and self.calibrant_name:
+                try:
+                    calibrant = ALL_CALIBRANTS[self.calibrant_name]
+                    calibrant.wavelength = self.ai.wavelength
+                    
+                    # Get expected 2theta positions for calibrant peaks
+                    tth_calibrant = calibrant.get_2th()
+                    tth_calibrant_deg = np.degrees(tth_calibrant)
+                    
+                    # Filter to visible range
+                    tth_min, tth_max = tth.min(), tth.max()
+                    visible_peaks = tth_calibrant_deg[(tth_calibrant_deg >= tth_min) & 
+                                                       (tth_calibrant_deg <= tth_max)]
+                    
+                    # Draw vertical lines for calibrant peaks
+                    y_max = intensity.max()
+                    for peak_pos in visible_peaks[:20]:  # Limit to first 20 peaks
+                        self.pattern_axes.axvline(peak_pos, color='red', linestyle='--', 
+                                                 alpha=0.5, linewidth=0.8)
+                    
+                    self.log(f"Added {len(visible_peaks)} calibrant peak positions")
+                except Exception as cal_error:
+                    self.log(f"Could not add calibrant peaks: {cal_error}")
+            
+            self.pattern_canvas.draw()
+            self.log(f"Pattern view updated: {len(tth)} points from {tth.min():.2f}° to {tth.max():.2f}°")
                 
         except Exception as e:
             import traceback
