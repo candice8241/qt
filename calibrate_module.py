@@ -500,11 +500,11 @@ class CalibrationCanvas(FigureCanvas):
             self.preview_patch = None
             self._last_mouse_pos = None
             
-            # Ring display control properties
-            self.show_rings = True  # Show/hide rings
-            self.num_rings_display = 10  # Number of rings to display
-            self.ring_alpha = 0.8  # Ring opacity (0.0-1.0)
-            self.ring_color = 'red'  # Ring color
+            # Ring display properties (fixed, Dioptas style)
+            self.show_rings = True  # Always show rings
+            self.num_rings_display = 50  # Show all available rings (Dioptas default)
+            self.ring_alpha = 1.0  # Full opacity (Dioptas default)
+            self.ring_color = 'red'  # Red color (Dioptas default)
             self.calibration_points = None  # Store calibration points
             
             # Connect events with error handling
@@ -1356,85 +1356,6 @@ class CalibrateModule(GUIBase):
         self.filename_txt.setReadOnly(True)
         self.filename_txt.setPlaceholderText("No file loaded")
         right_layout.addWidget(self.filename_txt)
-        
-        # Ring display control section
-        ring_control_card = self.create_card_frame(right_widget)
-        ring_control_layout = QVBoxLayout(ring_control_card)
-        ring_control_layout.setSpacing(8)
-        
-        ring_title = QLabel("⭕ Ring Display Control")
-        ring_title.setFont(QFont('Arial', 11, QFont.Weight.Bold))
-        ring_title.setStyleSheet(f"color: {self.colors['text_dark']};")
-        ring_control_layout.addWidget(ring_title)
-        
-        # Show/Hide rings checkbox
-        self.show_rings_cb = QCheckBox("Show Calibration Rings")
-        self.show_rings_cb.setChecked(True)
-        self.show_rings_cb.setStyleSheet(f"color: {self.colors['text_dark']}; font-weight: bold;")
-        self.show_rings_cb.stateChanged.connect(self.on_show_rings_changed)
-        ring_control_layout.addWidget(self.show_rings_cb)
-        
-        # Number of rings to display
-        ring_num_frame = QFrame()
-        ring_num_layout = QHBoxLayout(ring_num_frame)
-        ring_num_layout.setContentsMargins(0, 0, 0, 0)
-        
-        ring_num_label = QLabel("Number of Rings:")
-        ring_num_label.setFixedWidth(110)
-        ring_num_layout.addWidget(ring_num_label)
-        
-        self.num_rings_spinbox = QSpinBox()
-        self.num_rings_spinbox.setMinimum(1)
-        self.num_rings_spinbox.setMaximum(50)
-        self.num_rings_spinbox.setValue(10)
-        self.num_rings_spinbox.setFixedWidth(60)
-        self.num_rings_spinbox.valueChanged.connect(self.on_num_rings_changed)
-        ring_num_layout.addWidget(self.num_rings_spinbox)
-        ring_num_layout.addStretch()
-        
-        ring_control_layout.addWidget(ring_num_frame)
-        
-        # Ring transparency/alpha
-        alpha_frame = QFrame()
-        alpha_layout = QHBoxLayout(alpha_frame)
-        alpha_layout.setContentsMargins(0, 0, 0, 0)
-        
-        alpha_label = QLabel("Ring Opacity:")
-        alpha_label.setFixedWidth(110)
-        alpha_layout.addWidget(alpha_label)
-        
-        self.ring_alpha_slider = QSlider(Qt.Orientation.Horizontal)
-        self.ring_alpha_slider.setMinimum(10)
-        self.ring_alpha_slider.setMaximum(100)
-        self.ring_alpha_slider.setValue(80)
-        self.ring_alpha_slider.valueChanged.connect(self.on_ring_alpha_changed)
-        alpha_layout.addWidget(self.ring_alpha_slider)
-        
-        self.ring_alpha_label = QLabel("80%")
-        self.ring_alpha_label.setFixedWidth(40)
-        alpha_layout.addWidget(self.ring_alpha_label)
-        
-        ring_control_layout.addWidget(alpha_frame)
-        
-        # Ring color selection
-        color_frame = QFrame()
-        color_layout = QHBoxLayout(color_frame)
-        color_layout.setContentsMargins(0, 0, 0, 0)
-        
-        color_label = QLabel("Ring Color:")
-        color_label.setFixedWidth(110)
-        color_layout.addWidget(color_label)
-        
-        self.ring_color_combo = QComboBox()
-        self.ring_color_combo.addItems(['Red', 'Green', 'Blue', 'Yellow', 'Cyan', 'Magenta', 'White'])
-        self.ring_color_combo.setCurrentText('Red')
-        self.ring_color_combo.currentTextChanged.connect(self.on_ring_color_changed)
-        color_layout.addWidget(self.ring_color_combo)
-        color_layout.addStretch()
-        
-        ring_control_layout.addWidget(color_frame)
-        
-        right_layout.addWidget(ring_control_card)
         
         # Toolbox for parameters (Dioptas style)
         self.toolbox = QToolBox()
@@ -3507,51 +3428,6 @@ class CalibrateModule(GUIBase):
             self.update_peaks_table()
     
 
-    def on_show_rings_changed(self, state):
-        """Handle show/hide rings checkbox"""
-        if hasattr(self, 'unified_canvas'):
-            self.unified_canvas.show_rings = (state == Qt.CheckState.Checked.value)
-            if self.unified_canvas.calibration_points is not None:
-                self.unified_canvas.display_calibration_image(self.current_image)
-            self.log(f"Ring display: {'ON' if self.unified_canvas.show_rings else 'OFF'}")
-    
-    def on_num_rings_changed(self, value):
-        """Handle number of rings spinbox change"""
-        if hasattr(self, 'unified_canvas'):
-            self.unified_canvas.num_rings_display = value
-            if self.unified_canvas.calibration_points is not None:
-                self.unified_canvas.display_calibration_image(self.current_image)
-            self.log(f"Number of rings to display: {value}")
-    
-    def on_ring_alpha_changed(self, value):
-        """Handle ring alpha/opacity slider change"""
-        alpha_percent = value
-        self.ring_alpha_label.setText(f"{alpha_percent}%")
-        
-        if hasattr(self, 'unified_canvas'):
-            self.unified_canvas.ring_alpha = alpha_percent / 100.0
-            if self.unified_canvas.calibration_points is not None:
-                self.unified_canvas.display_calibration_image(self.current_image)
-            self.log(f"Ring opacity: {alpha_percent}%")
-    
-    def on_ring_color_changed(self, color_name):
-        """Handle ring color selection change"""
-        # Map color names to matplotlib colors
-        color_map = {
-            'Red': 'red',
-            'Green': 'green',
-            'Blue': 'blue',
-            'Yellow': 'yellow',
-            'Cyan': 'cyan',
-            'Magenta': 'magenta',
-            'White': 'white'
-        }
-        
-        if hasattr(self, 'unified_canvas'):
-            self.unified_canvas.ring_color = color_map.get(color_name, 'red')
-            if self.unified_canvas.calibration_points is not None:
-                self.unified_canvas.display_calibration_image(self.current_image)
-            self.log(f"Ring color: {color_name}")
     
     def run_calibration(self):
         """Run detector calibration"""
