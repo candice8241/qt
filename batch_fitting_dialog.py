@@ -129,36 +129,46 @@ class BatchFittingDialog(QWidget):
     def paintEvent(self, event):
         """Custom paint event to draw border with explicit right and bottom lines"""
         super().paintEvent(event)
-        
+
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
+
         rect = self.rect()
-        border_width = 2
-        
-        # Draw main border with enough inset
-        pen = QPen(QColor("#7E57C2"), border_width)
+
+        # Draw main border
+        pen = QPen(QColor("#7E57C2"), 2)
         pen.setStyle(Qt.PenStyle.SolidLine)
         painter.setPen(pen)
-        
-        # Draw rounded rectangle with proper insets
         painter.drawRoundedRect(
-            rect.adjusted(1, 1, -8, -8),  # Larger inset on right and bottom
+            rect.adjusted(1, 1, -2, -2),
             6, 6
         )
-        
-        # Draw EXPLICIT right border line (guaranteed visible)
-        pen_thick = QPen(QColor("#7E57C2"), 3)
-        painter.setPen(pen_thick)
-        
-        # Right vertical line
-        right_x = rect.width() - 6  # 6px from right edge
-        painter.drawLine(right_x, 5, right_x, rect.height() - 5)
-        
-        # Bottom horizontal line on the right side
-        bottom_y = rect.height() - 6  # 6px from bottom edge
-        painter.drawLine(rect.width() - 100, bottom_y, right_x, bottom_y)
-        
+
+        # Draw THICK right border line (GUARANTEED VISIBLE)
+        # Use very thick pen and bright color
+        pen_right = QPen(QColor("#9C27B0"), 6)  # 6px thick, brighter purple
+        pen_right.setStyle(Qt.PenStyle.SolidLine)
+        pen_right.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen_right)
+
+        # Draw right vertical line - positioned clearly inside the widget
+        right_x = rect.width() - 4  # 4px from edge
+        painter.drawLine(right_x, 10, right_x, rect.height() - 10)
+
+        # Draw additional thinner line slightly inside for double-border effect
+        pen_right2 = QPen(QColor("#7E57C2"), 3)
+        pen_right2.setStyle(Qt.PenStyle.SolidLine)
+        painter.setPen(pen_right2)
+        right_x2 = rect.width() - 8
+        painter.drawLine(right_x2, 10, right_x2, rect.height() - 10)
+
+        # Draw bottom line on the right section
+        pen_bottom = QPen(QColor("#9C27B0"), 6)
+        pen_bottom.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen_bottom)
+        bottom_y = rect.height() - 4
+        painter.drawLine(rect.width() // 2, bottom_y, rect.width() - 4, bottom_y)
+
         painter.end()
     
     def setup_ui(self):
