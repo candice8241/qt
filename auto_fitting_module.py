@@ -215,6 +215,9 @@ class AutoFittingModule(QWidget):
         self._previous_peaks = None
         self._previous_bg_points = None
         
+        # Store complete state for each file (for navigation preservation)
+        self._file_states = {}  # filepath -> state dict
+        
         # Undo stack (lines 607-608)
         self.undo_stack = []
         
@@ -832,9 +835,10 @@ class AutoFittingModule(QWidget):
             marker, = self.ax.plot(peak_x, peak_y, '*', color='#FF1493',
                                   markersize=10, markeredgecolor='#FFD700',
                                   markeredgewidth=1.5, zorder=10)
-            text = self.ax.text(peak_x, peak_y * 1.03, f'P{len(self.selected_peaks)+1}',
-                               ha='center', fontsize=6, color='#FF1493',
-                               fontweight='bold', zorder=11)
+            # Use red vertical line instead of text label
+            y_min, y_max = self.ax.get_ylim()
+            text = self.ax.axvline(x=peak_x, color='red', linestyle='-', linewidth=1.5, 
+                                  alpha=0.7, zorder=11)
             
             self.selected_peaks.append(peak_idx)
             self.peak_markers.append(marker)
@@ -863,9 +867,7 @@ class AutoFittingModule(QWidget):
                 except:
                     pass
                 
-                for i, text_obj in enumerate(self.peak_texts):
-                    text_obj.set_text(f'P{i+1}')
-                
+                # No need to renumber since we're using vertical lines instead of text
                 self.canvas.draw()
                 
                 self.update_info(f"Peak removed at 2theta = {removed_peak_x:.4f}\n")
@@ -906,9 +908,36 @@ class AutoFittingModule(QWidget):
         except ValueError:
             self.current_file_index = 0
     
-    def load_file_by_path(self, filepath):
+    def load_file_by_path(self, filepath, skip_state_save=False):
         """Load XRD data file from specific path (lines 1188-1247)"""
         try:
+            # Save current file state before loading new file (unless skipped)
+            if not skip_state_save and self.filepath is not None:
+                self._save_file_state()
+            
+            # Try to restore state if this file was loaded before
+            if filepath in self._file_states:
+                if self._restore_file_state(filepath):
+                    # Enable buttons
+                    self.btn_fit.setEnabled(True)
+                    self.btn_reset.setEnabled(True)
+                    self.btn_select_bg.setEnabled(True)
+                    self.btn_clear_bg.setEnabled(True)
+                    self.btn_auto_bg.setEnabled(True)
+                    self.btn_auto_find.setEnabled(True)
+                    self.btn_overlap_mode.setEnabled(True)
+                    self.btn_apply_smooth.setEnabled(True)
+                    self.btn_reset_smooth.setEnabled(True)
+                    
+                    if len(self.file_list) > 1:
+                        self.btn_prev_file.setEnabled(True)
+                        self.btn_next_file.setEnabled(True)
+                        self.btn_batch_auto.setEnabled(True)
+                    
+                    self.update_info(f"File restored from cache: {self.filename}\nData points: {len(self.x)}\n")
+                    return
+            
+            # Load fresh data if no cached state
             with open(filepath, encoding='latin1') as f:
                 data = np.genfromtxt(f, comments="#")
             
@@ -1084,9 +1113,9 @@ class AutoFittingModule(QWidget):
                 marker, = self.ax.plot(self.x[idx], self.y[idx], '*', color='#FF1493',
                                       markersize=10, markeredgecolor='#FFD700',
                                       markeredgewidth=1.5, zorder=10)
-                text = self.ax.text(self.x[idx], self.y[idx] * 1.03, f'P{i+1}',
-                                   ha='center', fontsize=6, color='#FF1493',
-                                   fontweight='bold', zorder=11)
+                # Use red vertical line instead of text label
+                text = self.ax.axvline(x=self.x[idx], color='red', linestyle='-', linewidth=1.5, 
+                                      alpha=0.7, zorder=11)
                 self.peak_markers[i] = marker
                 self.peak_texts[i] = text
             
@@ -1230,9 +1259,9 @@ class AutoFittingModule(QWidget):
                 marker, = self.ax.plot(peak_x, peak_y, '*', color='#FF1493',
                                       markersize=10, markeredgecolor='#FFD700',
                                       markeredgewidth=1.5, zorder=10)
-                text = self.ax.text(peak_x, peak_y * 1.03, f'P{len(self.selected_peaks)+1}',
-                                   ha='center', fontsize=6, color='#FF1493',
-                                   fontweight='bold', zorder=11)
+                # Use red vertical line instead of text label
+                text = self.ax.axvline(x=peak_x, color='red', linestyle='-', linewidth=1.5, 
+                                      alpha=0.7, zorder=11)
                 
                 self.selected_peaks.append(peak_idx)
                 self.peak_markers.append(marker)
@@ -2053,46 +2082,97 @@ class AutoFittingModule(QWidget):
     def _process_single_file_auto(self, filepath):
         """Process a single file automatically with verification dialog (lines 2290-2397)"""
         try:
-            # Step 1: Load file
+            # Step 1: Load file (skip state save during batch processing)
             self.update_info("  Step 1: Loading file...\n")
-            self.load_file_by_path(filepath)
+            self.load_file_by_path(filepath, skip_state_save=True)
             QApplication.processEvents()
             self.update_info("  ✓ File loaded successfully\n")
             
             # Restore previous peaks and background points if they exist
             # This ensures modifications from previous verification are retained
+            previous_peaks_indices = []
             if hasattr(self, '_previous_peaks') and self._previous_peaks is not None:
-                self.selected_peaks = self._previous_peaks.copy()
+                previous_peaks_indices = self._previous_peaks.copy()
                 self._previous_peaks = None
             
+            previous_bg_points = []
             if hasattr(self, '_previous_bg_points') and self._previous_bg_points is not None:
-                self.bg_points = self._previous_bg_points.copy()
+                previous_bg_points = self._previous_bg_points.copy()
                 self._previous_bg_points = None
             
-            # If no previous state, auto-detect
-            if len(self.selected_peaks) == 0:
-                # Step 2: Auto-find peaks
-                self.update_info("  Step 2: Auto-detecting peaks...\n")
-                self.auto_find_peaks()
-                QApplication.processEvents()
-                
-                if len(self.selected_peaks) == 0:
-                    self.update_info("  ❌ No peaks detected!\n")
-                    return False
-                
-                self.update_info(f"  ✓ Detected {len(self.selected_peaks)} peaks\n")
-            else:
-                self.update_info(f"  Using previous {len(self.selected_peaks)} peak(s)\n")
+            # Step 2: Auto-find peaks (always perform auto peak finding)
+            self.update_info("  Step 2: Auto-detecting peaks...\n")
+            peaks = PeakDetector.auto_find_peaks(self.x, self.y)
             
-            # If no previous background, auto-select
-            if len(self.bg_points) == 0:
+            # Merge auto-detected peaks with previous peaks
+            # Convert previous peak indices to x positions for comparison
+            if len(previous_peaks_indices) > 0:
+                self.update_info(f"  Merging {len(previous_peaks_indices)} previous peaks with auto-detected peaks...\n")
+                # Get x positions of previous peaks (need to map to new data)
+                # For simplicity, we'll just use the previous indices
+                combined_peaks = list(peaks)  # Start with auto-detected peaks
+                
+                # Add previous peaks that are not too close to auto-detected ones
+                dx_threshold = 5  # index distance threshold
+                for prev_idx in previous_peaks_indices:
+                    # Check if this previous peak is far from all auto-detected peaks
+                    is_new = True
+                    for auto_idx in peaks:
+                        if abs(prev_idx - auto_idx) < dx_threshold:
+                            is_new = False
+                            break
+                    if is_new and 0 <= prev_idx < len(self.x):
+                        combined_peaks.append(prev_idx)
+                
+                peaks = np.array(sorted(set(combined_peaks)))
+                self.update_info(f"  Combined total: {len(peaks)} peaks\n")
+            
+            # Add all peaks (auto + previous merged)
+            for peak_idx in peaks:
+                peak_x = self.x[peak_idx]
+                peak_y = self.y[peak_idx]
+                
+                marker, = self.ax.plot(peak_x, peak_y, '*', color='#FF1493',
+                                      markersize=10, markeredgecolor='#FFD700',
+                                      markeredgewidth=1.5, zorder=10)
+                # Use red vertical line instead of text label
+                text = self.ax.axvline(x=peak_x, color='red', linestyle='-', linewidth=1.5, 
+                                      alpha=0.7, zorder=11)
+                
+                self.selected_peaks.append(peak_idx)
+                self.peak_markers.append(marker)
+                self.peak_texts.append(text)
+            
+            self.canvas.draw()
+            
+            if len(self.selected_peaks) == 0:
+                self.update_info("  ❌ No peaks detected!\n")
+                return False
+            
+            self.update_info(f"  ✓ Total {len(self.selected_peaks)} peaks ready\n")
+            
+            # Restore or auto-select background
+            if len(previous_bg_points) > 0:
+                self.bg_points = previous_bg_points.copy()
+                # Redraw background points
+                for bg_x, bg_y in self.bg_points:
+                    idx = np.argmin(np.abs(self.x - bg_x))
+                    marker, = self.ax.plot(bg_x, bg_y, 'o', color='#4169E1',
+                                          markersize=8, markeredgecolor='white',
+                                          markeredgewidth=1, zorder=5)
+                    text_obj = self.ax.text(bg_x, bg_y * 0.95, '',
+                                           ha='center', fontsize=6, color='#4169E1',
+                                           fontweight='bold', zorder=6)
+                    self.bg_markers.append((marker, text_obj))
+                self.update_bg_connect_line()
+                self.canvas.draw()
+                self.update_info(f"  Using previous {len(self.bg_points)} background point(s)\n")
+            else:
                 # Auto-select background
                 self.update_info("  Auto-selecting background...\n")
                 self.auto_select_background()
                 QApplication.processEvents()
                 self.update_info(f"  ✓ Selected {len(self.bg_points)} background points\n")
-            else:
-                self.update_info(f"  Using previous {len(self.bg_points)} background point(s)\n")
             
             # Manual verification step - allow user to review and adjust
             self.update_info("  Waiting for manual verification...\n")
@@ -2129,6 +2209,9 @@ class AutoFittingModule(QWidget):
             
             if not self.fitted or self.fit_results is None:
                 self.update_info("  ❌ Peak fitting failed!\n")
+                # Save current state for next file even if fitting failed
+                self._previous_peaks = self.selected_peaks.copy()
+                self._previous_bg_points = self.bg_points.copy()
                 return False
             
             self.update_info(f"  ✓ Successfully fitted {len(self.fit_results)} peaks\n")
@@ -2140,6 +2223,13 @@ class AutoFittingModule(QWidget):
                 csv_path, _ = self._save_results_to_dir(save_dir)
                 self.batch_csv_paths.append(csv_path)
                 self.update_info(f"  ✓ Results saved to {save_dir}\n")
+            
+            # Save current state for next file (always retain peaks and bg_points)
+            self._previous_peaks = self.selected_peaks.copy()
+            self._previous_bg_points = self.bg_points.copy()
+            
+            # Also save the complete file state for navigation preservation
+            self._save_file_state()
             
             self.update_info("  ✅ File processed successfully!\n")
             return True
@@ -2438,6 +2528,122 @@ class AutoFittingModule(QWidget):
         layout.addWidget(btn_frame)
         
         dialog.exec()
+    
+    def _save_file_state(self):
+        """Save current file state for navigation preservation"""
+        if self.filepath is None:
+            return
+        
+        # Create a deep copy of the current state
+        state = {
+            'x': self.x.copy() if self.x is not None else None,
+            'y': self.y.copy() if self.y is not None else None,
+            'y_original': self.y_original.copy() if self.y_original is not None else None,
+            'filename': self.filename,
+            'selected_peaks': self.selected_peaks.copy(),
+            'bg_points': self.bg_points.copy(),
+            'fitted': self.fitted,
+            'fit_results': self.fit_results.copy() if self.fit_results else None,
+            'fit_method': self.fit_method,
+        }
+        
+        self._file_states[self.filepath] = state
+    
+    def _restore_file_state(self, filepath):
+        """Restore file state if it exists"""
+        if filepath not in self._file_states:
+            return False
+        
+        state = self._file_states[filepath]
+        
+        # Restore data
+        self.x = state['x'].copy() if state['x'] is not None else None
+        self.y = state['y'].copy() if state['y'] is not None else None
+        self.y_original = state['y_original'].copy() if state['y_original'] is not None else None
+        self.filename = state['filename']
+        self.filepath = filepath
+        
+        # Clear existing visual elements
+        self.reset_peaks()
+        self.clear_background()
+        
+        # Restore state variables
+        self.selected_peaks = state['selected_peaks'].copy()
+        self.bg_points = state['bg_points'].copy()
+        self.fitted = state['fitted']
+        self.fit_results = state['fit_results'].copy() if state['fit_results'] else None
+        self.fit_method = state['fit_method']
+        
+        # Redraw the plot with all restored elements
+        self.ax.clear()
+        self.ax.plot(self.x, self.y, '-', color='#9370DB', linewidth=0.8, label='Data')
+        self.ax.set_facecolor('#F4F6FB')
+        self.ax.grid(True, alpha=0.3, linestyle='--', color='#D4A5D4')
+        self.ax.set_xlabel('2theta (degree)', fontsize=13, color='black', fontname='Arial')
+        self.ax.set_ylabel('Intensity', fontsize=13, color='black', fontname='Arial')
+        
+        # Restore peak markers
+        for peak_idx in self.selected_peaks:
+            if peak_idx < len(self.x):
+                peak_x = self.x[peak_idx]
+                peak_y = self.y[peak_idx]
+                marker, = self.ax.plot(peak_x, peak_y, '*', color='#FF1493',
+                                      markersize=10, markeredgecolor='#FFD700',
+                                      markeredgewidth=1.5, zorder=10)
+                text = self.ax.axvline(x=peak_x, color='red', linestyle='-', linewidth=1.5, 
+                                      alpha=0.7, zorder=11)
+                self.peak_markers.append(marker)
+                self.peak_texts.append(text)
+        
+        # Restore background points
+        for bg_x, bg_y in self.bg_points:
+            marker, = self.ax.plot(bg_x, bg_y, 'o', color='#4169E1',
+                                  markersize=8, markeredgecolor='white',
+                                  markeredgewidth=1, zorder=5)
+            text_obj = self.ax.text(bg_x, bg_y * 0.95, '',
+                                   ha='center', fontsize=6, color='#4169E1',
+                                   fontweight='bold', zorder=6)
+            self.bg_markers.append((marker, text_obj))
+        
+        if len(self.bg_points) >= 2:
+            self.update_bg_connect_line()
+        
+        # Restore fitted results if they exist
+        if self.fitted and self.fit_results:
+            # Re-fit to restore the visual fit lines
+            # This is a simplified approach - we just call fit_peaks again
+            # since we have the peaks and bg_points restored
+            try:
+                self.fit_peaks()
+            except:
+                # If re-fitting fails, just display peaks without fit
+                pass
+        
+        # Set title
+        if self.fitted:
+            self.ax.set_title(f'{self.filename} - Fit Complete ({self.fit_method})',
+                            fontsize=11, fontweight='bold', color='black', fontname='Arial')
+        else:
+            self.ax.set_title(f'{self.filename} | Click on peaks to select',
+                            fontsize=11, color='black', fontname='Arial')
+        
+        # Set tick labels
+        for label in self.ax.get_xticklabels() + self.ax.get_yticklabels():
+            label.set_fontname('Arial')
+            label.set_color('black')
+            label.set_fontsize(9)
+        
+        # Expand x-axis range
+        x_range = self.x.max() - self.x.min()
+        self.ax.set_xlim(self.x.min() - x_range * 0.05, self.x.max() + x_range * 0.05)
+        self.fig.subplots_adjust(left=0.08, right=0.98, top=0.92, bottom=0.15)
+        self.canvas.draw()
+        
+        # Update info
+        file_info = f"File {self.current_file_index + 1}/{len(self.file_list)}: {self.filename}"
+        self.status_label.setText(file_info)
+        
+        return True
 
 
 # For standalone testing
