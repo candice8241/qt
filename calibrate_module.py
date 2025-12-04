@@ -1756,31 +1756,14 @@ class CalibrateModule(GUIBase):
         # Clear and Undo buttons
         btn_layout = QHBoxLayout()
         
-        # Toggle peaks table button
-        self.toggle_peaks_table_btn = QPushButton("Show Peaks ▼")
-        self.toggle_peaks_table_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-                padding: 5px 10px;
-                border-radius: 3px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-        """)
-        self.toggle_peaks_table_btn.clicked.connect(self.toggle_peaks_table)
-        btn_layout.addWidget(self.toggle_peaks_table_btn)
-        
         self.clear_peaks_btn = QPushButton("Clear Peaks")
         self.clear_peaks_btn.setStyleSheet("padding: 5px;")
         self.clear_peaks_btn.clicked.connect(self.clear_manual_peaks)
         btn_layout.addWidget(self.clear_peaks_btn)
         
-        self.undo_peaks_btn = QPushButton("Undo")
+        self.undo_peaks_btn = QPushButton("Undo Last")
         self.undo_peaks_btn.setStyleSheet("padding: 5px;")
+        self.undo_peaks_btn.clicked.connect(self.undo_last_peak)
         btn_layout.addWidget(self.undo_peaks_btn)
         
         peak_layout.addLayout(btn_layout)
@@ -1790,65 +1773,6 @@ class CalibrateModule(GUIBase):
         self.peak_count_label.setFont(QFont('Arial', 8))
         self.peak_count_label.setStyleSheet("color: blue; padding: 3px;")
         peak_layout.addWidget(self.peak_count_label)
-        
-        # Control points table (initially hidden)
-        self.peaks_table_frame = QFrame()
-        self.peaks_table_frame.setVisible(False)
-        peaks_table_layout = QVBoxLayout(self.peaks_table_frame)
-        peaks_table_layout.setContentsMargins(0, 5, 0, 0)
-        
-        # Instructions
-        instructions = QLabel("Double-click Ring # to edit. Click Delete to remove.")
-        instructions.setStyleSheet("color: gray; font-size: 8pt; padding: 3px;")
-        instructions.setWordWrap(True)
-        peaks_table_layout.addWidget(instructions)
-        
-        # Table
-        self.peaks_table = QTableWidget()
-        self.peaks_table.setColumnCount(5)
-        self.peaks_table.setHorizontalHeaderLabels(['#', 'X', 'Y', 'Ring #', 'Delete'])
-        self.peaks_table.setMaximumHeight(200)
-        self.peaks_table.setMinimumHeight(100)
-        
-        # Table styling
-        self.peaks_table.setAlternatingRowColors(True)
-        self.peaks_table.setStyleSheet("""
-            QTableWidget {
-                gridline-color: #d0d0d0;
-                selection-background-color: #e3f2fd;
-                font-size: 8pt;
-            }
-            QTableWidget::item {
-                padding: 2px;
-            }
-            QHeaderView::section {
-                background-color: #f5f5f5;
-                padding: 3px;
-                border: 1px solid #d0d0d0;
-                font-weight: bold;
-                font-size: 8pt;
-            }
-        """)
-        
-        # Column widths
-        header = self.peaks_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-        
-        # Connect cell changed signal
-        self.peaks_table.cellChanged.connect(self.on_peaks_table_cell_changed)
-        
-        peaks_table_layout.addWidget(self.peaks_table)
-        
-        # Summary label
-        self.peaks_summary_label = QLabel()
-        self.peaks_summary_label.setStyleSheet("font-size: 8pt; padding: 3px; color: blue;")
-        peaks_table_layout.addWidget(self.peaks_summary_label)
-        
-        peak_layout.addWidget(self.peaks_table_frame)
         
         parent_layout.addWidget(peak_gb)
     
@@ -3265,165 +3189,27 @@ class CalibrateModule(GUIBase):
                 """)
                 self.log("Peak picking mode: DISABLED")
     
-    def toggle_peaks_table(self):
-        """Toggle peaks table visibility"""
-        if not hasattr(self, 'peaks_table_frame'):
+    def undo_last_peak(self):
+        """Undo the last manually selected peak"""
+        if not hasattr(self, 'unified_canvas') or self.unified_canvas is None:
             return
         
-        is_visible = self.peaks_table_frame.isVisible()
-        self.peaks_table_frame.setVisible(not is_visible)
+        if len(self.unified_canvas.manual_peaks) == 0:
+            self.log("No peaks to undo")
+            return
         
-        # Update button text
-        if not is_visible:
-            self.toggle_peaks_table_btn.setText("Hide Peaks ▲")
-            self.update_peaks_table()
-        else:
-            self.toggle_peaks_table_btn.setText("Show Peaks ▼")
+        # Remove the last peak
+        removed_peak = self.unified_canvas.manual_peaks.pop()
+        self.log(f"Removed peak at ({removed_peak[0]:.1f}, {removed_peak[1]:.1f}), Ring #{removed_peak[2]}")
+        
+        # Update peak count
+        if hasattr(self, 'peak_count_label'):
+            self.peak_count_label.setText(f"Peaks: {len(self.unified_canvas.manual_peaks)}")
+        
+        # Redraw image
+        if self.current_image is not None:
+            self.unified_canvas.display_calibration_image(self.current_image)
     
-    def update_peaks_table(self):
-        """Update the peaks table with current control points"""
-        if not hasattr(self, 'peaks_table') or not hasattr(self, 'calibration_canvas'):
-            return
-        
-        # Disconnect signal to avoid triggering during update
-        self.peaks_table.cellChanged.disconnect(self.on_peaks_table_cell_changed)
-        
-        manual_peaks = self.calibration_canvas.manual_peaks
-        self.peaks_table.setRowCount(len(manual_peaks))
-        
-        for i, (x, y, ring_num) in enumerate(manual_peaks):
-            # Index
-            idx_item = QTableWidgetItem(str(i + 1))
-            idx_item.setFlags(idx_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            idx_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.peaks_table.setItem(i, 0, idx_item)
-            
-            # X coordinate
-            x_item = QTableWidgetItem(f"{x:.1f}")
-            x_item.setFlags(x_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            x_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.peaks_table.setItem(i, 1, x_item)
-            
-            # Y coordinate
-            y_item = QTableWidgetItem(f"{y:.1f}")
-            y_item.setFlags(y_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            y_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.peaks_table.setItem(i, 2, y_item)
-            
-            # Ring number (editable)
-            ring_item = QTableWidgetItem(str(ring_num))
-            ring_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            ring_item.setBackground(Qt.GlobalColor.yellow)
-            font = ring_item.font()
-            font.setBold(True)
-            ring_item.setFont(font)
-            self.peaks_table.setItem(i, 3, ring_item)
-            
-            # Delete button
-            delete_btn = QPushButton("✕")
-            delete_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #ff6b6b;
-                    color: white;
-                    border: none;
-                    padding: 2px 5px;
-                    border-radius: 3px;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background-color: #ff5252;
-                }
-            """)
-            delete_btn.setMaximumWidth(30)
-            delete_btn.clicked.connect(lambda checked, row=i: self.delete_peak_from_table(row))
-            self.peaks_table.setCellWidget(i, 4, delete_btn)
-        
-        # Reconnect signal
-        self.peaks_table.cellChanged.connect(self.on_peaks_table_cell_changed)
-        
-        # Update summary
-        self.update_peaks_summary()
-    
-    def on_peaks_table_cell_changed(self, row, col):
-        """Handle cell value change in peaks table"""
-        if col != 3:  # Only Ring # column is editable
-            return
-        
-        try:
-            new_ring = int(self.peaks_table.item(row, col).text())
-            if new_ring < 0:
-                raise ValueError("Ring number must be >= 0")
-            
-            # Update manual_peaks
-            if hasattr(self, 'calibration_canvas'):
-                x, y, _ = self.calibration_canvas.manual_peaks[row]
-                self.calibration_canvas.manual_peaks[row] = (x, y, new_ring)
-                
-                # Highlight changed cell
-                self.peaks_table.item(row, col).setBackground(Qt.GlobalColor.green)
-                
-                # Update display
-                self.calibration_canvas.display_calibration_image(
-                    self.calibration_canvas._last_image_data,
-                    self.calibration_canvas._last_calib_points
-                )
-                
-                # Update summary
-                self.update_peaks_summary()
-                
-                self.log(f"Updated point #{row + 1}: Ring # changed to {new_ring}")
-        
-        except ValueError as e:
-            QMessageBox.warning(self.parent, "Invalid Input", 
-                              f"Please enter a valid ring number (integer >= 0).\nError: {e}")
-            # Restore original value
-            if hasattr(self, 'calibration_canvas') and row < len(self.calibration_canvas.manual_peaks):
-                x, y, ring_num = self.calibration_canvas.manual_peaks[row]
-                self.peaks_table.item(row, col).setText(str(ring_num))
-    
-    def delete_peak_from_table(self, row):
-        """Delete a peak from the control points list"""
-        if not hasattr(self, 'calibration_canvas'):
-            return
-        
-        if row < 0 or row >= len(self.calibration_canvas.manual_peaks):
-            return
-        
-        # Remove from list
-        del self.calibration_canvas.manual_peaks[row]
-        
-        # Update display
-        self.calibration_canvas.display_calibration_image(
-            self.calibration_canvas._last_image_data,
-            self.calibration_canvas._last_calib_points
-        )
-        
-        # Update table and count
-        self.update_peaks_table()
-        self.update_peak_count()
-        
-        self.log(f"Deleted point #{row + 1}")
-    
-    def update_peaks_summary(self):
-        """Update peaks summary label"""
-        if not hasattr(self, 'peaks_summary_label') or not hasattr(self, 'calibration_canvas'):
-            return
-        
-        manual_peaks = self.calibration_canvas.manual_peaks
-        if not manual_peaks:
-            self.peaks_summary_label.setText("No control points")
-            return
-        
-        # Count points per ring
-        from collections import Counter
-        ring_counts = Counter([ring for _, _, ring in manual_peaks])
-        
-        summary_parts = [f"Total: {len(manual_peaks)}"]
-        for ring_num in sorted(ring_counts.keys()):
-            count = ring_counts[ring_num]
-            summary_parts.append(f"Ring {ring_num}: {count}")
-        
-        self.peaks_summary_label.setText(" | ".join(summary_parts))
     
     def clear_manual_peaks(self):
         """Clear manually selected peaks"""
@@ -3434,13 +3220,9 @@ class CalibrateModule(GUIBase):
     
     def update_peak_count(self):
         """Update peak count display"""
-        if hasattr(self, 'peak_count_label') and hasattr(self, 'calibration_canvas'):
-            count = len(self.calibration_canvas.manual_peaks)
+        if hasattr(self, 'peak_count_label') and hasattr(self, 'unified_canvas'):
+            count = len(self.unified_canvas.manual_peaks)
             self.peak_count_label.setText(f"Peaks: {count}")
-        
-        # Also update peaks table if it's visible
-        if hasattr(self, 'peaks_table_frame') and self.peaks_table_frame.isVisible():
-            self.update_peaks_table()
     
 
     
