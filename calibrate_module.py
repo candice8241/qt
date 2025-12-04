@@ -672,12 +672,21 @@ class CalibrationCanvas(FigureCanvas):
             x, y = event.xdata, event.ydata
             
             # Get ring number from parent
-            ring_num = 0
-            if hasattr(self, 'parent_module'):
-                try:
-                    ring_num = int(self.parent_module.ring_number_entry.text())
-                except (ValueError, AttributeError):
-                    ring_num = 0
+            # Get ring number from parent (support both main UI and compact UI)
+            ring_num = 1  # Default to ring 1
+            if hasattr(self, 'parent_module') and self.parent_module is not None:
+                # Try main UI spinbox first
+                if hasattr(self.parent_module, 'ring_number_spinbox'):
+                    try:
+                        ring_num = self.parent_module.ring_number_spinbox.value()
+                    except:
+                        ring_num = 1
+                # Fall back to compact UI entry
+                elif hasattr(self.parent_module, 'ring_number_entry'):
+                    try:
+                        ring_num = int(self.parent_module.ring_number_entry.text())
+                    except (ValueError, AttributeError):
+                        ring_num = 1
             
             # Add peak
             self.manual_peaks.append((x, y, ring_num))
@@ -696,15 +705,32 @@ class CalibrationCanvas(FigureCanvas):
             # Use draw_idle() instead of immediate draw for better performance
             self.draw_idle()
             
-            # Auto-increment ring number for next peak
-            if hasattr(self, 'parent_module'):
+            # Auto-increment ring number for next peak (Dioptas style)
+            if hasattr(self, 'parent_module') and self.parent_module is not None:
                 self.parent_module.update_peak_count()
-                # Auto increment ring number (start from 1, not 0)
-                try:
+                
+                # Check if auto increment is enabled
+                auto_inc = False
+                if hasattr(self.parent_module, 'automatic_peak_num_inc_cb'):
+                    try:
+                        auto_inc = self.parent_module.automatic_peak_num_inc_cb.isChecked()
+                    except:
+                        auto_inc = False
+                
+                if auto_inc:
                     next_ring_num = ring_num + 1
-                    self.parent_module.ring_number_entry.setText(str(next_ring_num))
-                except (ValueError, AttributeError):
-                    pass
+                    # Update main UI spinbox
+                    if hasattr(self.parent_module, 'ring_number_spinbox'):
+                        try:
+                            self.parent_module.ring_number_spinbox.setValue(next_ring_num)
+                        except:
+                            pass
+                    # Update compact UI entry
+                    elif hasattr(self.parent_module, 'ring_number_entry'):
+                        try:
+                            self.parent_module.ring_number_entry.setText(str(next_ring_num))
+                        except:
+                            pass
         
         # Mask editing mode
         elif self.mask_editing_mode and event.button == 1:
@@ -1714,31 +1740,43 @@ class CalibrateModule(GUIBase):
         self.peak_mode_group.addButton(self.select_peak_rb, 1)
         peak_layout.addWidget(self.select_peak_rb)
         
-        # Peak number and search size
-        peak_params_layout = QHBoxLayout()
-        peak_params_layout.addWidget(QLabel("Peak #:"))
-        self.peak_num_sb = QSpinBox()
-        self.peak_num_sb.setMinimum(0)
-        self.peak_num_sb.setMaximum(50)
-        self.peak_num_sb.setValue(0)
-        self.peak_num_sb.setFixedWidth(60)
-        peak_params_layout.addWidget(self.peak_num_sb)
+        # Current Ring Number (Dioptas style)
+        ring_num_row = QHBoxLayout()
+        ring_num_row.addWidget(QLabel("Current Ring #:"))
+        self.ring_number_spinbox = QSpinBox()
+        self.ring_number_spinbox.setMinimum(0)
+        self.ring_number_spinbox.setMaximum(50)
+        self.ring_number_spinbox.setValue(1)  # Default to ring 1
+        self.ring_number_spinbox.setFixedWidth(60)
+        self.ring_number_spinbox.setStyleSheet("""
+            QSpinBox {
+                background-color: #FFF8DC;
+                font-weight: bold;
+                padding: 3px;
+            }
+        """)
+        ring_num_row.addWidget(self.ring_number_spinbox)
+        ring_num_row.addStretch()
+        peak_layout.addLayout(ring_num_row)
         
-        peak_params_layout.addWidget(QLabel("Size:"))
+        # Auto increment checkbox (Dioptas style)
+        self.automatic_peak_num_inc_cb = QCheckBox("Automatic increase ring number")
+        self.automatic_peak_num_inc_cb.setChecked(True)
+        self.automatic_peak_num_inc_cb.setStyleSheet(f"color: {self.colors['text_dark']};")
+        peak_layout.addWidget(self.automatic_peak_num_inc_cb)
+        
+        # Peak search size
+        search_size_row = QHBoxLayout()
+        search_size_row.addWidget(QLabel("Search Size:"))
         self.search_size_sb = QSpinBox()
         self.search_size_sb.setMinimum(5)
         self.search_size_sb.setMaximum(100)
         self.search_size_sb.setValue(10)
         self.search_size_sb.setFixedWidth(60)
-        peak_params_layout.addWidget(self.search_size_sb)
-        peak_params_layout.addStretch()
-        
-        peak_layout.addLayout(peak_params_layout)
-        
-        # Auto increment checkbox
-        self.automatic_peak_num_inc_cb = QCheckBox("Auto increment peak number")
-        self.automatic_peak_num_inc_cb.setChecked(True)
-        peak_layout.addWidget(self.automatic_peak_num_inc_cb)
+        search_size_row.addWidget(self.search_size_sb)
+        search_size_row.addWidget(QLabel("pixels"))
+        search_size_row.addStretch()
+        peak_layout.addLayout(search_size_row)
         
         # Clear and Undo buttons
         btn_layout = QHBoxLayout()
@@ -2720,6 +2758,12 @@ class CalibrateModule(GUIBase):
         
         ring_layout.addStretch()
         card_layout.addWidget(ring_frame)
+        
+        # Auto increment checkbox (Dioptas style)
+        self.automatic_peak_num_inc_cb = QCheckBox("Automatic increase ring number")
+        self.automatic_peak_num_inc_cb.setChecked(True)
+        self.automatic_peak_num_inc_cb.setStyleSheet(f"color: {self.colors['text_dark']}; font-size: 9pt;")
+        card_layout.addWidget(self.automatic_peak_num_inc_cb)
         
         # Separator
         separator = QFrame()
