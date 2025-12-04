@@ -128,16 +128,16 @@ class LatticeParamsModule(QWidget, GUIBase):
         
         # Columns layout with more spacing
         columns = QHBoxLayout()
-        columns.setSpacing(40)  # Increased from 16 to 40 for more space between left and right
+        columns.setSpacing(30)  # Balanced spacing between left and right panels
         
-        # Left column: file inputs (enlarged)
+        # Left column: file inputs (enlarged with longer text boxes)
         left_panel = QWidget()
-        left_panel.setMinimumWidth(600)  # Increased from 550
+        left_panel.setMinimumWidth(650)  # Increased from 600 to 650
         left_panel.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Minimum)
         left_panel.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(0, 4, 0, 4)
-        left_layout.setSpacing(12)  # Increased from 10 to 12
+        left_layout.setSpacing(12)
         
         left_title = QLabel("")
         left_title.setFont(QFont('Arial', 11, QFont.Weight.Bold))  # Increased from 10 to 11
@@ -179,18 +179,17 @@ class LatticeParamsModule(QWidget, GUIBase):
         right_layout.setSpacing(10)
         right_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
         
-        # Create framed container for crystal system and wavelength
-        combined_container = QFrame()
+        # Create container for crystal system and wavelength (no border)
+        combined_container = QWidget()
         combined_container.setStyleSheet(f"""
-            QFrame {{
+            QWidget {{
                 background-color: {self.colors['card_bg']};
-                border: 2px solid #888888;
-                border-radius: 6px;
+                border: none;
             }}
         """)
         combined_container_layout = QVBoxLayout(combined_container)
-        combined_container_layout.setContentsMargins(10, 8, 10, 8)
-        combined_container_layout.setSpacing(15)
+        combined_container_layout.setContentsMargins(5, 5, 5, 5)  # Minimal margins, close to content
+        combined_container_layout.setSpacing(12)
         
         # Crystal System title
         right_title = QLabel("Crystal System")
