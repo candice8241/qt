@@ -132,7 +132,7 @@ class LatticeParamsModule(QWidget, GUIBase):
         
         # Left column: file inputs (enlarged with longer text boxes)
         left_panel = QWidget()
-        left_panel.setMinimumWidth(700)  # Increased from 650 to 700 for longer text boxes
+        left_panel.setMinimumWidth(750)  # Increased from 700 to 750 for even longer text boxes
         left_panel.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Minimum)
         left_panel.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         left_layout = QVBoxLayout(left_panel)
@@ -227,7 +227,7 @@ class LatticeParamsModule(QWidget, GUIBase):
             row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
             row_layout = QHBoxLayout(row)
             row_layout.setContentsMargins(0, 0, 0, 0)
-            row_layout.setSpacing(35)  # Increased spacing between two systems in a row
+            row_layout.setSpacing(45)  # Increased spacing between two systems in a row (35->45)
             
             # First crystal system in this row
             label1, value1, min_peaks1 = systems[i]
@@ -311,7 +311,7 @@ class LatticeParamsModule(QWidget, GUIBase):
             QLineEdit {{
                 background-color: white;
                 color: {self.colors['text_dark']};
-                border: 2px solid #AAAAAA;
+                border: none;
                 padding: 3px;
             }}
         """)
