@@ -179,26 +179,18 @@ class LatticeParamsModule(QWidget, GUIBase):
         right_layout.setSpacing(10)
         right_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
         
-        # Create combined frame for crystal system and wavelength
-        combined_frame = QFrame()
-        combined_frame.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-        combined_frame.setStyleSheet(f"""
-            QFrame {{
-                background-color: {self.colors['card_bg']};
-                border: 2px solid #888888;
-                border-radius: 6px;
-            }}
-        """)
-        
-        combined_frame_layout = QVBoxLayout(combined_frame)
-        combined_frame_layout.setContentsMargins(10, 8, 10, 8)
-        combined_frame_layout.setSpacing(15)
+        # Create container for crystal system and wavelength (no border frame)
+        combined_container = QWidget()
+        combined_container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
+        combined_container_layout = QVBoxLayout(combined_container)
+        combined_container_layout.setContentsMargins(0, 0, 0, 0)
+        combined_container_layout.setSpacing(15)
         
         # Crystal System title
         right_title = QLabel("Crystal System")
         right_title.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        right_title.setStyleSheet(f"color: {self.colors['text_dark']};border: none; background-color: {self.colors['card_bg']};")
-        combined_frame_layout.addWidget(right_title)
+        right_title.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
+        combined_container_layout.addWidget(right_title)
         
         # Crystal systems with required peaks info
         # Format: (display_name, value, min_peaks)
@@ -213,7 +205,7 @@ class LatticeParamsModule(QWidget, GUIBase):
             ('Triclinic', 'Triclinic', 6),
         ]
         
-        self.phase_system_group = QButtonGroup(combined_frame)
+        self.phase_system_group = QButtonGroup(combined_container)
         
         # Helper function to create proper closure for each radio button
         def make_radio_handler(system_value):
@@ -223,18 +215,20 @@ class LatticeParamsModule(QWidget, GUIBase):
                     print(f"✓ Crystal system selected: {system_value}")
             return handler
         
-        # Create each crystal system as a separate row
-        for idx, (label, value, min_peaks) in enumerate(systems):
+        # Create crystal systems - two per row
+        for i in range(0, len(systems), 2):
             row = QWidget()
             row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
             row_layout = QHBoxLayout(row)
             row_layout.setContentsMargins(0, 0, 0, 0)
-            row_layout.setSpacing(8)
+            row_layout.setSpacing(30)
             
-            radio = QRadioButton(label)
-            radio.setChecked(value == self.phase_volume_system)
-            radio.setFont(QFont('Arial', 8))
-            radio.setStyleSheet(f"""
+            # First crystal system in this row
+            label1, value1, min_peaks1 = systems[i]
+            radio1 = QRadioButton(f"{label1} (≥{min_peaks1})")
+            radio1.setChecked(value1 == self.phase_volume_system)
+            radio1.setFont(QFont('Arial', 8))
+            radio1.setStyleSheet(f"""
                 QRadioButton {{
                     color: {self.colors['text_dark']};
                     background-color: {self.colors['card_bg']};
@@ -253,18 +247,41 @@ class LatticeParamsModule(QWidget, GUIBase):
                     image:url(check.png);
                 }}
             """)
-            radio.toggled.connect(make_radio_handler(value))
-            self.phase_system_group.addButton(radio)
-            row_layout.addWidget(radio)
+            radio1.toggled.connect(make_radio_handler(value1))
+            self.phase_system_group.addButton(radio1)
+            row_layout.addWidget(radio1)
             
-            # Add peak requirement info
-            peak_info = QLabel(f"(≥{min_peaks} peak{'s' if min_peaks > 1 else ''})")
-            peak_info.setFont(QFont('Arial', 7))
-            peak_info.setStyleSheet(f"color: #666666; background-color: {self.colors['card_bg']};")
-            row_layout.addWidget(peak_info)
+            # Second crystal system in this row (if exists)
+            if i + 1 < len(systems):
+                label2, value2, min_peaks2 = systems[i + 1]
+                radio2 = QRadioButton(f"{label2} (≥{min_peaks2})")
+                radio2.setChecked(value2 == self.phase_volume_system)
+                radio2.setFont(QFont('Arial', 8))
+                radio2.setStyleSheet(f"""
+                    QRadioButton {{
+                        color: {self.colors['text_dark']};
+                        background-color: {self.colors['card_bg']};
+                    }}
+                    QRadioButton::indicator {{
+                        width: 10px;
+                        height: 10px;
+                        border: 1.5px solid #999999;
+                        border-radius: 2px;
+                        background-color:{self.colors['primary']} ;
+                    }}
+                    QRadioButton::indicator:checked {{
+                        background-color: {self.colors['primary']};
+                        border: 1.5px solid #999999;
+                        border-radius: 2px;
+                        image:url(check.png);
+                    }}
+                """)
+                radio2.toggled.connect(make_radio_handler(value2))
+                self.phase_system_group.addButton(radio2)
+                row_layout.addWidget(radio2)
             
             row_layout.addStretch()
-            combined_frame_layout.addWidget(row)
+            combined_container_layout.addWidget(row)
         
         # Wavelength section
         wl_row = QWidget()
@@ -275,7 +292,7 @@ class LatticeParamsModule(QWidget, GUIBase):
         
         wl_label = QLabel("Wavelength (Å)")
         wl_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        wl_label.setStyleSheet(f"color: {self.colors['text_dark']}; border: none;background-color: transparent;")
+        wl_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: transparent;")
         wl_row_layout.addWidget(wl_label)
         
         self.phase_wavelength_entry = QLineEdit(str(self.phase_wavelength))
@@ -294,10 +311,10 @@ class LatticeParamsModule(QWidget, GUIBase):
         wl_row_layout.addWidget(self.phase_wavelength_entry)
         
         wl_row_layout.addStretch()
-        combined_frame_layout.addWidget(wl_row)
+        combined_container_layout.addWidget(wl_row)
         
-        # Add frame to right layout
-        right_layout.addWidget(combined_frame)
+        # Add container to right layout
+        right_layout.addWidget(combined_container)
         right_layout.addStretch()
         
         # Add columns to card
@@ -308,27 +325,47 @@ class LatticeParamsModule(QWidget, GUIBase):
         parent_layout.addWidget(card)
     
     def setup_console(self, parent_layout):
-        """Setup console/log output area"""
-        console_label = QLabel("📋 Console Output")
-        console_label.setFont(QFont('Arial', 11, QFont.Weight.Bold))
-        console_label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: transparent;")
-        parent_layout.addWidget(console_label)
+        """Setup console/log output area (matching batch_int Process Log style)"""
+        # Create log card
+        log_card = self.create_card_frame(None)
+        log_card_layout = QVBoxLayout(log_card)
+        log_card_layout.setContentsMargins(20, 12, 20, 12)
         
+        # Log header
+        log_header = QWidget()
+        log_header.setStyleSheet(f"background-color: {self.colors['card_bg']};")
+        log_header_layout = QHBoxLayout(log_header)
+        log_header_layout.setContentsMargins(0, 0, 0, 8)
+        log_header_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
+        
+        emoji_label = QLabel("🐰")
+        emoji_label.setFont(QFont('Segoe UI Emoji', 14))
+        emoji_label.setStyleSheet(f"background-color: {self.colors['card_bg']};")
+        log_header_layout.addWidget(emoji_label)
+        
+        log_title = QLabel("Process Log")
+        log_title.setFont(QFont('Arial', 11, QFont.Weight.Bold))
+        log_title.setStyleSheet(f"color: {self.colors['primary']}; background-color: {self.colors['card_bg']};")
+        log_header_layout.addWidget(log_title)
+        
+        log_card_layout.addWidget(log_header)
+        
+        # Log text area
         self.console = QTextEdit()
         self.console.setReadOnly(True)
-        self.console.setMinimumHeight(150)
-        self.console.setStyleSheet("""
-            QTextEdit {
-                background-color: #E3F2FD;
-                color: #1565C0;
-                font-family: 'Consolas', 'Courier New', monospace;
-                font-size: 10pt;
-                border: 2px solid #90CAF9;
-                border-radius: 6px;
-                padding: 8px;
-            }
+        self.console.setFont(QFont('Arial', 10))
+        self.console.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: #FAFAFA;
+                color: {self.colors['primary']};
+                border: none;
+                padding: 10px;
+            }}
         """)
-        parent_layout.addWidget(self.console)
+        self.console.setMinimumHeight(200)
+        log_card_layout.addWidget(self.console)
+        
+        parent_layout.addWidget(log_card)
     
     def create_file_input(self, parent_layout, label_text, var_name):
         """Create a file input row with browse button (matching powder_module style)"""
