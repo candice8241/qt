@@ -939,7 +939,10 @@ class InteractiveEoSGUI(QWidget):
         self.data_info_label.setText(info)
 
     def on_eos_changed(self):
-        """Handle EoS model change"""
+        """Handle EoS model change
+        
+        Special handling for Birch-Murnaghan 3rd order: automatically unlocks all parameters
+        """
         eos_map = {
             "Birch-Murnaghan 2nd": EoSType.BIRCH_MURNAGHAN_2ND,
             "Birch-Murnaghan 3rd": EoSType.BIRCH_MURNAGHAN_3RD,
@@ -952,6 +955,29 @@ class InteractiveEoSGUI(QWidget):
         self.eos_type = eos_map.get(self.eos_combo.currentText(), EoSType.BIRCH_MURNAGHAN_3RD)
         reg_strength = self.reg_slider.value() / 10.0
         self.fitter = CrysFMLEoS(eos_type=self.eos_type, regularization_strength=reg_strength)
+
+        # Special handling for Birch-Murnaghan 3rd order
+        if self.eos_type == EoSType.BIRCH_MURNAGHAN_3RD:
+            # Check if any parameters are locked
+            any_locked = (self.param_locks['V0'].isChecked() or 
+                         self.param_locks['B0'].isChecked() or 
+                         self.param_locks['B0_prime'].isChecked())
+            
+            if any_locked:
+                # Automatically unlock all parameters
+                self.param_locks['V0'].setChecked(False)
+                self.param_locks['B0'].setChecked(False)
+                self.param_locks['B0_prime'].setChecked(False)
+                
+                # Show information message
+                QMessageBox.information(
+                    self,
+                    "Parameters Unlocked",
+                    "ℹ️ Birch-Murnaghan 3rd Order Selected\n\n"
+                    "All parameters have been automatically unlocked.\n\n"
+                    "The F-f linearization method used for BM3 requires "
+                    "all three parameters (V₀, B₀, B₀') to be free for proper fitting."
+                )
 
         if self.V_data is not None and self.P_data is not None:
             self.update_manual_fit()
@@ -1021,8 +1047,8 @@ class InteractiveEoSGUI(QWidget):
     def fit_unlocked(self):
         """Fit only unlocked parameters
         
-        Uses replicated CrysFML algorithm for BM3 with all parameters unlocked,
-        otherwise uses external fitter
+        IMPORTANT: For Birch-Murnaghan 3rd order, all parameters must be unlocked.
+        The F-f linearization method requires all three parameters (V0, B0, B0') to be free.
         """
         if self.V_data is None or self.P_data is None:
             QMessageBox.warning(self, "Warning", "Please load data first!")
@@ -1036,6 +1062,28 @@ class InteractiveEoSGUI(QWidget):
             QMessageBox.warning(self, "Warning", "All parameters are locked!")
             return
 
+        # Special check for Birch-Murnaghan 3rd order
+        if self.eos_type == EoSType.BIRCH_MURNAGHAN_3RD:
+            if V0_locked or B0_locked or B0_prime_locked:
+                locked_params = []
+                if V0_locked:
+                    locked_params.append("V₀")
+                if B0_locked:
+                    locked_params.append("B₀")
+                if B0_prime_locked:
+                    locked_params.append("B₀'")
+                
+                QMessageBox.warning(
+                    self, 
+                    "Birch-Murnaghan 3rd Order Constraint",
+                    f"⚠️ For Birch-Murnaghan 3rd order fitting, ALL parameters must be unlocked!\n\n"
+                    f"Currently locked: {', '.join(locked_params)}\n\n"
+                    f"The F-f linearization method used for BM3 requires all three parameters "
+                    f"(V₀, B₀, B₀') to be free for proper fitting.\n\n"
+                    f"Please unlock all parameters and try again."
+                )
+                return
+
         reg_strength = self.reg_slider.value() / 10.0
         self.fitter = CrysFMLEoS(eos_type=self.eos_type, regularization_strength=reg_strength)
 
@@ -1047,11 +1095,11 @@ class InteractiveEoSGUI(QWidget):
                 'B0_prime': B0_prime_locked,
             }
             
-            # Use replicated algorithm for BM3 if all parameters are unlocked
-            if self.eos_type == EoSType.BIRCH_MURNAGHAN_3RD and not any(lock_flags.values()):
+            # Use replicated algorithm for BM3 (all parameters must be unlocked at this point)
+            if self.eos_type == EoSType.BIRCH_MURNAGHAN_3RD:
                 params = self._fit_birch_murnaghan_3rd_linear(self.V_data, self.P_data, reg_strength)
             else:
-                # Use external fitter for other cases
+                # Use external fitter for other EoS types
                 params = self.fitter.fit(
                     self.V_data,
                     self.P_data,
@@ -1072,21 +1120,60 @@ class InteractiveEoSGUI(QWidget):
                 self.current_params = params
                 self.update_plot()
             else:
+                QMessageBox.warning(
+                    self,
+                    "Fitting Failed",
+                    "⚠️ Fitting failed to converge.\n\n"
+                    "Try adjusting the regularization strength or check your data quality."
+                )
                 self.update_manual_fit()
 
         except Exception as e:
-            print(f"Fit unlocked error: {e}")
+            error_msg = str(e)
+            print(f"Fit unlocked error: {error_msg}")
+            QMessageBox.critical(
+                self,
+                "Fitting Error",
+                f"❌ An error occurred during fitting:\n\n{error_msg}\n\n"
+                f"Please check your data and try again."
+            )
             self.update_manual_fit()
 
     def fit_multiple_strategies(self):
         """Try fitting with multiple strategies
         
-        Uses replicated CrysFML algorithm for BM3 as primary strategy,
-        then tries external fitter strategies
+        IMPORTANT: For Birch-Murnaghan 3rd order, all parameters must be unlocked.
+        This method will check for locked parameters and warn the user.
         """
         if self.V_data is None or self.P_data is None:
             QMessageBox.warning(self, "Warning", "Please load data first!")
             return
+
+        # Special check for Birch-Murnaghan 3rd order
+        if self.eos_type == EoSType.BIRCH_MURNAGHAN_3RD:
+            V0_locked = self.param_locks['V0'].isChecked()
+            B0_locked = self.param_locks['B0'].isChecked()
+            B0_prime_locked = self.param_locks['B0_prime'].isChecked()
+            
+            if V0_locked or B0_locked or B0_prime_locked:
+                locked_params = []
+                if V0_locked:
+                    locked_params.append("V₀")
+                if B0_locked:
+                    locked_params.append("B₀")
+                if B0_prime_locked:
+                    locked_params.append("B₀'")
+                
+                QMessageBox.warning(
+                    self, 
+                    "Birch-Murnaghan 3rd Order Constraint",
+                    f"⚠️ For Birch-Murnaghan 3rd order fitting, ALL parameters must be unlocked!\n\n"
+                    f"Currently locked: {', '.join(locked_params)}\n\n"
+                    f"The F-f linearization method used for BM3 requires all three parameters "
+                    f"(V₀, B₀, B₀') to be free for proper fitting.\n\n"
+                    f"Please unlock all parameters and try again."
+                )
+                return
 
         reg_strength = self.reg_slider.value() / 10.0
         self.fitter = CrysFMLEoS(eos_type=self.eos_type, regularization_strength=reg_strength)
@@ -1143,10 +1230,26 @@ class InteractiveEoSGUI(QWidget):
                 print("="*60)
                 print("All strategies failed - using current manual values")
                 print("="*60 + "\n")
+                QMessageBox.warning(
+                    self,
+                    "All Strategies Failed",
+                    "⚠️ All fitting strategies failed to converge.\n\n"
+                    "Suggestions:\n"
+                    "• Try adjusting the regularization strength\n"
+                    "• Check your data quality\n"
+                    "• Try a different EoS model"
+                )
                 self.update_manual_fit()
 
         except Exception as e:
-            print(f"Error in multiple strategies: {e}")
+            error_msg = str(e)
+            print(f"Error in multiple strategies: {error_msg}")
+            QMessageBox.critical(
+                self,
+                "Fitting Error",
+                f"❌ An error occurred during fitting:\n\n{error_msg}\n\n"
+                f"Please check your data and try again."
+            )
             self.update_manual_fit()
 
     def update_plot(self):
