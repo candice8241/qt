@@ -175,7 +175,7 @@ class BatchFittingDialog(QWidget):
         # Main layout with margins for manual border
         # Extra margins on right and bottom for border visibility
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(3, 3, 12, 12)  # Right:12px Bottom:12px for visibility
+        main_layout.setContentsMargins(3, 3, 18, 12)  # Right:18px Bottom:12px for visibility
         main_layout.setSpacing(0)
         
         # Create content container
@@ -194,7 +194,7 @@ class BatchFittingDialog(QWidget):
         
         # Inner layout for actual content
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(8, 8, 15, 8)  # Increased right margin from 8 to 15
         layout.setSpacing(5)
         
         # Title and controls (no border)
@@ -301,7 +301,7 @@ class BatchFittingDialog(QWidget):
         """Create right panel with plot and controls"""
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setContentsMargins(5, 5, 20, 5)  # Increased right margin from 5 to 20
         layout.setSpacing(5)
         
         # Control bar
