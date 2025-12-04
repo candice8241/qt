@@ -131,7 +131,7 @@ class BatchFittingDialog(QWidget):
         # Set background with padding for border
         self.setStyleSheet("""
             BatchFittingDialog {
-                background-color: #E8E8E8;
+                background-color: #D0D0D0;
                 min-width: 1400px;
                 min-height: 800px;
             }
@@ -171,7 +171,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(8, 5, 8, 5)
+        header_layout.setContentsMargins(8, 5, 15, 5)
         
         title = QLabel("📊 Batch Peak Fitting - Interactive Mode")
         title.setFont(QFont('Arial', 13, QFont.Weight.Bold))
