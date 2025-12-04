@@ -141,6 +141,14 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         self.powder_btn = self.create_sidebar_button("⚗️  Batch Int.", lambda: self.switch_tab("powder"), is_active=True)
         sidebar_layout.addWidget(self.powder_btn)
 
+        # GlobalFit button (renamed from Auto Fit)
+        self.auto_fitting_btn = self.create_sidebar_button("🌐  GlobalFit", lambda: self.switch_tab("auto_fitting"), is_active=False)
+        sidebar_layout.addWidget(self.auto_fitting_btn)
+
+        # AzimuthFit button (renamed from Batch)
+        self.batch_btn = self.create_sidebar_button("📐  AzimuthFit", self.open_batch, is_active=False)
+        sidebar_layout.addWidget(self.batch_btn)
+
         # Hidden buttons - SC and Radial Int
         # self.radial_btn = self.create_sidebar_button("🔄  Radial Int.", lambda: self.switch_tab("radial"), is_active=False)
         # sidebar_layout.addWidget(self.radial_btn)
@@ -153,14 +161,6 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
 
         self.dioptas_btn = self.create_sidebar_button("💎  Dioptas", lambda: self.switch_tab("dioptas"), is_active=False)
         sidebar_layout.addWidget(self.dioptas_btn)
-
-        # Auto Fitting button
-        self.auto_fitting_btn = self.create_sidebar_button("🔍  Auto Fit", lambda: self.switch_tab("auto_fitting"), is_active=False)
-        sidebar_layout.addWidget(self.auto_fitting_btn)
-
-        # Batch Fitting button (standalone)
-        self.batch_btn = self.create_sidebar_button("📊  Batch", self.open_batch, is_active=False)
-        sidebar_layout.addWidget(self.batch_btn)
 
         # Curve Fitting button (hidden)
         # self.curvefit_btn = self.create_sidebar_button("📈  curvefit", self.open_curvefit, is_active=False)
