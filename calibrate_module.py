@@ -1419,13 +1419,6 @@ class CalibrateModule(GUIBase):
         
         right_layout.addWidget(bottom_frame)
         
-        # Log output at bottom (compact)
-        self.log_output = QTextEdit()
-        self.log_output.setMaximumHeight(80)
-        self.log_output.setReadOnly(True)
-        self.log_output.setFont(QFont('Courier', 7))
-        right_layout.addWidget(self.log_output)
-        
         # Set scroll area content
         right_scroll.setWidget(right_widget)
         
@@ -1438,6 +1431,28 @@ class CalibrateModule(GUIBase):
         main_splitter.setStretchFactor(1, 0)
         
         layout.addWidget(main_splitter)
+        
+        # Log output at bottom of entire interface (larger font)
+        log_label = QLabel("📋 Log Output:")
+        log_label.setFont(QFont('Arial', 11, QFont.Weight.Bold))
+        log_label.setStyleSheet(f"color: {self.colors['text_dark']}; padding: 5px;")
+        layout.addWidget(log_label)
+        
+        self.log_output = QTextEdit()
+        self.log_output.setMaximumHeight(150)  # Increased from 80
+        self.log_output.setMinimumHeight(100)
+        self.log_output.setReadOnly(True)
+        self.log_output.setFont(QFont('Consolas', 10))  # Increased from Courier 7
+        self.log_output.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: #f8f9fa;
+                border: 2px solid {self.colors['border']};
+                border-radius: 5px;
+                padding: 5px;
+                color: #2c3e50;
+            }}
+        """)
+        layout.addWidget(self.log_output)
         
         # Mark UI as initialized
         self._ui_initialized = True
@@ -3621,7 +3636,8 @@ class CalibrateModule(GUIBase):
             raise ValueError(f"Not enough control points: {len(geo_ref.data) if hasattr(geo_ref, 'data') and geo_ref.data is not None else 0}. "
                            "Need at least 3 points. Use Manual Peak Selection to add more peaks.")
         
-        # Refine geometry (Dioptas-style, conservative multi-stage approach)
+        # Refine geometry (Conservative approach: NO rotation refinement by default)
+        # This avoids unrealistic tilt angles that can occur with limited data
         try:
             self.log("\nStarting geometry refinement...")
             self.log(f"Number of control points: {len(geo_ref.data)}")
@@ -3640,50 +3656,58 @@ class CalibrateModule(GUIBase):
             self.log(f"    Distance: {geo_ref.dist*1000:.2f} mm")
             
             # Stage 2: Refine distance and beam center
-            # Still fix rotations and wavelength
+            # Keep rotations fixed at zero (assume perpendicular detector)
             self.log("\n  Stage 2: Refining distance and beam center...")
             geo_ref.refine2(fix=["wavelength", "rot1", "rot2", "rot3"])
             self.log(f"    Distance: {geo_ref.dist*1000:.2f} mm")
             self.log(f"    Beam center: ({geo_ref.poni2*1000:.2f}, {geo_ref.poni1*1000:.2f}) mm")
             
-            # Stage 3: Optionally add tilt refinement (only if enough rings)
-            # Only refine tilts if we have 4+ rings with good coverage
-            if len(ring_nums) >= 4 and len(geo_ref.data) >= 20:
-                self.log("\n  Stage 3: Refining with detector tilts...")
-                # First try rot3 only (in-plane rotation, usually safe)
-                geo_ref.refine2(fix=["wavelength", "rot1", "rot2"])
-                self.log(f"    Rot3 (in-plane): {np.degrees(geo_ref.rot3):.4f}°")
-                
-                # Then add rot1 and rot2 (tilts) only if rot3 is small
-                if abs(np.degrees(geo_ref.rot3)) < 5.0:  # rot3 should be small
-                    try:
-                        geo_ref.refine2(fix=["wavelength"])
-                        rot1_deg = np.degrees(geo_ref.rot1)
-                        rot2_deg = np.degrees(geo_ref.rot2)
-                        rot3_deg = np.degrees(geo_ref.rot3)
-                        
-                        # Check if tilts are reasonable (should be < 10 degrees typically)
-                        if abs(rot1_deg) > 15 or abs(rot2_deg) > 15:
-                            self.log(f"    Warning: Large tilts detected (rot1={rot1_deg:.3f}°, rot2={rot2_deg:.3f}°)")
-                            self.log(f"    This may indicate poor fit. Consider:")
-                            self.log(f"      - Checking detector distance estimate")
-                            self.log(f"      - Adding more control points")
-                            self.log(f"      - Verifying calibrant selection")
-                        
-                        self.log(f"    Tilts: rot1={rot1_deg:.4f}°, rot2={rot2_deg:.4f}°, rot3={rot3_deg:.4f}°")
-                    except Exception as tilt_error:
-                        self.log(f"    Tilt refinement failed: {tilt_error}")
-                        self.log(f"    Continuing with distance and center only...")
-                        # Reset rotations to zero if refinement failed
+            # Stage 3: SKIP rotation refinement by default
+            # Rotation refinement is DISABLED to avoid unrealistic angles
+            # In most cases, detector is nearly perpendicular to beam (rot1≈0, rot2≈0, rot3≈0)
+            self.log("\n  Stage 3: Rotation refinement DISABLED")
+            self.log(f"    Detector assumed perpendicular to beam (rot1=0°, rot2=0°, rot3=0°)")
+            self.log(f"    This is the safest and most common configuration.")
+            
+            # Optional: Only refine rotations if EXCELLENT data (strict criteria)
+            # Uncomment the block below if you want to enable rotation refinement for very high quality data
+            """
+            if len(ring_nums) >= 8 and len(geo_ref.data) >= 100:
+                self.log("\n  [OPTIONAL] Stage 3b: High-quality data detected, attempting rotation refinement...")
+                try:
+                    # Save current state
+                    dist_backup = geo_ref.dist
+                    poni1_backup = geo_ref.poni1
+                    poni2_backup = geo_ref.poni2
+                    
+                    # Try rotation refinement
+                    geo_ref.refine2(fix=["wavelength"])
+                    
+                    rot1_deg = np.degrees(geo_ref.rot1)
+                    rot2_deg = np.degrees(geo_ref.rot2)
+                    rot3_deg = np.degrees(geo_ref.rot3)
+                    
+                    # Check if result is reasonable
+                    if abs(rot1_deg) > 5 or abs(rot2_deg) > 5 or abs(rot3_deg) > 5:
+                        self.log(f"    Warning: Unrealistic rotations detected!")
+                        self.log(f"    rot1={rot1_deg:.3f}°, rot2={rot2_deg:.3f}°, rot3={rot3_deg:.3f}°")
+                        self.log(f"    Reverting to zero rotations (perpendicular detector)")
+                        # Revert
                         geo_ref.rot1 = 0.0
                         geo_ref.rot2 = 0.0
                         geo_ref.rot3 = 0.0
-                else:
-                    self.log(f"    Skipping rot1/rot2 refinement (rot3={np.degrees(geo_ref.rot3):.3f}° too large)")
-            else:
-                self.log(f"\n  Stage 3: Skipping tilt refinement (need 4+ rings with 20+ points)")
-                self.log(f"    Current: {len(ring_nums)} rings, {len(geo_ref.data)} points")
-                self.log(f"    Detector assumed perpendicular to beam")
+                        geo_ref.dist = dist_backup
+                        geo_ref.poni1 = poni1_backup
+                        geo_ref.poni2 = poni2_backup
+                    else:
+                        self.log(f"    Rotations accepted: rot1={rot1_deg:.4f}°, rot2={rot2_deg:.4f}°, rot3={rot3_deg:.4f}°")
+                except Exception as rot_error:
+                    self.log(f"    Rotation refinement failed: {rot_error}")
+                    self.log(f"    Keeping rotations at zero")
+                    geo_ref.rot1 = 0.0
+                    geo_ref.rot2 = 0.0
+                    geo_ref.rot3 = 0.0
+            """
             
             self.log("\n  Refinement completed successfully!")
             
