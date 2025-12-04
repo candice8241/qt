@@ -476,7 +476,7 @@ class InteractiveEoSGUI(QWidget):
         # Left panel - Controls
         left_panel = QWidget()
         left_panel.setFixedWidth(400)
-        left_panel.setStyleSheet(f"background-color: {self.palette['panel_bg']}; border: 1px solid #ccc;")
+        left_panel.setStyleSheet(f"background-color: {self.palette['panel_bg']}; border: none;")
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(12, 12, 12, 12)
         left_layout.setSpacing(12)
