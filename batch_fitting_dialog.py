@@ -131,7 +131,7 @@ class BatchFittingDialog(QWidget):
         # Set background with padding for border
         self.setStyleSheet("""
             BatchFittingDialog {
-                background-color: #B0C4DE;
+                background-color: #FFFFFF;
                 min-width: 1300px;
                 min-height: 700px;
             }
