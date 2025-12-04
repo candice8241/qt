@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                               QListWidget, QListWidgetItem, QSplitter, QWidget,
                               QFrame, QComboBox, QLineEdit, QSizePolicy)
 from PyQt6.QtCore import Qt, QRect
-from PyQt6.QtGui import QFont, QPainter, QPen, QColor
+from PyQt6.QtGui import QFont
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
@@ -125,41 +125,6 @@ class BatchFittingDialog(QWidget):
             self.reset_zoom()
         else:
             super().keyPressEvent(event)
-        
-    def paintEvent(self, event):
-        """Custom paint event to draw border with explicit right and bottom lines"""
-        super().paintEvent(event)
-        
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
-        rect = self.rect()
-        border_width = 2
-        
-        # Draw main border with enough inset
-        pen = QPen(QColor("#7E57C2"), border_width)
-        pen.setStyle(Qt.PenStyle.SolidLine)
-        painter.setPen(pen)
-        
-        # Draw rounded rectangle with proper insets
-        painter.drawRoundedRect(
-            rect.adjusted(1, 1, -8, -8),  # Larger inset on right and bottom
-            6, 6
-        )
-        
-        # Draw EXPLICIT right border line (guaranteed visible)
-        pen_thick = QPen(QColor("#7E57C2"), 3)
-        painter.setPen(pen_thick)
-        
-        # Right vertical line
-        right_x = rect.width() - 6  # 6px from right edge
-        painter.drawLine(right_x, 5, right_x, rect.height() - 5)
-        
-        # Bottom horizontal line on the right side
-        bottom_y = rect.height() - 6  # 6px from bottom edge
-        painter.drawLine(rect.width() - 100, bottom_y, right_x, bottom_y)
-        
-        painter.end()
     
     def setup_ui(self):
         """Setup the user interface"""
@@ -172,10 +137,9 @@ class BatchFittingDialog(QWidget):
             }
         """)
         
-        # Main layout with margins for manual border
-        # Extra margins on right and bottom for border visibility
+        # Main layout
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(3, 3, 18, 12)  # Right:18px Bottom:12px for visibility
+        main_layout.setContentsMargins(3, 3, 3, 3)
         main_layout.setSpacing(0)
         
         # Create content container
@@ -194,7 +158,7 @@ class BatchFittingDialog(QWidget):
         
         # Inner layout for actual content
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(8, 8, 15, 8)  # Increased right margin from 8 to 15
+        layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(5)
         
         # Title and controls (no border)
@@ -207,7 +171,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(8, 5, 25, 5)  # Increased right margin from 8 to 25
+        header_layout.setContentsMargins(8, 5, 8, 5)
         
         title = QLabel("📊 Batch Peak Fitting - Interactive Mode")
         title.setFont(QFont('Arial', 13, QFont.Weight.Bold))
@@ -301,7 +265,7 @@ class BatchFittingDialog(QWidget):
         """Create right panel with plot and controls"""
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(5, 5, 20, 5)  # Increased right margin from 5 to 20
+        layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(5)
         
         # Control bar
@@ -332,7 +296,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         main_layout = QVBoxLayout(bar)
-        main_layout.setContentsMargins(10, 5, 25, 5)  # Increased right margin from 10 to 25
+        main_layout.setContentsMargins(10, 5, 10, 5)
         main_layout.setSpacing(5)
         
         # First row: mode and method
@@ -553,9 +517,6 @@ class BatchFittingDialog(QWidget):
         info_label.setStyleSheet("color: #666666;")
         row2.addWidget(info_label)
         
-        # Add spacing to prevent components from extending to right edge
-        row2.addSpacing(5)
-        
         main_layout.addLayout(row2)
         
         return bar
@@ -572,7 +533,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(10, 5, 25, 5)  # Increased right margin from 10 to 25
+        layout.setContentsMargins(10, 5, 10, 5)
         
         # Current file label
         self.current_file_label = QLabel("No file loaded")
@@ -633,9 +594,6 @@ class BatchFittingDialog(QWidget):
         """)
         save_btn.clicked.connect(self.save_all_results)
         layout.addWidget(save_btn)
-        
-        # Add spacing after save button to prevent it from extending to right edge
-        layout.addSpacing(5)
         
         return bar
         
