@@ -200,29 +200,17 @@ class LatticeParamsModule(QWidget, GUIBase):
         right_title.setStyleSheet(f"color: {self.colors['text_dark']};border: none; background-color: {self.colors['card_bg']};")
         combined_frame_layout.addWidget(right_title)
         
-        # First row of crystal systems
-        row1 = QWidget()
-        row1.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        row1_layout = QHBoxLayout(row1)
-        row1_layout.setContentsMargins(0, 0, 0, 0)
-        row1_layout.setSpacing(19)
-        
-        # Second row of crystal systems
-        row2 = QWidget()
-        row2.setStyleSheet(f"background-color: {self.colors['card_bg']}; ")
-        row2_layout = QHBoxLayout(row2)
-        row2_layout.setContentsMargins(0, 0, 0, 0)
-        row2_layout.setSpacing(30)
-        
+        # Crystal systems with required peaks info
+        # Format: (display_name, value, min_peaks)
         systems = [
-            ('FCC', 'FCC'),
-            ('BCC', 'BCC'),
-            ('Trigonal', 'Trigonal'),
-            ('HCP', 'HCP'),
-            ('Tetragonal', 'Tetragonal'),
-            ('Orthorhombic', 'Orthorhombic'),
-            ('Monoclinic', 'Monoclinic'),
-            ('Triclinic', 'Triclinic'),
+            ('FCC', 'FCC', 1),
+            ('BCC', 'BCC', 1),
+            ('Trigonal', 'Trigonal', 2),
+            ('HCP', 'HCP', 2),
+            ('Tetragonal', 'Tetragonal', 2),
+            ('Orthorhombic', 'Orthorhombic', 3),
+            ('Monoclinic', 'Monoclinic', 4),
+            ('Triclinic', 'Triclinic', 6),
         ]
         
         self.phase_system_group = QButtonGroup(combined_frame)
@@ -235,7 +223,14 @@ class LatticeParamsModule(QWidget, GUIBase):
                     print(f"✓ Crystal system selected: {system_value}")
             return handler
         
-        for idx, (label, value) in enumerate(systems):
+        # Create each crystal system as a separate row
+        for idx, (label, value, min_peaks) in enumerate(systems):
+            row = QWidget()
+            row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
+            row_layout = QHBoxLayout(row)
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setSpacing(8)
+            
             radio = QRadioButton(label)
             radio.setChecked(value == self.phase_volume_system)
             radio.setFont(QFont('Arial', 8))
@@ -260,15 +255,16 @@ class LatticeParamsModule(QWidget, GUIBase):
             """)
             radio.toggled.connect(make_radio_handler(value))
             self.phase_system_group.addButton(radio)
-            if idx < 4:
-                row1_layout.addWidget(radio)
-            else:
-                row2_layout.addWidget(radio)
-        
-        row1_layout.addStretch()
-        row2_layout.addStretch()
-        combined_frame_layout.addWidget(row1)
-        combined_frame_layout.addWidget(row2)
+            row_layout.addWidget(radio)
+            
+            # Add peak requirement info
+            peak_info = QLabel(f"(≥{min_peaks} peak{'s' if min_peaks > 1 else ''})")
+            peak_info.setFont(QFont('Arial', 7))
+            peak_info.setStyleSheet(f"color: #666666; background-color: {self.colors['card_bg']};")
+            row_layout.addWidget(peak_info)
+            
+            row_layout.addStretch()
+            combined_frame_layout.addWidget(row)
         
         # Wavelength section
         wl_row = QWidget()
@@ -323,11 +319,11 @@ class LatticeParamsModule(QWidget, GUIBase):
         self.console.setMinimumHeight(150)
         self.console.setStyleSheet("""
             QTextEdit {
-                background-color: #2B2B2B;
-                color: #CCCCCC;
+                background-color: #E3F2FD;
+                color: #1565C0;
                 font-family: 'Consolas', 'Courier New', monospace;
                 font-size: 10pt;
-                border: 2px solid #555555;
+                border: 2px solid #90CAF9;
                 border-radius: 6px;
                 padding: 8px;
             }
@@ -335,107 +331,98 @@ class LatticeParamsModule(QWidget, GUIBase):
         parent_layout.addWidget(self.console)
     
     def create_file_input(self, parent_layout, label_text, var_name):
-        """Create a file input row with browse button"""
-        row = QWidget()
-        row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        layout = QHBoxLayout(row)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
-        
+        """Create a file input row with browse button (matching powder_module style)"""
+        container = QWidget()
+        container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 8)
+
         label = QLabel(label_text)
-        label.setFixedWidth(240)
-        label.setFont(QFont('Arial', 9))
+        label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
         layout.addWidget(label)
-        
+
+        input_layout = QHBoxLayout()
+        input_layout.setSpacing(5)
+
         entry = QLineEdit()
         entry.setFont(QFont('Arial', 9))
-        entry.setStyleSheet("""
-            QLineEdit {
+        entry.setStyleSheet(f"""
+            QLineEdit {{
                 background-color: white;
-                border: 2px solid #BBBBBB;
-                padding: 4px;
-                border-radius: 3px;
-            }
+                color: {self.colors['text_dark']};
+                border: 2px solid #AAAAAA;
+                padding: 3px;
+            }}
         """)
         entry.textChanged.connect(lambda text: setattr(self, var_name, text))
-        layout.addWidget(entry)
-        
-        # Store reference to entry widget
-        setattr(self, f"{var_name}_entry", entry)
-        
-        browse_btn = QPushButton("Browse")
-        browse_btn.setFixedWidth(70)
+        input_layout.addWidget(entry, stretch=1)  # Allow entry to stretch with panel
+
+        browse_btn = ModernButton(
+            "Browse",
+            lambda: self.browse_file(var_name),
+            bg_color=self.colors['secondary'],
+            hover_color=self.colors['primary'],
+            width=75, height=28,
+            parent=container
+        )
         browse_btn.setFont(QFont('Arial', 9))
-        browse_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.colors['secondary']};
-                color: white;
-                border: none;
-                padding: 4px;
-                border-radius: 4px;
-            }}
-            QPushButton:hover {{
-                background-color: {self.colors['primary']};
-            }}
-        """)
-        browse_btn.clicked.connect(lambda: self.browse_file(var_name))
-        layout.addWidget(browse_btn)
-        
-        parent_layout.addWidget(row)
+        input_layout.addWidget(browse_btn, stretch=0)  # Keep button fixed size
+
+        layout.addLayout(input_layout)
+        parent_layout.addWidget(container)
+
+        # Store reference to entry
+        setattr(self, f"{var_name}_entry", entry)
     
     def create_folder_input(self, parent_layout, label_text, var_name):
-        """Create a folder input row with browse button"""
-        row = QWidget()
-        row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        layout = QHBoxLayout(row)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(8)
-        
+        """Create a folder input row with browse button (matching powder_module style)"""
+        container = QWidget()
+        container.setStyleSheet(f"background-color: {self.colors['card_bg']};")
+        layout = QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 8)
+
         label = QLabel(label_text)
-        label.setFixedWidth(240)
-        label.setFont(QFont('Arial', 9))
+        label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         label.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
         layout.addWidget(label)
-        
+
+        input_layout = QHBoxLayout()
+        input_layout.setSpacing(5)
+
         entry = QLineEdit()
         entry.setFont(QFont('Arial', 9))
-        entry.setStyleSheet("""
-            QLineEdit {
+        entry.setStyleSheet(f"""
+            QLineEdit {{
                 background-color: white;
-                border: 2px solid #BBBBBB;
-                padding: 4px;
-                border-radius: 3px;
-            }
+                color: {self.colors['text_dark']};
+                border: 2px solid #AAAAAA;
+                padding: 3px;
+            }}
         """)
         entry.textChanged.connect(lambda text: setattr(self, var_name, text))
-        layout.addWidget(entry)
-        
-        # Store reference to entry widget
-        setattr(self, f"{var_name}_entry", entry)
-        
-        browse_btn = QPushButton("Browse")
-        browse_btn.setFixedWidth(70)
+        input_layout.addWidget(entry, stretch=1)  # Allow entry to stretch with panel
+
+        browse_btn = ModernButton(
+            "Browse",
+            lambda: self.browse_folder(var_name),
+            bg_color=self.colors['secondary'],
+            hover_color=self.colors['primary'],
+            width=75, height=28,
+            parent=container
+        )
         browse_btn.setFont(QFont('Arial', 9))
-        browse_btn.setStyleSheet(f"""
-            QPushButton {{
-                background-color: {self.colors['secondary']};
-                color: white;
-                border: none;
-                padding: 4px;
-                border-radius: 4px;
-            }}
-            QPushButton:hover {{
-                background-color: {self.colors['primary']};
-            }}
-        """)
-        browse_btn.clicked.connect(lambda: self.browse_folder(var_name))
-        layout.addWidget(browse_btn)
-        
-        parent_layout.addWidget(row)
+        input_layout.addWidget(browse_btn, stretch=0)  # Keep button fixed size
+
+        layout.addLayout(input_layout)
+        parent_layout.addWidget(container)
+
+        # Store reference to entry
+        setattr(self, f"{var_name}_entry", entry)
     
     def browse_file(self, var_name):
         """Browse for a file"""
+        entry = getattr(self, f"{var_name}_entry", None)
         file_path, _ = QFileDialog.getOpenFileName(
             self,
             "Select File",
@@ -444,13 +431,13 @@ class LatticeParamsModule(QWidget, GUIBase):
         )
         if file_path:
             setattr(self, var_name, file_path)
-            entry = getattr(self, f"{var_name}_entry", None)
             if entry:
                 entry.setText(file_path)
             self.log(f"Selected file: {file_path}")
     
     def browse_folder(self, var_name):
         """Browse for a folder"""
+        entry = getattr(self, f"{var_name}_entry", None)
         folder_path = QFileDialog.getExistingDirectory(
             self,
             "Select Folder",
@@ -458,7 +445,6 @@ class LatticeParamsModule(QWidget, GUIBase):
         )
         if folder_path:
             setattr(self, var_name, folder_path)
-            entry = getattr(self, f"{var_name}_entry", None)
             if entry:
                 entry.setText(folder_path)
             self.log(f"Selected folder: {folder_path}")
