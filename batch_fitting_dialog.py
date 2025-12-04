@@ -139,7 +139,7 @@ class BatchFittingDialog(QWidget):
 
         # Main layout - content fills entire space
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 15, 10)  # Keep right margin for border visibility
+        layout.setContentsMargins(5, 8, 15, 10)  # Reduced left margin from 8 to 5
         layout.setSpacing(5)
         
         # Title and controls
@@ -153,7 +153,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(10, 6, 15, 6)  # Reduce height, more right margin
+        header_layout.setContentsMargins(10, 6, 17, 6)  # Align right margin with right panel
         
         title = QLabel("📊 Batch Peak Fitting - Interactive Mode")
         title.setFont(QFont('Arial', 11, QFont.Weight.Bold))
@@ -185,11 +185,11 @@ class BatchFittingDialog(QWidget):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         splitter.setStyleSheet("""
             QSplitter::handle {
-                background-color: #BDBDBD;
+                background-color: #E0E0E0;
                 width: 4px;
             }
             QSplitter::handle:hover {
-                background-color: #9E9E9E;
+                background-color: #BDBDBD;
             }
         """)
         splitter.setHandleWidth(4)
