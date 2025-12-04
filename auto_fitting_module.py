@@ -764,8 +764,8 @@ class AutoFittingModule(QWidget):
         """Handle clicks in background selection mode (lines 1038-1084)"""
         if event.button == 1:  # Left click - add point
             marker, = self.ax.plot(point_x, point_y, 's', color='#4169E1',
-                                  markersize=5, markeredgecolor='#FFD700',
-                                  markeredgewidth=1.5, zorder=10)
+                                  markersize=4, markeredgecolor='white',
+                                  markeredgewidth=1, zorder=10)
             text = self.ax.text(point_x, point_y * 0.97, f'BG{len(self.bg_points)+1}',
                                ha='center', fontsize=5, color='#4169E1',
                                fontweight='bold', zorder=11)
@@ -1060,8 +1060,8 @@ class AutoFittingModule(QWidget):
             
             for point_x, point_y in bg_points:
                 marker, = self.ax.plot(point_x, point_y, 's', color='#4169E1',
-                                      markersize=5, markeredgecolor='#FFD700',
-                                      markeredgewidth=1.5, zorder=10)
+                                      markersize=4, markeredgecolor='white',
+                                      markeredgewidth=1, zorder=10)
                 text = self.ax.text(point_x, point_y * 0.97, f'BG{len(self.bg_points)+1}',
                                    ha='center', fontsize=5, color='#4169E1',
                                    fontweight='bold', zorder=11)
@@ -1603,7 +1603,8 @@ class AutoFittingModule(QWidget):
             bg_x = [p[0] for p in global_bg_points]
             bg_y = [p[1] for p in global_bg_points]
             bg_markers, = self.ax.plot(bg_x, bg_y, 's', color='#4169E1',
-                                      markersize=3, alpha=0.8, zorder=3)
+                                      markersize=4, markeredgecolor='white',
+                                      markeredgewidth=1, zorder=3)
             self.fit_lines.append(bg_markers)
             
             # Plot background line
@@ -1697,7 +1698,8 @@ class AutoFittingModule(QWidget):
             
             info_msg += f"Peak {original_idx+1}: 2theta={cen:.4f}, FWHM={fwhm:.5f}, Area={area:.1f}\n"
         
-        results.sort(key=lambda r: r['Peak'])
+        # Sort by peak position (center) instead of Peak number
+        results.sort(key=lambda r: r['center'])
         
         self.fit_results = results
         self.fitted = True
@@ -1773,9 +1775,12 @@ class AutoFittingModule(QWidget):
         import pandas as pd
         df = pd.DataFrame(self.fit_results)
         
-        # Rename 'center' to 'Center' for consistency
+        # Sort by peak position (center) before saving
         if 'center' in df.columns:
+            df = df.sort_values('center').reset_index(drop=True)
             df.rename(columns={'center': 'Center'}, inplace=True)
+        elif 'Center' in df.columns:
+            df = df.sort_values('Center').reset_index(drop=True)
         
         df['File'] = self.filename
         
@@ -2115,7 +2120,7 @@ class AutoFittingModule(QWidget):
                 for bg_x, bg_y in self.bg_points:
                     idx = np.argmin(np.abs(self.x - bg_x))
                     marker, = self.ax.plot(bg_x, bg_y, 's', color='#4169E1',
-                                          markersize=6, markeredgecolor='white',
+                                          markersize=4, markeredgecolor='white',
                                           markeredgewidth=1, zorder=5)
                     text_obj = self.ax.text(bg_x, bg_y * 0.95, '',
                                            ha='center', fontsize=6, color='#4169E1',
@@ -2361,6 +2366,13 @@ class AutoFittingModule(QWidget):
             for idx, csv_path in enumerate(self.batch_csv_paths):
                 try:
                     df = pd.read_csv(csv_path)
+                    
+                    # Sort by peak position (Center or center column) before merging
+                    if 'Center' in df.columns:
+                        df = df.sort_values('Center').reset_index(drop=True)
+                    elif 'center' in df.columns:
+                        df = df.sort_values('center').reset_index(drop=True)
+                    
                     # Add source filename column
                     source_name = os.path.basename(csv_path).replace('_fit_results.csv', '').replace('_peaks.csv', '')
                     df.insert(0, 'Source_File', source_name)
@@ -2551,7 +2563,7 @@ class AutoFittingModule(QWidget):
         # Restore background points (square markers)
         for bg_x, bg_y in self.bg_points:
             marker, = self.ax.plot(bg_x, bg_y, 's', color='#4169E1',
-                                  markersize=6, markeredgecolor='white',
+                                  markersize=4, markeredgecolor='white',
                                   markeredgewidth=1, zorder=5)
             text_obj = self.ax.text(bg_x, bg_y * 0.95, '',
                                    ha='center', fontsize=6, color='#4169E1',
