@@ -476,7 +476,11 @@ class InteractiveEoSGUI(QWidget):
         # Left panel - Controls
         left_panel = QWidget()
         left_panel.setFixedWidth(400)
-        left_panel.setStyleSheet(f"background-color: {self.palette['panel_bg']}; border: none;")
+        left_panel.setStyleSheet(f"""
+            background-color: {self.palette['panel_bg']}; 
+            border: 1px solid #e0e6f0;
+            border-radius: 4px;
+        """)
         left_layout = QVBoxLayout(left_panel)
         left_layout.setContentsMargins(12, 12, 12, 12)
         left_layout.setSpacing(12)
@@ -502,8 +506,14 @@ class InteractiveEoSGUI(QWidget):
 
         # Setup left panel sections
         self.setup_data_section(left_layout)
+        self.add_separator(left_layout)
+        
         self.setup_eos_selection(left_layout)
+        self.add_separator(left_layout)
+        
         self.setup_parameters_section(left_layout)
+        self.add_separator(left_layout)
+        
         self.setup_fitting_section(left_layout)
         left_layout.addStretch()
 
@@ -511,6 +521,22 @@ class InteractiveEoSGUI(QWidget):
         self.setup_plot(plot_container)
         self.setup_results_section(results_container)
 
+    def add_separator(self, parent_layout):
+        """Add a subtle separator line between sections"""
+        separator = QFrame()
+        separator.setFrameShape(QFrame.Shape.HLine)
+        separator.setFrameShadow(QFrame.Shadow.Plain)
+        separator.setStyleSheet(f"""
+            QFrame {{
+                color: #e8ecf5;
+                background-color: #e8ecf5;
+                border: none;
+                height: 1px;
+                margin: 8px 0px;
+            }}
+        """)
+        parent_layout.addWidget(separator)
+    
     def setup_data_section(self, parent_layout):
         """Setup data loading section"""
         frame = QGroupBox("Data")
