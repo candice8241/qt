@@ -3,6 +3,7 @@
 ## 更新内容 (Changes)
 
 ### 修改的区域
+✅ **左侧面板外框** - 去除灰色边框线  
 ✅ **Data** - 数据加载区域  
 ✅ **EoS Model** - 模型选择区域  
 ✅ **EoS Parameters** - 参数输入区域  
@@ -22,7 +23,13 @@
 
 ## 具体修改 (Detailed Changes)
 
-### 样式属性变化
+### 左侧面板外框
+
+| 属性 | 之前 | 之后 |
+|-----|------|------|
+| `border` | `1px solid #ccc` (灰色边框) | `none` (无边框) |
+
+### 内部区域样式属性变化
 
 | 属性 | 之前 | 之后 |
 |-----|------|------|
@@ -34,6 +41,16 @@
 
 ### 代码示例
 
+#### 左侧面板外框
+```python
+# 之前
+left_panel.setStyleSheet(f"background-color: {self.palette['panel_bg']}; border: 1px solid #ccc;")
+
+# 之后
+left_panel.setStyleSheet(f"background-color: {self.palette['panel_bg']}; border: none;")
+```
+
+#### 内部区域
 ```python
 # 之前
 frame.setStyleSheet(f"""
@@ -101,9 +118,13 @@ python3 interactive_eos_gui.py
 # ✅ 正常启动和运行
 ```
 
-## Git 提交 (Git Commit)
+## Git 提交 (Git Commits)
 
 ```
+Commit: a7087ef
+Message: Remove outer border from left panel
+Changed: 1 file, +1 insertion, -1 deletion
+
 Commit: 6a7d09c
 Message: Remove borders from left panel sections for cleaner UI
 Changed: 1 file, +20 insertions, -16 deletions
