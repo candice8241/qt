@@ -301,7 +301,7 @@ class BatchFittingDialog(QWidget):
         """Create right panel with plot and controls"""
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setContentsMargins(5, 5, 15, 5)  # Increased right margin from 5 to 15
         layout.setSpacing(5)
         
         # Control bar
@@ -332,7 +332,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         main_layout = QVBoxLayout(bar)
-        main_layout.setContentsMargins(10, 5, 10, 5)
+        main_layout.setContentsMargins(10, 5, 15, 5)  # Increased right margin from 10 to 15
         main_layout.setSpacing(5)
         
         # First row: mode and method
@@ -504,7 +504,7 @@ class BatchFittingDialog(QWidget):
         
         # Auto fit (Enter key)
         auto_fit_btn = QPushButton("⚡ Auto Fit (Enter)")
-        auto_fit_btn.setFixedWidth(140)
+        auto_fit_btn.setFixedWidth(130)  # Reduced from 140 to 130
         auto_fit_btn.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         auto_fit_btn.setStyleSheet("""
             QPushButton {
@@ -523,7 +523,7 @@ class BatchFittingDialog(QWidget):
         
         # Overlap mode button (like auto_fitting_module.py)
         self.overlap_btn = QPushButton("Overlap Mode")
-        self.overlap_btn.setFixedWidth(120)
+        self.overlap_btn.setFixedWidth(110)  # Reduced from 120 to 110
         self.overlap_btn.setFont(QFont('Arial', 9))
         self.overlap_btn.setCheckable(True)
         self.overlap_btn.setStyleSheet("""
@@ -547,8 +547,8 @@ class BatchFittingDialog(QWidget):
         
         row2.addStretch()
         
-        # Instructions
-        info_label = QLabel("💡 Left: Add | Right: Delete | Scroll: Zoom | Enter: Auto-fit")
+        # Instructions (shortened to fit better)
+        info_label = QLabel("💡 L:Add | R:Del | Scroll:Zoom | Enter:Auto")
         info_label.setFont(QFont('Arial', 8))
         info_label.setStyleSheet("color: #666666;")
         row2.addWidget(info_label)
@@ -569,7 +569,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setContentsMargins(10, 5, 15, 5)  # Increased right margin from 10 to 15
         
         # Current file label
         self.current_file_label = QLabel("No file loaded")
