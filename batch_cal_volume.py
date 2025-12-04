@@ -122,14 +122,16 @@ class LatticeParameterCalculator:
         }
     }
 
-    def __init__(self, wavelength=0.4133):
+    def __init__(self, wavelength=0.4133, n_pressure_points=4):
         """
         Initialize LatticeParameterCalculator
         
         Parameters:
             wavelength (float): X-ray wavelength in Angstroms (default: 0.4133 Å)
+            n_pressure_points (int): Number of pressure points (kept for backward compatibility, not used in simplified version)
         """
         self.wavelength = wavelength
+        self.n_pressure_points = n_pressure_points  # Kept for backward compatibility
         self.pressure_data = None
         self.results = None
 
@@ -614,6 +616,41 @@ class LatticeParameterCalculator:
         print("\n" + "="*60 + "\n")
         
         return self.results
+
+    def analyze(self, csv_path, original_system=None, new_system=None, auto_mode=False):
+        """
+        Backward compatibility method - calls calculate() for simplified workflow
+        
+        Parameters:
+            csv_path (str): Path to input CSV file
+            original_system (str, optional): Crystal system for calculation
+            new_system (str, optional): Ignored in simplified version
+            auto_mode (bool): If True, use provided system without prompting
+            
+        Returns:
+            dict: Analysis results
+        """
+        print("\n⚠️  Note: Using simplified lattice parameter calculation")
+        print("   Phase transition detection has been removed from this version")
+        print("   Please separate peaks manually before using this tool\n")
+        
+        # Use original_system if provided, otherwise prompt
+        crystal_system = original_system if auto_mode and original_system else None
+        
+        # Call the simplified calculate method
+        results = self.calculate(csv_path, crystal_system_key=crystal_system)
+        
+        # Return in a format compatible with old code
+        return {
+            'single_phase_results': results,
+            'transition_pressure': None
+        }
+
+
+# ==================== Backward Compatibility ====================
+
+# Alias for backward compatibility with existing code
+XRayDiffractionAnalyzer = LatticeParameterCalculator
 
 
 # ==================== Example Usage ====================
