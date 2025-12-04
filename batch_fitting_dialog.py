@@ -56,7 +56,7 @@ class BatchFittingDialog(QWidget):
         # Don't set window title when used as embedded widget
         # self.setWindowTitle("Batch Peak Fitting (Interactive)")
         self.setMinimumWidth(1300)
-        self.setMinimumHeight(800)
+        self.setMinimumHeight(700)
         
         # Data variables
         self.file_list = []
@@ -133,7 +133,7 @@ class BatchFittingDialog(QWidget):
             BatchFittingDialog {
                 background-color: #B0C4DE;
                 min-width: 1300px;
-                min-height: 800px;
+                min-height: 700px;
             }
         """)
         
@@ -159,7 +159,7 @@ class BatchFittingDialog(QWidget):
         # Inner layout for actual content
         layout = QVBoxLayout(container)
         layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(5)
+        layout.setSpacing(4)
         
         # Title and controls (no border)
         header = QWidget()
@@ -266,14 +266,14 @@ class BatchFittingDialog(QWidget):
         panel = QWidget()
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(5)
+        layout.setSpacing(4)
         
         # Control bar
         control_bar = self.create_control_bar()
         layout.addWidget(control_bar)
         
         # Plot canvas
-        self.canvas = MplCanvas(self, width=9, height=6, dpi=100)
+        self.canvas = MplCanvas(self, width=9, height=5.5, dpi=100)
         self.canvas.mpl_connect('button_press_event', self.on_plot_click)
         self.canvas.mpl_connect('scroll_event', self.on_scroll)
         layout.addWidget(self.canvas)
@@ -287,7 +287,7 @@ class BatchFittingDialog(QWidget):
     def create_control_bar(self):
         """Create control bar with buttons and settings"""
         bar = QWidget()
-        bar.setFixedHeight(85)
+        bar.setFixedHeight(80)
         bar.setStyleSheet("""
             QWidget {
                 background-color: #E3F2FF;
@@ -524,7 +524,7 @@ class BatchFittingDialog(QWidget):
     def create_navigation_bar(self):
         """Create navigation bar with prev/next/save buttons"""
         bar = QWidget()
-        bar.setFixedHeight(50)
+        bar.setFixedHeight(45)
         bar.setStyleSheet("""
             QWidget {
                 background-color: #FFF9C4;
