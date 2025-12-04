@@ -788,7 +788,8 @@ class PowderXRDModule(GUIBase):
         systems = [
             ('FCC', 'FCC'),
             ('BCC', 'BCC'),
-            ('Hexagonal', 'Hexagonal'),
+            ('Trigonal', 'Trigonal'),
+            ('HCP', 'HCP'),
             ('Tetragonal', 'Tetragonal'),
             ('Orthorhombic', 'Orthorhombic'),
             ('Monoclinic', 'Monoclinic'),
@@ -1551,7 +1552,7 @@ except Exception as e:
                 system_map = {
                     'FCC': 'cubic_FCC',
                     'BCC': 'cubic_BCC',
-                    'SC': 'cubic_SC',
+                    'Trigonal': 'Trigonal',
                     'HCP': 'Hexagonal',
                     'Tetragonal': 'Tetragonal',
                     'Orthorhombic': 'Orthorhombic'

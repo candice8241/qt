@@ -301,13 +301,19 @@ class LatticeParameterCalculator:
             
             results[pressure] = {
                 'a': a_fitted,
+                'b': a_fitted,  # Cubic: a = b = c
+                'c': a_fitted,
+                'alpha': 90.0,  # Cubic: α = β = γ = 90°
+                'beta': 90.0,
+                'gamma': 90.0,
                 'V_cell': V_cell,
                 'V_atomic': V_atomic,
                 'num_peaks_used': num_peaks
             }
             
             print(f"Pressure: {pressure:.2f} GPa")
-            print(f"  Lattice parameter a = {a_fitted:.6f} Å")
+            print(f"  Lattice parameters: a = b = c = {a_fitted:.6f} Å")
+            print(f"  Angles: α = β = γ = 90.0°")
             print(f"  Unit cell volume V = {V_cell:.6f} Å³")
             print(f"  Average atomic volume = {V_atomic:.6f} Å³/atom")
         
@@ -359,7 +365,11 @@ class LatticeParameterCalculator:
             
             results[pressure] = {
                 'a': a_fitted,
+                'b': a_fitted,  # Hexagonal: a = b ≠ c
                 'c': c_fitted,
+                'alpha': 90.0,  # Hexagonal: α = β = 90°, γ = 120°
+                'beta': 90.0,
+                'gamma': 120.0,
                 'c/a': c_fitted / a_fitted,
                 'V_cell': V_cell,
                 'V_atomic': V_atomic,
@@ -367,8 +377,8 @@ class LatticeParameterCalculator:
             }
             
             print(f"Pressure: {pressure:.2f} GPa")
-            print(f"  Lattice parameter a = {a_fitted:.6f} Å")
-            print(f"  Lattice parameter c = {c_fitted:.6f} Å")
+            print(f"  Lattice parameters: a = b = {a_fitted:.6f} Å, c = {c_fitted:.6f} Å")
+            print(f"  Angles: α = β = 90.0°, γ = 120.0°")
             print(f"  c/a ratio = {c_fitted/a_fitted:.6f}")
             print(f"  Unit cell volume V = {V_cell:.6f} Å³")
             print(f"  Average atomic volume = {V_atomic:.6f} Å³/atom")
@@ -413,7 +423,11 @@ class LatticeParameterCalculator:
             
             results[pressure] = {
                 'a': a_fitted,
+                'b': a_fitted,  # Trigonal (hexagonal setting): a = b ≠ c
                 'c': c_fitted,
+                'alpha': 90.0,  # Trigonal (hexagonal setting): α = β = 90°, γ = 120°
+                'beta': 90.0,
+                'gamma': 120.0,
                 'c/a': c_fitted / a_fitted,
                 'V_cell': V_cell,
                 'V_atomic': V_atomic,
@@ -421,8 +435,8 @@ class LatticeParameterCalculator:
             }
             
             print(f"Pressure: {pressure:.2f} GPa")
-            print(f"  Lattice parameter a = {a_fitted:.6f} Å")
-            print(f"  Lattice parameter c = {c_fitted:.6f} Å")
+            print(f"  Lattice parameters: a = b = {a_fitted:.6f} Å, c = {c_fitted:.6f} Å")
+            print(f"  Angles: α = β = 90.0°, γ = 120.0°")
             print(f"  c/a ratio = {c_fitted/a_fitted:.6f}")
             print(f"  Unit cell volume V = {V_cell:.6f} Å³")
             print(f"  Average atomic volume = {V_atomic:.6f} Å³/atom")
@@ -467,7 +481,11 @@ class LatticeParameterCalculator:
             
             results[pressure] = {
                 'a': a_fitted,
+                'b': a_fitted,  # Tetragonal: a = b ≠ c
                 'c': c_fitted,
+                'alpha': 90.0,  # Tetragonal: α = β = γ = 90°
+                'beta': 90.0,
+                'gamma': 90.0,
                 'c/a': c_fitted / a_fitted,
                 'V_cell': V_cell,
                 'V_atomic': V_atomic,
@@ -475,8 +493,8 @@ class LatticeParameterCalculator:
             }
             
             print(f"Pressure: {pressure:.2f} GPa")
-            print(f"  Lattice parameter a = {a_fitted:.6f} Å")
-            print(f"  Lattice parameter c = {c_fitted:.6f} Å")
+            print(f"  Lattice parameters: a = b = {a_fitted:.6f} Å, c = {c_fitted:.6f} Å")
+            print(f"  Angles: α = β = γ = 90.0°")
             print(f"  c/a ratio = {c_fitted/a_fitted:.6f}")
             print(f"  Unit cell volume V = {V_cell:.6f} Å³")
             print(f"  Average atomic volume = {V_atomic:.6f} Å³/atom")
@@ -524,15 +542,17 @@ class LatticeParameterCalculator:
                 'a': a_fitted,
                 'b': b_fitted,
                 'c': c_fitted,
+                'alpha': 90.0,  # Orthorhombic: α = β = γ = 90°
+                'beta': 90.0,
+                'gamma': 90.0,
                 'V_cell': V_cell,
                 'V_atomic': V_atomic,
                 'num_peaks_used': num_peaks
             }
             
             print(f"Pressure: {pressure:.2f} GPa")
-            print(f"  Lattice parameter a = {a_fitted:.6f} Å")
-            print(f"  Lattice parameter b = {b_fitted:.6f} Å")
-            print(f"  Lattice parameter c = {c_fitted:.6f} Å")
+            print(f"  Lattice parameters: a = {a_fitted:.6f} Å, b = {b_fitted:.6f} Å, c = {c_fitted:.6f} Å")
+            print(f"  Angles: α = β = γ = 90.0°")
             print(f"  Unit cell volume V = {V_cell:.6f} Å³")
             print(f"  Average atomic volume = {V_atomic:.6f} Å³/atom")
         
@@ -621,6 +641,14 @@ class LatticeParameterCalculator:
             data_rows.append(row)
         
         df = pd.DataFrame(data_rows)
+        
+        # Reorder columns to ensure 6 lattice parameters come first
+        base_columns = ['Pressure (GPa)', 'a', 'b', 'c', 'alpha', 'beta', 'gamma']
+        available_base = [col for col in base_columns if col in df.columns]
+        other_columns = [col for col in df.columns if col not in base_columns]
+        column_order = available_base + other_columns
+        df = df[column_order]
+        
         df.to_csv(filename, index=False)
         print(f"\n✓ Results saved to: {filename}")
 
