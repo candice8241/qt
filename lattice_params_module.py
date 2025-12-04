@@ -132,7 +132,7 @@ class LatticeParamsModule(QWidget, GUIBase):
         
         # Left column: file inputs (enlarged with longer text boxes)
         left_panel = QWidget()
-        left_panel.setMinimumWidth(750)  # Increased from 700 to 750 for even longer text boxes
+        left_panel.setMinimumWidth(820)  # Increased from 750 to 820 for even longer text boxes
         left_panel.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Minimum)
         left_panel.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         left_layout = QVBoxLayout(left_panel)
@@ -181,6 +181,7 @@ class LatticeParamsModule(QWidget, GUIBase):
         
         # Create framed container for crystal system and wavelength
         combined_container = QFrame()
+        combined_container.setMaximumWidth(400)  # Shrink frame to fit content
         combined_container.setStyleSheet(f"""
             QFrame {{
                 background-color: {self.colors['card_bg']};
@@ -227,7 +228,7 @@ class LatticeParamsModule(QWidget, GUIBase):
             row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
             row_layout = QHBoxLayout(row)
             row_layout.setContentsMargins(0, 0, 0, 0)
-            row_layout.setSpacing(45)  # Increased spacing between two systems in a row (35->45)
+            row_layout.setSpacing(10)  # Reduced spacing since we're using fixed widths now
             
             # First crystal system in this row
             label1, value1, min_peaks1 = systems[i]
@@ -235,6 +236,7 @@ class LatticeParamsModule(QWidget, GUIBase):
             radio1 = QRadioButton(f"{label1} ({peak_text1})")
             radio1.setChecked(value1 == self.phase_volume_system)
             radio1.setFont(QFont('Arial', 8))
+            radio1.setFixedWidth(170)  # Fixed width for alignment
             radio1.setStyleSheet(f"""
                 QRadioButton {{
                     color: {self.colors['text_dark']};
@@ -265,6 +267,7 @@ class LatticeParamsModule(QWidget, GUIBase):
                 radio2 = QRadioButton(f"{label2} ({peak_text2})")
                 radio2.setChecked(value2 == self.phase_volume_system)
                 radio2.setFont(QFont('Arial', 8))
+                radio2.setFixedWidth(170)  # Fixed width for alignment
                 radio2.setStyleSheet(f"""
                     QRadioButton {{
                         color: {self.colors['text_dark']};
@@ -311,7 +314,8 @@ class LatticeParamsModule(QWidget, GUIBase):
             QLineEdit {{
                 background-color: white;
                 color: {self.colors['text_dark']};
-                border: none;
+                border: 2px solid #AAAAAA;
+                border-radius: 4px;
                 padding: 3px;
             }}
         """)
