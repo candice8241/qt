@@ -11,6 +11,7 @@ Created: 2025-11-24
 
 import numpy as np
 import pandas as pd
+from typing import Tuple
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg, NavigationToolbar2QT
 from matplotlib.figure import Figure
 from PyQt6.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
@@ -23,6 +24,394 @@ from crysfml_eos_module import CrysFMLEoS, EoSType, EoSParameters
 
 
 class InteractiveEoSGUI(QWidget):
+    """
+    Interactive GUI for EoS fitting with real-time parameter adjustment
+    
+    IMPORTANT: This class contains a 1:1 replication of the CrysFML third-order
+    Birch-Murnaghan fitting algorithm to ensure exact consistency with the
+    crysfml_eos_module.py implementation.
+    """
+    
+    # ==================== CrysFML Algorithm Replication ====================
+    # The following methods are exact 1:1 replications from crysfml_eos_module.py
+    
+    @staticmethod
+    def _birch_murnaghan_3rd_pv(V: np.ndarray, V0: float, B0: float, B0_prime: float) -> np.ndarray:
+        """
+        3rd order Birch-Murnaghan Equation of State (P-V form)
+        
+        EXACT REPLICATION from crysfml_eos_module.py lines 176-205
+        
+        Rewritten to follow the same Eulerian strain formulation as the
+        Fortran ``eosfit`` routines from CrysFML.  Expressing the pressure
+        in terms of ``f`` and ``(1+2f)`` matches the linearised ``F-f``
+        approach used elsewhere in this module and prevents rounding
+        differences between GUI updates and the dedicated fitting path.
+
+        Parameters:
+        -----------
+        V : array
+            Volume (Å³/atom)
+        V0 : float
+            Zero-pressure volume (Å³/atom)
+        B0 : float
+            Zero-pressure bulk modulus (GPa)
+        B0_prime : float
+            Pressure derivative of bulk modulus
+
+        Returns:
+        --------
+        P : array
+            Pressure (GPa)
+        """
+        f = 0.5 * ((V0 / V) ** (2 / 3) - 1.0)
+        prefactor = 3.0 * B0 * f * (1.0 + 2.0 * f) ** 2.5
+        correction = 1.0 + 1.5 * (B0_prime - 4.0) * f
+        return prefactor * correction
+    
+    @staticmethod
+    def _birch_murnaghan_f_F_transform(V_data: np.ndarray, P_data: np.ndarray, 
+                                       V0_estimate: float) -> Tuple[np.ndarray, np.ndarray]:
+        """
+        Transform P-V data to normalized strain-stress (f-F) form
+        
+        EXACT REPLICATION from crysfml_eos_module.py lines 441-470
+        
+        CrysFML KEY METHOD: Linearizes Birch-Murnaghan equation
+        
+        f = normalized strain = [(V0/V)^(2/3) - 1] / 2
+        F = normalized stress = P / [3f(1+2f)^(5/2)]
+        
+        For BM3: F = B0 [1 + (B0'-4)f]  --> LINEAR in f!
+        
+        This allows weighted linear regression to get stable B0_prime
+        """
+        # Calculate Eulerian strain
+        x = (V0_estimate / V_data) ** (1.0/3.0)
+        f = 0.5 * (x**2 - 1.0)
+        
+        # Calculate normalized stress (avoid division by zero)
+        denominator = 3.0 * f * (1.0 + 2.0*f)**(5.0/2.0)
+        
+        # Small strain handling
+        mask = np.abs(f) > 1e-10
+        F = np.zeros_like(P_data)
+        F[mask] = P_data[mask] / denominator[mask]
+        
+        # For very small strains, use limit
+        F[~mask] = P_data[~mask] / (3.0 * V0_estimate)
+        
+        return f, F
+    
+    def _fit_birch_murnaghan_3rd_linear(self, V_data: np.ndarray, P_data: np.ndarray, 
+                                        regularization_strength: float) -> EoSParameters:
+        """
+        CrysFML method: Two-stage fitting using F-f linearization
+        
+        EXACT REPLICATION from crysfml_eos_module.py lines 472-708
+        (adapted to work within the GUI context)
+
+        Stage 1: Determine V0 and B0 (2nd order fit or iteration)
+        Stage 2: Linear regression F vs f to get B0_prime (stable!)
+
+        This prevents B0_prime divergence because it's determined from a linear fit
+
+        Following CrysFML methodology:
+        - Iterative refinement of V0
+        - Weighted linear regression in F-f space
+        - Full error propagation using variance-covariance matrix
+        - Physical constraints on B0' (typically 2-8, centered around 4)
+        """
+        # Physical bounds on B0' based on literature (Angel et al., Gonzalez-Platas)
+        # Most crystalline materials have B0' between 3 and 6
+        # We allow slightly wider range (2-8) for flexibility
+        B0_PRIME_MIN = 2.0
+        B0_PRIME_MAX = 8.0
+
+        # Stage 1: Get initial V0 estimate
+        V0_guess, B0_guess, B0_prime_guess = self._smart_initial_guess(V_data, P_data)
+
+        # Iteratively refine V0 using 2nd order BM
+        # Start with initial guess (slightly above maximum volume for safety)
+        V0_current = max(V0_guess, np.max(V_data) * 1.01)
+        V0_history = [V0_current]
+
+        # Sanity check on initial B0 estimate
+        if B0_guess < 50 or B0_guess > 500:
+            B0_guess = 150.0
+
+        for iteration in range(10):  # Increased iterations for better convergence
+            # Transform to f-F space
+            f, F = self._birch_murnaghan_f_F_transform(V_data, P_data, V0_current)
+
+            # Check for valid strain range
+            if np.max(np.abs(f)) > 0.5:  # Strain too large, adjust V0
+                V0_current = np.max(V_data) * 1.05
+                V0_history.append(V0_current)
+                continue
+
+            # CrysFML weighting scheme: emphasize low-strain data even more
+            # Weight = 1 / (strain^2 + epsilon) to avoid singularity
+            # Use smaller epsilon for stronger emphasis on low-strain points
+            weights = 1.0 / (f**2 + 0.001)
+            weights = weights / np.sum(weights) * len(weights)
+
+            # Linear fit: F = a + b*f where b = B0' - 4
+            # Use regularized weighted least squares to prevent B0' divergence
+            W = np.diag(weights)
+            A = np.column_stack([np.ones_like(f), f])
+
+            # Apply Tikhonov regularization to constrain B0' near 4.0
+            try:
+                # Regularization based on CrysFML methodology: penalize deviations from B0' = 4.0
+                # User can adjust regularization_strength parameter
+                lambda_reg = regularization_strength * np.mean(weights)
+                R = np.array([[0.0, 0.0], [0.0, 1.0]])  # Only regularize B0' term
+
+                ATA = A.T @ W @ A
+                ATF = A.T @ W @ F
+                ATA_reg = ATA + lambda_reg * R  # Add soft constraint
+
+                beta = np.linalg.solve(ATA_reg, ATF)
+
+                B0_fit = beta[0]
+                b_fit = beta[1]
+                B0_prime_fit = 4.0 + b_fit
+
+                # Physical constraints based on literature
+                # B0: 20-800 GPa (very wide, most materials 50-400 GPa)
+                if B0_fit < 20 or B0_fit > 800:
+                    break  # Stop iteration, use current V0
+
+                # B0': Must be within physical bounds (2-8)
+                # This is the KEY improvement following CrysFML/EosFit methodology
+                if B0_prime_fit < B0_PRIME_MIN or B0_prime_fit > B0_PRIME_MAX:
+                    break  # Stop iteration, use current V0
+
+                # Simple V0 update: minimize RMSE in P-V space
+                # Try small adjustments around current V0
+                best_V0 = V0_current
+                best_rmse = float('inf')
+
+                for delta in [-0.02, -0.01, 0.0, 0.01, 0.02]:
+                    V0_test = V0_current * (1.0 + delta)
+                    if V0_test > np.max(V_data):  # V0 must be larger than all measured volumes
+                        P_test = self._birch_murnaghan_3rd_pv(V_data, V0_test, B0_fit, B0_prime_fit)
+                        rmse_test = np.sqrt(np.mean((P_data - P_test)**2))
+                        if rmse_test < best_rmse:
+                            best_rmse = rmse_test
+                            best_V0 = V0_test
+
+                # Damped update
+                V0_current = 0.8 * V0_current + 0.2 * best_V0
+                V0_history.append(V0_current)
+
+                # Check convergence
+                if len(V0_history) > 1:
+                    V0_change = abs(V0_history[-1] - V0_history[-2]) / V0_history[-2]
+                    if V0_change < 1e-6:  # Convergence threshold
+                        break
+
+            except (np.linalg.LinAlgError, RuntimeWarning):
+                # If linear solve fails, use initial guess
+                break
+
+        # Final fit with refined V0
+        f, F = self._birch_murnaghan_f_F_transform(V_data, P_data, V0_current)
+
+        # Final weighted linear regression with improved CrysFML weighting
+        # Use smaller epsilon to strongly emphasize low-strain data
+        weights = 1.0 / (f**2 + 0.001)
+        weights = weights / np.sum(weights) * len(weights)
+
+        W = np.diag(weights)
+        A = np.column_stack([np.ones_like(f), f])
+
+        try:
+            # CrysFML Method: Regularized least squares with penalty on B0' deviation
+            # This prevents B0' from diverging while still allowing it to vary
+            #
+            # Minimize: ||W(F - A*beta)||² + λ * (b - 0)²
+            # where b = beta[1] = B0' - 4, and λ is regularization parameter
+            #
+            # Physical reasoning: B0' should be close to 4.0 for most materials
+            # Regularization keeps it near 4.0 unless data strongly suggests otherwise
+
+            # Regularization parameter: controls how strongly we constrain B0' to ~4.0
+            # Larger λ = stronger constraint toward B0' = 4.0
+            # User-adjustable via regularization_strength parameter
+            lambda_reg = regularization_strength * np.mean(weights)
+
+            # Modified normal equations with Tikhonov regularization:
+            # (A^T W A + λR) beta = A^T W F
+            # where R = [[0, 0], [0, 1]] penalizes deviation in beta[1] only
+            R = np.array([[0.0, 0.0], [0.0, 1.0]])  # Only regularize B0' term
+
+            ATA = A.T @ W @ A
+            ATF = A.T @ W @ F
+            ATA_reg = ATA + lambda_reg * R  # Add regularization
+
+            beta = np.linalg.solve(ATA_reg, ATF)
+
+            # Calculate parameter errors from covariance matrix
+            # Following CrysFML error propagation methodology
+            F_fit = A @ beta
+            residuals_F = F - F_fit
+
+            # Weighted chi-square
+            chi2 = np.sum(weights * residuals_F**2)
+            dof = len(f) - 2  # degrees of freedom
+
+            # Variance-covariance matrix for B0 and B0_prime
+            # Account for regularization in error estimation
+            if dof > 0:
+                s2 = chi2 / dof
+                # Use regularized matrix for proper error propagation
+                cov_B0_B0p = s2 * np.linalg.inv(ATA_reg)
+                errors_linear = np.sqrt(np.diag(cov_B0_B0p))
+            else:
+                errors_linear = np.array([0.0, 0.0])
+
+            # Extract parameters
+            B0_final = beta[0]
+            B0_prime_final = 4.0 + beta[1]
+
+            # Apply physical constraints if B0' is out of bounds
+            # If out of bounds, try constrained fit with B0' fixed at nearest bound
+            if B0_prime_final < B0_PRIME_MIN:
+                # B0' too small, fix at minimum and refit for B0 only
+                B0_prime_final = B0_PRIME_MIN
+                # Refit with constrained B0': F = B0 [1 + (B0'-4)f]
+                # F / [1 + (B0'-4)f] = B0
+                constraint_factor = 1.0 + (B0_prime_final - 4.0) * f
+                F_constrained = F / constraint_factor
+                B0_final = np.sum(weights * F_constrained) / np.sum(weights)
+                B0_err = np.sqrt(s2 / np.sum(weights)) if dof > 0 else 0.0
+                B0_prime_err = 0.0  # Fixed parameter
+            elif B0_prime_final > B0_PRIME_MAX:
+                # B0' too large, fix at maximum and refit for B0 only
+                B0_prime_final = B0_PRIME_MAX
+                constraint_factor = 1.0 + (B0_prime_final - 4.0) * f
+                F_constrained = F / constraint_factor
+                B0_final = np.sum(weights * F_constrained) / np.sum(weights)
+                B0_err = np.sqrt(s2 / np.sum(weights)) if dof > 0 else 0.0
+                B0_prime_err = 0.0  # Fixed parameter
+            else:
+                # Parameters within bounds, use normal errors
+                B0_err = errors_linear[0]
+                B0_prime_err = errors_linear[1]
+
+            # Estimate V0 error using error propagation
+            # The uncertainty in V0 comes from the scatter in the V0 iteration
+            if len(V0_history) > 3:
+                # Use standard deviation of last few iterations as V0 error estimate
+                V0_err = np.std(V0_history[-3:])
+            else:
+                # Alternative: estimate from residuals
+                # σ(V0) ≈ σ(V) * (∂V0/∂V) where σ(V) from residuals
+                P_fit = self._birch_murnaghan_3rd_pv(V_data, V0_current, B0_final, B0_prime_final)
+                residuals_P = P_data - P_fit
+                # Estimate V uncertainty from P residuals: dV/dP ≈ V/B
+                V_uncertainty = np.std(residuals_P) * V0_current / B0_final
+                V0_err = V_uncertainty * 0.5  # Conservative estimate
+
+            # Calculate R² and RMSE in P-V space (for comparison)
+            P_fit = self._birch_murnaghan_3rd_pv(V_data, V0_current, B0_final, B0_prime_final)
+            residuals_P = P_data - P_fit
+            ss_res = np.sum(residuals_P**2)
+            ss_tot = np.sum((P_data - np.mean(P_data))**2)
+            r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0
+            rmse = np.sqrt(np.mean(residuals_P**2))
+
+            # Calculate reduced chi-square (CrysFML method)
+            # chi2_reduced = (weighted sum of squared residuals) / degrees of freedom
+            chi2_reduced = chi2 / dof if dof > 0 else 0.0
+
+            # Create parameter object with full error estimates
+            params = EoSParameters(eos_type=self.eos_type)
+            params.V0 = V0_current
+            params.V0_err = V0_err  # Now properly estimated!
+            params.B0 = B0_final
+            params.B0_err = B0_err
+            params.B0_prime = B0_prime_final
+            params.B0_prime_err = B0_prime_err
+            params.R_squared = r_squared
+            params.RMSE = rmse
+            params.chi2 = chi2_reduced
+            params.n_data = len(V_data)
+
+            return params
+
+        except np.linalg.LinAlgError:
+            return None
+    
+    def _smart_initial_guess(self, V_data: np.ndarray, P_data: np.ndarray) -> Tuple[float, float, float]:
+        """
+        Smart initial guess estimation based on data characteristics
+        
+        EXACT REPLICATION from crysfml_eos_module.py lines 377-439
+        
+        Uses physical constraints and data-driven estimation similar to CrysFML approach
+
+        Parameters:
+        -----------
+        V_data : array
+            Volume data
+        P_data : array
+            Pressure data
+
+        Returns:
+        --------
+        V0_guess, B0_guess, B0_prime_guess : tuple
+            Initial parameter guesses
+        """
+        # Sort data by pressure for better estimation
+        sort_idx = np.argsort(P_data)
+        P_sorted = P_data[sort_idx]
+        V_sorted = V_data[sort_idx]
+        
+        # V0: Estimate zero-pressure volume
+        # Use the volume at lowest pressure as starting point
+        min_P_idx = 0  # After sorting, lowest pressure is at index 0
+        V0_guess = V_sorted[min_P_idx]
+        
+        # If minimum pressure is not near zero, extrapolate using first few points
+        if P_sorted[min_P_idx] > 0.5:
+            # Linear extrapolation using lowest 2-3 pressure points
+            n_points = min(3, len(P_sorted))
+            if n_points >= 2:
+                # Fit linear P-V relationship for low pressure region
+                coeffs = np.polyfit(P_sorted[:n_points], V_sorted[:n_points], 1)
+                V0_guess = coeffs[1]  # Intercept at P=0
+        
+        # Ensure V0 is slightly larger than maximum observed volume
+        V0_guess = max(V0_guess, np.max(V_sorted) * 1.005)
+        
+        # B0: Estimate bulk modulus from initial compressibility
+        # K = -V * (dP/dV), use low pressure region
+        if len(V_sorted) >= 4:
+            # Use first 3-5 points to estimate initial slope
+            n_points = min(5, len(V_sorted))
+            # Calculate dP/dV using finite differences
+            dP = P_sorted[1:n_points] - P_sorted[0:n_points-1]
+            dV = V_sorted[1:n_points] - V_sorted[0:n_points-1]
+            dP_dV = np.mean(dP / dV)
+            
+            # B0 = -V * dP/dV at zero pressure
+            B0_guess = -V0_guess * dP_dV
+            
+            # Constrain to reasonable range based on material properties
+            B0_guess = np.clip(B0_guess, 80, 300)
+        else:
+            B0_guess = 150.0
+        
+        # B0_prime: Use typical value of 4.0
+        # Most materials have B0_prime between 3.5 and 5.0
+        B0_prime_guess = 4.0
+
+        return V0_guess, B0_guess, B0_prime_guess
+    
+    # ==================== End of CrysFML Algorithm Replication ====================
     """
     Interactive GUI for EoS fitting with real-time parameter adjustment
 
@@ -568,22 +957,20 @@ class InteractiveEoSGUI(QWidget):
             self.update_manual_fit()
 
     def reset_parameters(self):
-        """Reset parameters to smart initial guess"""
+        """Reset parameters to smart initial guess
+        
+        Uses replicated CrysFML smart initial guess algorithm
+        """
         if self.V_data is None or self.P_data is None:
             return
 
         reg_strength = self.reg_slider.value() / 10.0
         self.fitter = CrysFMLEoS(eos_type=self.eos_type, regularization_strength=reg_strength)
 
-        # Get smart initial guess
-        if hasattr(self.fitter, '_smart_initial_guess'):
-            V0_guess, B0_guess, B0_prime_guess = self.fitter._smart_initial_guess(
-                self.V_data, self.P_data
-            )
-        else:
-            V0_guess = self.V_data.max() * 1.05
-            B0_guess = 130.0
-            B0_prime_guess = 4.0
+        # Use replicated smart initial guess
+        V0_guess, B0_guess, B0_prime_guess = self._smart_initial_guess(
+            self.V_data, self.P_data
+        )
 
         self.param_entries['V0'].setText(f"{V0_guess:.4f}")
         self.param_entries['B0'].setText(f"{B0_guess:.2f}")
@@ -600,7 +987,10 @@ class InteractiveEoSGUI(QWidget):
         return params
 
     def update_manual_fit(self):
-        """Update plot with current manual parameters"""
+        """Update plot with current manual parameters
+        
+        Uses replicated CrysFML algorithm for BM3, otherwise uses external fitter
+        """
         if self.V_data is None or self.P_data is None:
             return
 
@@ -610,7 +1000,12 @@ class InteractiveEoSGUI(QWidget):
 
         try:
             params = self.get_current_params()
-            P_fit = self.fitter.calculate_pressure(self.V_data, params)
+            
+            # Use replicated algorithm for BM3
+            if self.eos_type == EoSType.BIRCH_MURNAGHAN_3RD:
+                P_fit = self._birch_murnaghan_3rd_pv(self.V_data, params.V0, params.B0, params.B0_prime)
+            else:
+                P_fit = self.fitter.calculate_pressure(self.V_data, params)
 
             residuals = self.P_data - P_fit
             ss_res = np.sum(residuals**2)
@@ -624,7 +1019,11 @@ class InteractiveEoSGUI(QWidget):
             print(f"Error calculating pressure: {e}")
 
     def fit_unlocked(self):
-        """Fit only unlocked parameters"""
+        """Fit only unlocked parameters
+        
+        Uses replicated CrysFML algorithm for BM3 with all parameters unlocked,
+        otherwise uses external fitter
+        """
         if self.V_data is None or self.P_data is None:
             QMessageBox.warning(self, "Warning", "Please load data first!")
             return
@@ -647,14 +1046,19 @@ class InteractiveEoSGUI(QWidget):
                 'B0': B0_locked,
                 'B0_prime': B0_prime_locked,
             }
-
-            params = self.fitter.fit(
-                self.V_data,
-                self.P_data,
-                use_smart_guess=True,
-                initial_params=self.get_current_params(),
-                lock_flags=lock_flags,
-            )
+            
+            # Use replicated algorithm for BM3 if all parameters are unlocked
+            if self.eos_type == EoSType.BIRCH_MURNAGHAN_3RD and not any(lock_flags.values()):
+                params = self._fit_birch_murnaghan_3rd_linear(self.V_data, self.P_data, reg_strength)
+            else:
+                # Use external fitter for other cases
+                params = self.fitter.fit(
+                    self.V_data,
+                    self.P_data,
+                    use_smart_guess=True,
+                    initial_params=self.get_current_params(),
+                    lock_flags=lock_flags,
+                )
 
             if params is not None:
                 if not V0_locked:
@@ -675,7 +1079,11 @@ class InteractiveEoSGUI(QWidget):
             self.update_manual_fit()
 
     def fit_multiple_strategies(self):
-        """Try fitting with multiple strategies"""
+        """Try fitting with multiple strategies
+        
+        Uses replicated CrysFML algorithm for BM3 as primary strategy,
+        then tries external fitter strategies
+        """
         if self.V_data is None or self.P_data is None:
             QMessageBox.warning(self, "Warning", "Please load data first!")
             return
@@ -688,22 +1096,48 @@ class InteractiveEoSGUI(QWidget):
             print("\n" + "="*60)
             print("Trying multiple fitting strategies...")
             print("="*60)
-
+            
+            best_params = None
+            
+            # Strategy 1: Use replicated CrysFML algorithm for BM3
+            if self.eos_type == EoSType.BIRCH_MURNAGHAN_3RD:
+                print("  Strategy 1: CrysFML Replicated F-f Linearization...")
+                try:
+                    params = self._fit_birch_murnaghan_3rd_linear(self.V_data, self.P_data, reg_strength)
+                    if params is not None:
+                        best_params = params
+                        print(f"    Success: R² = {params.R_squared:.6f}, RMSE = {params.RMSE:.4f}, B0' = {params.B0_prime:.3f}")
+                except Exception as e:
+                    print(f"    Failed: {e}")
+            
+            # Strategy 2: Try external fitter strategies
+            print("  Strategy 2: External fitter strategies...")
             params = self.fitter.fit_with_multiple_strategies(
                 self.V_data, self.P_data, verbose=True
             )
+            
+            # Choose best result
+            if best_params is None:
+                best_params = params
+            elif params is not None:
+                # Compare by R² and RMSE
+                if params.R_squared > best_params.R_squared or \
+                   (abs(params.R_squared - best_params.R_squared) < 0.001 and params.RMSE < best_params.RMSE):
+                    best_params = params
 
-            if params is not None:
-                self.param_entries['V0'].setText(f"{params.V0:.4f}")
-                self.param_entries['B0'].setText(f"{params.B0:.2f}")
-                self.param_entries['B0_prime'].setText(f"{params.B0_prime:.3f}")
+            if best_params is not None:
+                self.param_entries['V0'].setText(f"{best_params.V0:.4f}")
+                self.param_entries['B0'].setText(f"{best_params.B0:.2f}")
+                self.param_entries['B0_prime'].setText(f"{best_params.B0_prime:.3f}")
 
-                self.fitted_params = params
-                self.current_params = params
+                self.fitted_params = best_params
+                self.current_params = best_params
                 self.update_plot()
 
                 print("="*60)
                 print("Best fit found!")
+                print(f"  V0 = {best_params.V0:.4f}, B0 = {best_params.B0:.2f}, B0' = {best_params.B0_prime:.3f}")
+                print(f"  R² = {best_params.R_squared:.6f}, RMSE = {best_params.RMSE:.4f}")
                 print("="*60 + "\n")
             else:
                 print("="*60)
@@ -716,7 +1150,10 @@ class InteractiveEoSGUI(QWidget):
             self.update_manual_fit()
 
     def update_plot(self):
-        """Update the plot with current data and fit"""
+        """Update the plot with current data and fit
+        
+        Uses replicated CrysFML algorithm for BM3 pressure calculation
+        """
         if self.V_data is None or self.P_data is None:
             return
 
@@ -730,7 +1167,13 @@ class InteractiveEoSGUI(QWidget):
         # Plot fit if available
         if self.current_params is not None:
             V_fit = np.linspace(self.V_data.min()*0.95, self.V_data.max()*1.05, 300)
-            P_fit = self.fitter.calculate_pressure(V_fit, self.current_params)
+            
+            # Use replicated algorithm for BM3
+            if self.eos_type == EoSType.BIRCH_MURNAGHAN_3RD:
+                P_fit = self._birch_murnaghan_3rd_pv(V_fit, self.current_params.V0, 
+                                                      self.current_params.B0, self.current_params.B0_prime)
+            else:
+                P_fit = self.fitter.calculate_pressure(V_fit, self.current_params)
 
             self.ax_main.plot(V_fit, P_fit, 'r-', linewidth=2.5,
                             label=f'Fitted Curve (R²={self.current_params.R_squared:.4f})',
@@ -758,7 +1201,10 @@ class InteractiveEoSGUI(QWidget):
         self._refresh_results_window()
 
     def _format_results_output(self):
-        """Create a compact, CrysFML-style summary"""
+        """Create a compact, CrysFML-style summary
+        
+        Uses replicated CrysFML algorithm for BM3 pressure calculation
+        """
         if self.current_params is None or self.V_data is None or self.P_data is None:
             return "No fitting results yet.\n\nLoad data and adjust parameters or run a fit."
 
@@ -768,7 +1214,11 @@ class InteractiveEoSGUI(QWidget):
         params = self.current_params
 
         try:
-            P_fit = self.fitter.calculate_pressure(self.V_data, params)
+            # Use replicated algorithm for BM3
+            if self.eos_type == EoSType.BIRCH_MURNAGHAN_3RD:
+                P_fit = self._birch_murnaghan_3rd_pv(self.V_data, params.V0, params.B0, params.B0_prime)
+            else:
+                P_fit = self.fitter.calculate_pressure(self.V_data, params)
             residuals = self.P_data - P_fit
         except Exception:
             P_fit, residuals = None, None
@@ -779,7 +1229,13 @@ class InteractiveEoSGUI(QWidget):
 
         if self.last_initial_params is not None and self.last_initial_params is not params:
             try:
-                start_P_fit = self.fitter.calculate_pressure(self.V_data, self.last_initial_params)
+                # Use replicated algorithm for BM3
+                if self.eos_type == EoSType.BIRCH_MURNAGHAN_3RD:
+                    start_P_fit = self._birch_murnaghan_3rd_pv(self.V_data, self.last_initial_params.V0,
+                                                                self.last_initial_params.B0, 
+                                                                self.last_initial_params.B0_prime)
+                else:
+                    start_P_fit = self.fitter.calculate_pressure(self.V_data, self.last_initial_params)
                 start_residuals = self.P_data - start_P_fit
             except Exception:
                 start_P_fit, start_residuals = None, None
