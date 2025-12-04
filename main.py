@@ -12,6 +12,7 @@ import sys
 import os
 from theme_module import GUIBase, ModernButton, ModernTab, CuteSheepProgressBar
 from mask_module import MaskModule
+from calibrate_module import CalibrateModule
 from powder_module import PowderXRDModule
 from radial_module import AzimuthalIntegrationModule
 from single_crystal_module import SingleCrystalModule
@@ -51,6 +52,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
 
         # Initialize modules
         self.mask_module = None
+        self.calibrate_module = None
         self.powder_module = None
         self.radial_module = None
         self.single_crystal_module = None
@@ -63,6 +65,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         # Containers for each module (prebuilt and stacked to avoid flicker)
         self.module_frames = {
             "mask": None,
+            "calibrate": None,
             "powder": None,
             "single": None,
             "radial": None,
@@ -140,6 +143,9 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         # Create navigation buttons (store references for state management)
         self.mask_btn = self.create_sidebar_button("🎭  Mask", lambda: self.switch_tab("mask"), is_active=False)
         sidebar_layout.addWidget(self.mask_btn)
+        
+        self.calibrate_btn = self.create_sidebar_button("🎯  Calibrate", lambda: self.switch_tab("calibrate"), is_active=False)
+        sidebar_layout.addWidget(self.calibrate_btn)
         
         self.powder_btn = self.create_sidebar_button("⚗️  Batch Int.", lambda: self.switch_tab("powder"), is_active=True)
         sidebar_layout.addWidget(self.powder_btn)
@@ -364,6 +370,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         """Update sidebar button styles based on active tab (None = no active module)"""
         buttons = {
             "mask": self.mask_btn,
+            "calibrate": self.calibrate_btn,
             "powder": self.powder_btn,
             # "radial": self.radial_btn,  # Hidden
             # "single": self.single_btn,  # Hidden
@@ -448,6 +455,13 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             self.mask_module = MaskModule(mask_frame, self)
             self.mask_module.setup_ui()
         mask_frame.hide()  # Ensure hidden after prebuild
+        
+        # Prebuild calibrate module
+        calibrate_frame = self._ensure_frame("calibrate")
+        if self.calibrate_module is None:
+            self.calibrate_module = CalibrateModule(calibrate_frame, self)
+            self.calibrate_module.setup_ui()
+        calibrate_frame.hide()  # Ensure hidden after prebuild
         
         # Only prebuild non-active modules in background
         radial_frame = self._ensure_frame("radial")
@@ -540,6 +554,15 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             if self.mask_module is None:
                 self.mask_module = MaskModule(target_frame, self)
                 self.mask_module.setup_ui()
+        
+        elif tab_name == "calibrate":
+            target_frame = self._ensure_frame("calibrate")
+            if self.calibrate_module is None:
+                self.calibrate_module = CalibrateModule(target_frame, self)
+                self.calibrate_module.setup_ui()
+                # Link mask module if available
+                if self.mask_module is not None:
+                    self.calibrate_module.mask_module_reference = self.mask_module
         
         elif tab_name == "powder":
             target_frame = self._ensure_frame("powder")

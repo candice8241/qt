@@ -2145,7 +2145,7 @@ class CalibrateModule(GUIBase):
         parent_layout.addWidget(card)
 
     def setup_calibrant_section_compact(self, parent_layout):
-        """Setup compact calibrant selection section"""
+        """Setup compact calibrant selection section - Dioptas style"""
         card = self.create_card_frame(self.parent)
         card_layout = QVBoxLayout(card)
         card_layout.setSpacing(5)
@@ -2165,6 +2165,17 @@ class CalibrateModule(GUIBase):
         self.calibrant_combo.currentTextChanged.connect(self.on_calibrant_changed)
         card_layout.addWidget(self.calibrant_combo)
         
+        # Load custom calibrant button
+        load_cal_btn = ModernButton("Load Custom",
+                                   self.load_custom_calibrant,
+                                   "📂",
+                                   bg_color=self.colors['secondary'],
+                                   hover_color=self.colors['primary'],
+                                   width=120, height=24,
+                                   font_size=8,
+                                   parent=card)
+        card_layout.addWidget(load_cal_btn)
+        
         # Wavelength
         wl_label = QLabel("λ (Å):")
         wl_label.setFont(QFont('Arial', 8))
@@ -2172,12 +2183,25 @@ class CalibrateModule(GUIBase):
         
         self.wavelength_entry = QLineEdit(str(self.wavelength))
         self.wavelength_entry.setPlaceholderText("Wavelength")
+        self.wavelength_entry.textChanged.connect(self.on_wavelength_changed)
         card_layout.addWidget(self.wavelength_entry)
         
         parent_layout.addWidget(card)
+        
+        # Update calibrant info for default
+        if not hasattr(self, 'calibrant_info_text'):
+            # For compact version, we don't show the info text, but still update the calibrant object
+            self.calibrant = None
+            if PYFAI_AVAILABLE:
+                try:
+                    calibrant_name = self.calibrant_combo.currentText()
+                    if calibrant_name in ALL_CALIBRANTS:
+                        self.calibrant = Calibrant(calibrant_name)
+                except:
+                    pass
     
     def setup_calibrant_section(self, parent_layout):
-        """Setup calibrant selection section"""
+        """Setup calibrant selection section - Dioptas style"""
         card = self.create_card_frame(self.parent)
         card_layout = QVBoxLayout(card)
         
@@ -2186,10 +2210,15 @@ class CalibrateModule(GUIBase):
         title.setStyleSheet(f"color: {self.colors['text_dark']}; background: {self.colors['card_bg']};")
         card_layout.addWidget(title)
         
-        # Calibrant selection
+        # Calibrant selection row
+        cal_row = QFrame()
+        cal_row_layout = QHBoxLayout(cal_row)
+        cal_row_layout.setContentsMargins(0, 5, 0, 5)
+        
         cal_label = QLabel("Calibrant:")
         cal_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        card_layout.addWidget(cal_label)
+        cal_label.setFixedWidth(80)
+        cal_row_layout.addWidget(cal_label)
         
         self.calibrant_combo = QComboBox()
         if PYFAI_AVAILABLE:
@@ -2201,18 +2230,61 @@ class CalibrateModule(GUIBase):
             self.calibrant_combo.addItems(["LaB6", "CeO2", "Si", "Al2O3"])
         
         self.calibrant_combo.currentTextChanged.connect(self.on_calibrant_changed)
-        card_layout.addWidget(self.calibrant_combo)
+        cal_row_layout.addWidget(self.calibrant_combo)
         
-        # Wavelength
+        card_layout.addWidget(cal_row)
+        
+        # Load custom calibrant button
+        load_cal_btn = ModernButton("Load Custom Calibrant",
+                                   self.load_custom_calibrant,
+                                   "📂",
+                                   bg_color=self.colors['secondary'],
+                                   hover_color=self.colors['primary'],
+                                   width=180, height=28,
+                                   font_size=9,
+                                   parent=card)
+        card_layout.addWidget(load_cal_btn)
+        
+        # Calibrant information display (d-spacings)
+        info_label = QLabel("D-spacings (Å):")
+        info_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        card_layout.addWidget(info_label)
+        
+        self.calibrant_info_text = QTextEdit()
+        self.calibrant_info_text.setReadOnly(True)
+        self.calibrant_info_text.setMaximumHeight(80)
+        self.calibrant_info_text.setFont(QFont('Courier', 8))
+        self.calibrant_info_text.setStyleSheet("""
+            QTextEdit {
+                background-color: #f9f9f9;
+                border: 1px solid #ddd;
+                border-radius: 3px;
+                padding: 3px;
+            }
+        """)
+        card_layout.addWidget(self.calibrant_info_text)
+        
+        # Wavelength row
+        wl_row = QFrame()
+        wl_row_layout = QHBoxLayout(wl_row)
+        wl_row_layout.setContentsMargins(0, 5, 0, 5)
+        
         wl_label = QLabel("Wavelength (Å):")
         wl_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        card_layout.addWidget(wl_label)
+        wl_label.setFixedWidth(120)
+        wl_row_layout.addWidget(wl_label)
         
         self.wavelength_entry = QLineEdit(str(self.wavelength))
-        self.wavelength_entry.setPlaceholderText("Enter wavelength in Angstroms")
-        card_layout.addWidget(self.wavelength_entry)
+        self.wavelength_entry.setPlaceholderText("Enter wavelength")
+        self.wavelength_entry.textChanged.connect(self.on_wavelength_changed)
+        wl_row_layout.addWidget(self.wavelength_entry)
+        
+        card_layout.addWidget(wl_row)
         
         parent_layout.addWidget(card)
+        
+        # Update calibrant info display for default calibrant
+        self.update_calibrant_info()
 
     def setup_detector_section_compact(self, parent_layout):
         """Setup compact detector parameters section"""
@@ -2864,6 +2936,86 @@ class CalibrateModule(GUIBase):
         """Handle calibrant selection change"""
         self.calibrant_name = calibrant_name
         self.log(f"Calibrant changed to: {calibrant_name}")
+        self.update_calibrant_info()
+    
+    def on_wavelength_changed(self, text):
+        """Handle wavelength change"""
+        try:
+            self.wavelength = float(text)
+            self.log(f"Wavelength set to: {self.wavelength} Å")
+        except ValueError:
+            pass
+    
+    def load_custom_calibrant(self):
+        """Load custom calibrant from .D file (Dioptas style)"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self.parent,
+            "Load Custom Calibrant",
+            "",
+            "Calibrant Files (*.D *.d);;All Files (*.*)"
+        )
+        
+        if file_path and PYFAI_AVAILABLE:
+            try:
+                # Load calibrant from file
+                calibrant = Calibrant(filename=file_path)
+                
+                # Add to combo box if not already there
+                calibrant_name = os.path.splitext(os.path.basename(file_path))[0]
+                
+                # Check if already in list
+                index = self.calibrant_combo.findText(calibrant_name)
+                if index == -1:
+                    self.calibrant_combo.addItem(calibrant_name)
+                    self.calibrant_combo.setCurrentText(calibrant_name)
+                else:
+                    self.calibrant_combo.setCurrentIndex(index)
+                
+                # Store custom calibrant
+                self.calibrant = calibrant
+                self.calibrant_name = calibrant_name
+                
+                self.log(f"✅ Loaded custom calibrant: {calibrant_name}")
+                self.update_calibrant_info()
+                
+            except Exception as e:
+                QMessageBox.critical(
+                    self.parent,
+                    "Error Loading Calibrant",
+                    f"Failed to load calibrant file:\n{str(e)}"
+                )
+                self.log(f"❌ Error loading calibrant: {str(e)}")
+    
+    def update_calibrant_info(self):
+        """Update calibrant information display with d-spacings"""
+        if not PYFAI_AVAILABLE:
+            return
+        
+        try:
+            # Get current calibrant
+            if self.calibrant is None:
+                calibrant_name = self.calibrant_combo.currentText()
+                if calibrant_name in ALL_CALIBRANTS:
+                    self.calibrant = Calibrant(calibrant_name)
+                else:
+                    return
+            
+            # Get d-spacings
+            dspacing = self.calibrant.get_dSpacing()
+            
+            if dspacing is not None and len(dspacing) > 0:
+                # Display first 10 d-spacings
+                info_text = ", ".join([f"{d:.4f}" for d in dspacing[:10]])
+                if len(dspacing) > 10:
+                    info_text += f"... ({len(dspacing)} total rings)"
+                
+                self.calibrant_info_text.setText(info_text)
+            else:
+                self.calibrant_info_text.setText("No d-spacing data available")
+                
+        except Exception as e:
+            self.calibrant_info_text.setText(f"Error: {str(e)}")
+            self.log(f"Warning: Could not load calibrant info: {str(e)}")
 
     def on_detector_changed(self, detector_name):
         """Handle detector selection change"""
