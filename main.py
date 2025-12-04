@@ -18,6 +18,7 @@ from single_crystal_module import SingleCrystalModule
 from bcdi_cal_module import BCDICalModule
 from dioptas_module import DioptasModule
 from auto_fitting_module import AutoFittingModule
+from lattice_params_module import LatticeParamsModule
 
 
 class XRDProcessingGUI(QMainWindow, GUIBase):
@@ -57,6 +58,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         self.dioptas_module = None
         self.auto_fitting_module = None
         self.batch_module = None
+        self.lattice_params_module = None
 
         # Containers for each module (prebuilt and stacked to avoid flicker)
         self.module_frames = {
@@ -67,7 +69,8 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             "bcdi_cal": None,
             "dioptas": None,
             "auto_fitting": None,
-            "batch": None
+            "batch": None,
+            "lattice_params": None
         }
         
         # Tool windows (embedded in right panel)
@@ -148,6 +151,10 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         # AzimuthFit button (renamed from Batch)
         self.batch_btn = self.create_sidebar_button("📐  AzimuthFit", self.open_batch, is_active=False)
         sidebar_layout.addWidget(self.batch_btn)
+
+        # Lattice Params button
+        self.lattice_params_btn = self.create_sidebar_button("🔬  Lattice", lambda: self.switch_tab("lattice_params"), is_active=False)
+        sidebar_layout.addWidget(self.lattice_params_btn)
 
         # Hidden buttons - SC and Radial Int
         # self.radial_btn = self.create_sidebar_button("🔄  Radial Int.", lambda: self.switch_tab("radial"), is_active=False)
@@ -364,6 +371,7 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             "dioptas": self.dioptas_btn,
             "auto_fitting": self.auto_fitting_btn,
             "batch": self.batch_btn,
+            "lattice_params": self.lattice_params_btn,
             # "curvefit": self.curvefit_btn,  # Hidden
             "eosfit": self.EOSfit_btn
         }
@@ -478,6 +486,12 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
             self.batch_module = BatchFittingDialog(batch_frame)
             batch_frame.layout().addWidget(self.batch_module)
         batch_frame.hide()  # Ensure hidden after prebuild
+        
+        lattice_params_frame = self._ensure_frame("lattice_params")
+        if self.lattice_params_module is None:
+            self.lattice_params_module = LatticeParamsModule(lattice_params_frame)
+            lattice_params_frame.layout().addWidget(self.lattice_params_module)
+        lattice_params_frame.hide()  # Ensure hidden after prebuild
     
     def prebuild_interactive_windows(self):
         """Prebuild interactive tool windows in background to avoid flash on first open"""
@@ -573,6 +587,12 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
                 from batch_fitting_dialog import BatchFittingDialog
                 self.batch_module = BatchFittingDialog(target_frame)
                 target_frame.layout().addWidget(self.batch_module)
+
+        elif tab_name == "lattice_params":
+            target_frame = self._ensure_frame("lattice_params")
+            if self.lattice_params_module is None:
+                self.lattice_params_module = LatticeParamsModule(target_frame)
+                target_frame.layout().addWidget(self.lattice_params_module)
 
         if target_frame is not None:
             target_frame.show()

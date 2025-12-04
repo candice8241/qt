@@ -19,7 +19,7 @@ class GUIBase:
         self.colors = {
             'bg': '#F8F7FF',
             'card_bg': '#FFFFFF',
-            'primary': '#E8D5F0',
+            'primary': '#E6ECFB',
             'primary_hover': '#D4BBFF',
             'secondary': '#E6ECFB',
             'accent': '#FF6B9D',
