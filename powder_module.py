@@ -788,7 +788,8 @@ class PowderXRDModule(GUIBase):
         systems = [
             ('FCC', 'FCC'),
             ('BCC', 'BCC'),
-            ('Hexagonal', 'Hexagonal'),
+            ('Trigonal', 'Trigonal'),
+            ('HCP', 'HCP'),
             ('Tetragonal', 'Tetragonal'),
             ('Orthorhombic', 'Orthorhombic'),
             ('Monoclinic', 'Monoclinic'),
@@ -796,6 +797,15 @@ class PowderXRDModule(GUIBase):
         ]
 
         self.phase_system_group = QButtonGroup(combined_frame)
+        
+        # Helper function to create proper closure for each radio button
+        def make_radio_handler(system_value):
+            def handler(checked):
+                if checked:
+                    self.phase_volume_system = system_value
+                    print(f"✓ Crystal system selected: {system_value}")
+            return handler
+        
         for idx, (label, value) in enumerate(systems):
             radio = QRadioButton(label)
             radio.setChecked(value == self.phase_volume_system)
@@ -820,7 +830,8 @@ class PowderXRDModule(GUIBase):
                     image:url(check.png);
                 }}
             """)
-            radio.toggled.connect(lambda checked, text=value: setattr(self, 'phase_volume_system', text) if checked else None)
+            # Use proper closure to avoid lambda variable capture issue
+            radio.toggled.connect(make_radio_handler(value))
             self.phase_system_group.addButton(radio)
             if idx < 4:
                 row1_layout.addWidget(radio)
@@ -1551,7 +1562,7 @@ except Exception as e:
                 system_map = {
                     'FCC': 'cubic_FCC',
                     'BCC': 'cubic_BCC',
-                    'SC': 'cubic_SC',
+                    'Trigonal': 'Trigonal',
                     'HCP': 'Hexagonal',
                     'Tetragonal': 'Tetragonal',
                     'Orthorhombic': 'Orthorhombic'
