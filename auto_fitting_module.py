@@ -832,17 +832,13 @@ class AutoFittingModule(QWidget):
                 peak_y = self.y[peak_idx]
                 adjustment_note = "(auto-adjusted to local max)" if peak_idx != idx else ""
             
-            marker, = self.ax.plot(peak_x, peak_y, '*', color='#FF1493',
-                                  markersize=10, markeredgecolor='#FFD700',
-                                  markeredgewidth=1.5, zorder=10)
-            # Use red vertical line instead of text label
-            y_min, y_max = self.ax.get_ylim()
-            text = self.ax.axvline(x=peak_x, color='red', linestyle='-', linewidth=1.5, 
-                                  alpha=0.7, zorder=11)
+            # Use red dashed vertical line for peak marker (no star)
+            vline = self.ax.axvline(x=peak_x, color='red', linestyle='--', linewidth=1.5, 
+                                   alpha=0.7, zorder=11)
             
             self.selected_peaks.append(peak_idx)
-            self.peak_markers.append(marker)
-            self.peak_texts.append(text)
+            self.peak_markers.append(vline)  # Store vline in markers for compatibility
+            self.peak_texts.append(vline)  # Also store in texts for removal
             self.canvas.draw()
             
             self.undo_stack.append(('peak', len(self.selected_peaks) - 1))
@@ -1108,16 +1104,12 @@ class AutoFittingModule(QWidget):
             self.ax.set_title(f'{self.filename} (BG Subtracted)',
                             fontsize=11, color='black', fontname='Arial')
             
-            # Re-add peak markers
+            # Re-add peak markers (red dashed vertical lines only, no stars)
             for i, idx in enumerate(self.selected_peaks):
-                marker, = self.ax.plot(self.x[idx], self.y[idx], '*', color='#FF1493',
-                                      markersize=10, markeredgecolor='#FFD700',
-                                      markeredgewidth=1.5, zorder=10)
-                # Use red vertical line instead of text label
-                text = self.ax.axvline(x=self.x[idx], color='red', linestyle='-', linewidth=1.5, 
-                                      alpha=0.7, zorder=11)
-                self.peak_markers[i] = marker
-                self.peak_texts[i] = text
+                vline = self.ax.axvline(x=self.x[idx], color='red', linestyle='--', linewidth=1.5, 
+                                       alpha=0.7, zorder=11)
+                self.peak_markers[i] = vline
+                self.peak_texts[i] = vline
             
             self.canvas.draw()
             
@@ -1251,21 +1243,16 @@ class AutoFittingModule(QWidget):
             self.peak_markers = []
             self.peak_texts = []
             
-            # Add detected peaks
+            # Add detected peaks (red dashed vertical lines only, no stars)
             for peak_idx in peaks:
                 peak_x = self.x[peak_idx]
-                peak_y = self.y[peak_idx]
                 
-                marker, = self.ax.plot(peak_x, peak_y, '*', color='#FF1493',
-                                      markersize=10, markeredgecolor='#FFD700',
-                                      markeredgewidth=1.5, zorder=10)
-                # Use red vertical line instead of text label
-                text = self.ax.axvline(x=peak_x, color='red', linestyle='-', linewidth=1.5, 
-                                      alpha=0.7, zorder=11)
+                vline = self.ax.axvline(x=peak_x, color='red', linestyle='--', linewidth=1.5, 
+                                       alpha=0.7, zorder=11)
                 
                 self.selected_peaks.append(peak_idx)
-                self.peak_markers.append(marker)
-                self.peak_texts.append(text)
+                self.peak_markers.append(vline)
+                self.peak_texts.append(vline)
             
             self.canvas.draw()
             self.btn_fit.setEnabled(True)
@@ -2088,60 +2075,30 @@ class AutoFittingModule(QWidget):
             QApplication.processEvents()
             self.update_info("  ✓ File loaded successfully\n")
             
-            # Restore previous peaks and background points if they exist
+            # Restore previous background points only (not peaks - always auto-detect peaks)
             # This ensures modifications from previous verification are retained
-            previous_peaks_indices = []
-            if hasattr(self, '_previous_peaks') and self._previous_peaks is not None:
-                previous_peaks_indices = self._previous_peaks.copy()
-                self._previous_peaks = None
-            
             previous_bg_points = []
             if hasattr(self, '_previous_bg_points') and self._previous_bg_points is not None:
                 previous_bg_points = self._previous_bg_points.copy()
                 self._previous_bg_points = None
             
-            # Step 2: Auto-find peaks (always perform auto peak finding)
+            # Clear any previous peaks (don't retain them)
+            self._previous_peaks = None
+            
+            # Step 2: Auto-find peaks (always perform fresh auto peak finding)
             self.update_info("  Step 2: Auto-detecting peaks...\n")
             peaks = PeakDetector.auto_find_peaks(self.x, self.y)
             
-            # Merge auto-detected peaks with previous peaks
-            # Convert previous peak indices to x positions for comparison
-            if len(previous_peaks_indices) > 0:
-                self.update_info(f"  Merging {len(previous_peaks_indices)} previous peaks with auto-detected peaks...\n")
-                # Get x positions of previous peaks (need to map to new data)
-                # For simplicity, we'll just use the previous indices
-                combined_peaks = list(peaks)  # Start with auto-detected peaks
-                
-                # Add previous peaks that are not too close to auto-detected ones
-                dx_threshold = 5  # index distance threshold
-                for prev_idx in previous_peaks_indices:
-                    # Check if this previous peak is far from all auto-detected peaks
-                    is_new = True
-                    for auto_idx in peaks:
-                        if abs(prev_idx - auto_idx) < dx_threshold:
-                            is_new = False
-                            break
-                    if is_new and 0 <= prev_idx < len(self.x):
-                        combined_peaks.append(prev_idx)
-                
-                peaks = np.array(sorted(set(combined_peaks)))
-                self.update_info(f"  Combined total: {len(peaks)} peaks\n")
-            
-            # Add all peaks (auto + previous merged)
+            # Add all peaks (red dashed vertical lines only, no stars)
             for peak_idx in peaks:
                 peak_x = self.x[peak_idx]
-                peak_y = self.y[peak_idx]
                 
-                marker, = self.ax.plot(peak_x, peak_y, '*', color='#FF1493',
-                                      markersize=10, markeredgecolor='#FFD700',
-                                      markeredgewidth=1.5, zorder=10)
-                # Use red vertical line instead of text label
-                text = self.ax.axvline(x=peak_x, color='red', linestyle='-', linewidth=1.5, 
-                                      alpha=0.7, zorder=11)
+                vline = self.ax.axvline(x=peak_x, color='red', linestyle='--', linewidth=1.5, 
+                                       alpha=0.7, zorder=11)
                 
                 self.selected_peaks.append(peak_idx)
-                self.peak_markers.append(marker)
-                self.peak_texts.append(text)
+                self.peak_markers.append(vline)
+                self.peak_texts.append(vline)
             
             self.canvas.draw()
             
@@ -2154,11 +2111,11 @@ class AutoFittingModule(QWidget):
             # Restore or auto-select background
             if len(previous_bg_points) > 0:
                 self.bg_points = previous_bg_points.copy()
-                # Redraw background points
+                # Redraw background points (square markers)
                 for bg_x, bg_y in self.bg_points:
                     idx = np.argmin(np.abs(self.x - bg_x))
-                    marker, = self.ax.plot(bg_x, bg_y, 'o', color='#4169E1',
-                                          markersize=8, markeredgecolor='white',
+                    marker, = self.ax.plot(bg_x, bg_y, 's', color='#4169E1',
+                                          markersize=6, markeredgecolor='white',
                                           markeredgewidth=1, zorder=5)
                     text_obj = self.ax.text(bg_x, bg_y * 0.95, '',
                                            ha='center', fontsize=6, color='#4169E1',
@@ -2186,8 +2143,8 @@ class AutoFittingModule(QWidget):
             if user_action == "skip":
                 self.update_info("  User chose to skip this file\n")
                 self.batch_skip_current = True
-                # Save current state for next file
-                self._previous_peaks = self.selected_peaks.copy()
+                # Save current state for next file (only background points, not peaks)
+                self._previous_peaks = None  # Don't retain peaks
                 self._previous_bg_points = self.bg_points.copy()
                 return False
             elif user_action == "stop":
@@ -2209,8 +2166,8 @@ class AutoFittingModule(QWidget):
             
             if not self.fitted or self.fit_results is None:
                 self.update_info("  ❌ Peak fitting failed!\n")
-                # Save current state for next file even if fitting failed
-                self._previous_peaks = self.selected_peaks.copy()
+                # Save current state for next file even if fitting failed (only bg points)
+                self._previous_peaks = None  # Don't retain peaks
                 self._previous_bg_points = self.bg_points.copy()
                 return False
             
@@ -2224,8 +2181,8 @@ class AutoFittingModule(QWidget):
                 self.batch_csv_paths.append(csv_path)
                 self.update_info(f"  ✓ Results saved to {save_dir}\n")
             
-            # Save current state for next file (always retain peaks and bg_points)
-            self._previous_peaks = self.selected_peaks.copy()
+            # Save current state for next file (only bg_points, not peaks)
+            self._previous_peaks = None  # Don't retain peaks - auto-detect each time
             self._previous_bg_points = self.bg_points.copy()
             
             # Also save the complete file state for navigation preservation
@@ -2582,23 +2539,19 @@ class AutoFittingModule(QWidget):
         self.ax.set_xlabel('2theta (degree)', fontsize=13, color='black', fontname='Arial')
         self.ax.set_ylabel('Intensity', fontsize=13, color='black', fontname='Arial')
         
-        # Restore peak markers
+        # Restore peak markers (red dashed vertical lines only, no stars)
         for peak_idx in self.selected_peaks:
             if peak_idx < len(self.x):
                 peak_x = self.x[peak_idx]
-                peak_y = self.y[peak_idx]
-                marker, = self.ax.plot(peak_x, peak_y, '*', color='#FF1493',
-                                      markersize=10, markeredgecolor='#FFD700',
-                                      markeredgewidth=1.5, zorder=10)
-                text = self.ax.axvline(x=peak_x, color='red', linestyle='-', linewidth=1.5, 
-                                      alpha=0.7, zorder=11)
-                self.peak_markers.append(marker)
-                self.peak_texts.append(text)
+                vline = self.ax.axvline(x=peak_x, color='red', linestyle='--', linewidth=1.5, 
+                                       alpha=0.7, zorder=11)
+                self.peak_markers.append(vline)
+                self.peak_texts.append(vline)
         
-        # Restore background points
+        # Restore background points (square markers)
         for bg_x, bg_y in self.bg_points:
-            marker, = self.ax.plot(bg_x, bg_y, 'o', color='#4169E1',
-                                  markersize=8, markeredgecolor='white',
+            marker, = self.ax.plot(bg_x, bg_y, 's', color='#4169E1',
+                                  markersize=6, markeredgecolor='white',
                                   markeredgewidth=1, zorder=5)
             text_obj = self.ax.text(bg_x, bg_y * 0.95, '',
                                    ha='center', fontsize=6, color='#4169E1',
