@@ -161,17 +161,18 @@ class BatchFittingDialog(QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(5)
         
-        # Title and controls (no border)
+        # Title and controls
         header = QWidget()
+        header.setObjectName("Header")
         header.setStyleSheet("""
-            QWidget {
+            QWidget#Header {
                 background-color: #F3E5F5;
-                border: none;
-                border-radius: 5px;
+                border: 2px solid #BA68C8;
+                border-radius: 6px;
             }
         """)
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(8, 5, 25, 5)  # Increased right margin from 8 to 25
+        header_layout.setContentsMargins(10, 8, 10, 8)
         
         title = QLabel("📊 Batch Peak Fitting - Interactive Mode")
         title.setFont(QFont('Arial', 13, QFont.Weight.Bold))
@@ -201,25 +202,41 @@ class BatchFittingDialog(QWidget):
         
         # Main content (splitter for file list and plot)
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        
+        splitter.setStyleSheet("""
+            QSplitter::handle {
+                background-color: #BDBDBD;
+                width: 4px;
+            }
+            QSplitter::handle:hover {
+                background-color: #9E9E9E;
+            }
+        """)
+        splitter.setHandleWidth(4)
+
         # Left panel: file list
         left_panel = self.create_left_panel()
         splitter.addWidget(left_panel)
-        
+
         # Right panel: plot and controls
         right_panel = self.create_right_panel()
         splitter.addWidget(right_panel)
-        
+
         splitter.setStretchFactor(0, 1)
         splitter.setStretchFactor(1, 3)
-        
+
         layout.addWidget(splitter)
         
     def create_left_panel(self):
-        """Create left panel with file list (no border)"""
+        """Create left panel with file list"""
         panel = QFrame()
-        panel.setFrameStyle(QFrame.Shape.NoFrame)
-        panel.setStyleSheet("background-color: #F5F5F5; border: none; border-radius: 5px;")
+        panel.setObjectName("LeftPanel")
+        panel.setStyleSheet("""
+            QFrame#LeftPanel {
+                background-color: #F5F5F5;
+                border: 2px solid #BDBDBD;
+                border-radius: 6px;
+            }
+        """)
         layout = QVBoxLayout(panel)
         layout.setContentsMargins(8, 8, 8, 8)
         
@@ -264,39 +281,63 @@ class BatchFittingDialog(QWidget):
     def create_right_panel(self):
         """Create right panel with plot and controls"""
         panel = QWidget()
+        panel.setObjectName("RightPanel")
+        panel.setStyleSheet("""
+            QWidget#RightPanel {
+                background-color: #FAFAFA;
+                border: 2px solid #BDBDBD;
+                border-radius: 6px;
+            }
+        """)
+
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(5, 5, 20, 5)  # Increased right margin from 5 to 20
+        layout.setContentsMargins(8, 8, 8, 8)  # Equal margins for clean boundaries
         layout.setSpacing(5)
-        
+
         # Control bar
         control_bar = self.create_control_bar()
         layout.addWidget(control_bar)
-        
-        # Plot canvas
+
+        # Plot canvas container with border
+        canvas_container = QWidget()
+        canvas_container.setObjectName("CanvasContainer")
+        canvas_container.setStyleSheet("""
+            QWidget#CanvasContainer {
+                background-color: white;
+                border: 2px solid #BDBDBD;
+                border-radius: 4px;
+            }
+        """)
+        canvas_layout = QVBoxLayout(canvas_container)
+        canvas_layout.setContentsMargins(5, 5, 5, 5)
+
         self.canvas = MplCanvas(self, width=10, height=7, dpi=100)
         self.canvas.mpl_connect('button_press_event', self.on_plot_click)
         self.canvas.mpl_connect('scroll_event', self.on_scroll)
-        layout.addWidget(self.canvas)
-        
+        canvas_layout.addWidget(self.canvas)
+
+        layout.addWidget(canvas_container)
+
         # Navigation bar
         nav_bar = self.create_navigation_bar()
         layout.addWidget(nav_bar)
-        
+
         return panel
         
     def create_control_bar(self):
         """Create control bar with buttons and settings"""
         bar = QWidget()
+        bar.setObjectName("ControlBar")
         bar.setFixedHeight(90)
         bar.setStyleSheet("""
-            QWidget {
+            QWidget#ControlBar {
                 background-color: #E3F2FF;
                 border: 2px solid #90CAF9;
                 border-radius: 6px;
             }
         """)
         main_layout = QVBoxLayout(bar)
-        main_layout.setContentsMargins(10, 5, 25, 5)  # Increased right margin from 10 to 25
+        main_layout.setContentsMargins(10, 5, 10, 5)
         main_layout.setSpacing(5)
         
         # First row: mode and method
@@ -517,26 +558,24 @@ class BatchFittingDialog(QWidget):
         info_label.setStyleSheet("color: #666666;")
         row2.addWidget(info_label)
         
-        # Add spacing to prevent components from extending to right edge
-        row2.addSpacing(5)
-        
         main_layout.addLayout(row2)
-        
+
         return bar
-        
+
     def create_navigation_bar(self):
         """Create navigation bar with prev/next/save buttons"""
         bar = QWidget()
+        bar.setObjectName("NavigationBar")
         bar.setFixedHeight(55)
         bar.setStyleSheet("""
-            QWidget {
+            QWidget#NavigationBar {
                 background-color: #FFF9C4;
                 border: 2px solid #FFD54F;
                 border-radius: 6px;
             }
         """)
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(10, 5, 25, 5)  # Increased right margin from 10 to 25
+        layout.setContentsMargins(10, 5, 10, 5)
         
         # Current file label
         self.current_file_label = QLabel("No file loaded")
@@ -597,10 +636,7 @@ class BatchFittingDialog(QWidget):
         """)
         save_btn.clicked.connect(self.save_all_results)
         layout.addWidget(save_btn)
-        
-        # Add spacing after save button to prevent it from extending to right edge
-        layout.addSpacing(5)
-        
+
         return bar
         
     def load_folder(self):
