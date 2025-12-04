@@ -132,7 +132,7 @@ class LatticeParamsModule(QWidget, GUIBase):
         
         # Left column: file inputs (enlarged with longer text boxes)
         left_panel = QWidget()
-        left_panel.setMinimumWidth(650)  # Increased from 600 to 650
+        left_panel.setMinimumWidth(700)  # Increased from 650 to 700 for longer text boxes
         left_panel.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Minimum)
         left_panel.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         left_layout = QVBoxLayout(left_panel)
@@ -179,17 +179,18 @@ class LatticeParamsModule(QWidget, GUIBase):
         right_layout.setSpacing(10)
         right_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)
         
-        # Create container for crystal system and wavelength (no border)
-        combined_container = QWidget()
+        # Create framed container for crystal system and wavelength
+        combined_container = QFrame()
         combined_container.setStyleSheet(f"""
-            QWidget {{
+            QFrame {{
                 background-color: {self.colors['card_bg']};
-                border: none;
+                border: 2px solid #888888;
+                border-radius: 6px;
             }}
         """)
         combined_container_layout = QVBoxLayout(combined_container)
-        combined_container_layout.setContentsMargins(5, 5, 5, 5)  # Minimal margins, close to content
-        combined_container_layout.setSpacing(12)
+        combined_container_layout.setContentsMargins(10, 15, 10, 10)  # Top margin increased to 15px to move content down
+        combined_container_layout.setSpacing(18)  # Increased spacing between rows
         
         # Crystal System title
         right_title = QLabel("Crystal System")
@@ -226,7 +227,7 @@ class LatticeParamsModule(QWidget, GUIBase):
             row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
             row_layout = QHBoxLayout(row)
             row_layout.setContentsMargins(0, 0, 0, 0)
-            row_layout.setSpacing(30)
+            row_layout.setSpacing(35)  # Increased spacing between two systems in a row
             
             # First crystal system in this row
             label1, value1, min_peaks1 = systems[i]
