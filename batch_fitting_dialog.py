@@ -56,7 +56,7 @@ class BatchFittingDialog(QWidget):
         # Don't set window title when used as embedded widget
         # self.setWindowTitle("Batch Peak Fitting (Interactive)")
         self.setMinimumWidth(1400)
-        self.setMinimumHeight(800)
+        self.setMinimumHeight(750)
         
         # Data variables
         self.file_list = []
@@ -133,7 +133,7 @@ class BatchFittingDialog(QWidget):
             BatchFittingDialog {
                 background-color: #E8E8E8;
                 min-width: 1400px;
-                min-height: 800px;
+                min-height: 750px;
             }
         """)
 
@@ -148,7 +148,7 @@ class BatchFittingDialog(QWidget):
         border_frame.setStyleSheet("""
             QFrame#BorderFrame {
                 background-color: #FAFAFA;
-                border: 6px solid #9C27B0;
+                border: 5px solid #CE93D8;
                 border-radius: 8px;
             }
         """)
@@ -158,7 +158,7 @@ class BatchFittingDialog(QWidget):
 
         # Inner layout for actual content
         layout = QVBoxLayout(border_frame)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(8, 8, 15, 12)  # More margin on right and bottom for border visibility
         layout.setSpacing(5)
         
         # Title and controls
@@ -167,15 +167,15 @@ class BatchFittingDialog(QWidget):
         header.setStyleSheet("""
             QWidget#Header {
                 background-color: #F3E5F5;
-                border: 2px solid #BA68C8;
+                border: 2px solid #CE93D8;
                 border-radius: 6px;
             }
         """)
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(10, 8, 10, 8)
+        header_layout.setContentsMargins(10, 6, 15, 6)  # Reduce height, more right margin
         
         title = QLabel("📊 Batch Peak Fitting - Interactive Mode")
-        title.setFont(QFont('Arial', 13, QFont.Weight.Bold))
+        title.setFont(QFont('Arial', 11, QFont.Weight.Bold))
         title.setStyleSheet("color: #4A148C;")
         header_layout.addWidget(title)
         
@@ -183,8 +183,8 @@ class BatchFittingDialog(QWidget):
         
         # Load folder button
         load_btn = QPushButton("📁 Load Folder")
-        load_btn.setFixedHeight(35)
-        load_btn.setFixedWidth(120)
+        load_btn.setFixedHeight(28)
+        load_btn.setFixedWidth(110)
         load_btn.setFont(QFont('Arial', 9))
         load_btn.setStyleSheet("""
             QPushButton {
@@ -291,8 +291,8 @@ class BatchFittingDialog(QWidget):
         """)
 
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(8, 8, 8, 8)  # Equal margins for clean boundaries
-        layout.setSpacing(5)
+        layout.setContentsMargins(8, 8, 15, 10)  # More right and bottom margin for border visibility
+        layout.setSpacing(4)
 
         # Control bar
         control_bar = self.create_control_bar()
@@ -328,7 +328,7 @@ class BatchFittingDialog(QWidget):
         """Create control bar with buttons and settings"""
         bar = QWidget()
         bar.setObjectName("ControlBar")
-        bar.setFixedHeight(90)
+        bar.setFixedHeight(80)  # Reduced from 90
         bar.setStyleSheet("""
             QWidget#ControlBar {
                 background-color: #E3F2FF;
@@ -337,8 +337,8 @@ class BatchFittingDialog(QWidget):
             }
         """)
         main_layout = QVBoxLayout(bar)
-        main_layout.setContentsMargins(10, 5, 10, 5)
-        main_layout.setSpacing(5)
+        main_layout.setContentsMargins(10, 4, 15, 4)  # Reduced vertical, more right margin
+        main_layout.setSpacing(4)
         
         # First row: mode and method
         row1 = QHBoxLayout()
@@ -566,7 +566,7 @@ class BatchFittingDialog(QWidget):
         """Create navigation bar with prev/next/save buttons"""
         bar = QWidget()
         bar.setObjectName("NavigationBar")
-        bar.setFixedHeight(55)
+        bar.setFixedHeight(50)  # Reduced from 55
         bar.setStyleSheet("""
             QWidget#NavigationBar {
                 background-color: #FFF9C4;
@@ -575,7 +575,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setContentsMargins(10, 5, 15, 5)  # More right margin
         
         # Current file label
         self.current_file_label = QLabel("No file loaded")
@@ -621,9 +621,9 @@ class BatchFittingDialog(QWidget):
         
         # Save all button
         save_btn = QPushButton("💾 Save All Results")
-        save_btn.setFixedWidth(140)
-        save_btn.setFixedHeight(40)
-        save_btn.setFont(QFont('Arial', 10, QFont.Weight.Bold))
+        save_btn.setFixedWidth(130)
+        save_btn.setFixedHeight(34)
+        save_btn.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         save_btn.setStyleSheet("""
             QPushButton {
                 background-color: #7E57C2;
@@ -1877,7 +1877,7 @@ if __name__ == "__main__":
     main_window = QMainWindow()
     main_window.setWindowTitle("Batch Peak Fitting")
     main_window.setMinimumWidth(1600)
-    main_window.setMinimumHeight(900)
+    main_window.setMinimumHeight(800)
     
     # Create batch widget
     batch_widget = BatchFittingDialog()
