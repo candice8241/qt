@@ -139,7 +139,7 @@ class BatchFittingDialog(QWidget):
         
         # Main layout
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(5, 3, 15, 5)
+        main_layout.setContentsMargins(5, 0, 15, 5)
         main_layout.setSpacing(0)
         
         # Create content container
