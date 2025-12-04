@@ -3621,24 +3621,71 @@ class CalibrateModule(GUIBase):
             raise ValueError(f"Not enough control points: {len(geo_ref.data) if hasattr(geo_ref, 'data') and geo_ref.data is not None else 0}. "
                            "Need at least 3 points. Use Manual Peak Selection to add more peaks.")
         
-        # Refine geometry (Dioptas-style, in stages for better convergence)
+        # Refine geometry (Dioptas-style, conservative multi-stage approach)
         try:
             self.log("\nStarting geometry refinement...")
+            self.log(f"Number of control points: {len(geo_ref.data)}")
             
-            # Stage 1: Refine basic geometry (distance, beam center)
-            # Fix wavelength and rotations initially
-            self.log("  Stage 1: Refining distance and beam center...")
+            # Count rings
+            ring_nums = set()
+            for point in geo_ref.data:
+                if len(point) > 0:
+                    ring_nums.add(point[0])
+            self.log(f"Number of rings: {len(ring_nums)}")
+            
+            # Stage 1: Refine distance only (most sensitive parameter)
+            # Fix everything else for initial convergence
+            self.log("\n  Stage 1: Refining distance only...")
+            geo_ref.refine2(fix=["wavelength", "poni1", "poni2", "rot1", "rot2", "rot3"])
+            self.log(f"    Distance: {geo_ref.dist*1000:.2f} mm")
+            
+            # Stage 2: Refine distance and beam center
+            # Still fix rotations and wavelength
+            self.log("\n  Stage 2: Refining distance and beam center...")
             geo_ref.refine2(fix=["wavelength", "rot1", "rot2", "rot3"])
             self.log(f"    Distance: {geo_ref.dist*1000:.2f} mm")
             self.log(f"    Beam center: ({geo_ref.poni2*1000:.2f}, {geo_ref.poni1*1000:.2f}) mm")
             
-            # Stage 2: Add rotation refinement
-            self.log("  Stage 2: Refining with rotations...")
-            geo_ref.refine2(fix=["wavelength"])
-            self.log(f"    Rotations: rot1={np.degrees(geo_ref.rot1):.3f}°, "
-                    f"rot2={np.degrees(geo_ref.rot2):.3f}°, rot3={np.degrees(geo_ref.rot3):.3f}°")
+            # Stage 3: Optionally add tilt refinement (only if enough rings)
+            # Only refine tilts if we have 4+ rings with good coverage
+            if len(ring_nums) >= 4 and len(geo_ref.data) >= 20:
+                self.log("\n  Stage 3: Refining with detector tilts...")
+                # First try rot3 only (in-plane rotation, usually safe)
+                geo_ref.refine2(fix=["wavelength", "rot1", "rot2"])
+                self.log(f"    Rot3 (in-plane): {np.degrees(geo_ref.rot3):.4f}°")
+                
+                # Then add rot1 and rot2 (tilts) only if rot3 is small
+                if abs(np.degrees(geo_ref.rot3)) < 5.0:  # rot3 should be small
+                    try:
+                        geo_ref.refine2(fix=["wavelength"])
+                        rot1_deg = np.degrees(geo_ref.rot1)
+                        rot2_deg = np.degrees(geo_ref.rot2)
+                        rot3_deg = np.degrees(geo_ref.rot3)
+                        
+                        # Check if tilts are reasonable (should be < 10 degrees typically)
+                        if abs(rot1_deg) > 15 or abs(rot2_deg) > 15:
+                            self.log(f"    Warning: Large tilts detected (rot1={rot1_deg:.3f}°, rot2={rot2_deg:.3f}°)")
+                            self.log(f"    This may indicate poor fit. Consider:")
+                            self.log(f"      - Checking detector distance estimate")
+                            self.log(f"      - Adding more control points")
+                            self.log(f"      - Verifying calibrant selection")
+                        
+                        self.log(f"    Tilts: rot1={rot1_deg:.4f}°, rot2={rot2_deg:.4f}°, rot3={rot3_deg:.4f}°")
+                    except Exception as tilt_error:
+                        self.log(f"    Tilt refinement failed: {tilt_error}")
+                        self.log(f"    Continuing with distance and center only...")
+                        # Reset rotations to zero if refinement failed
+                        geo_ref.rot1 = 0.0
+                        geo_ref.rot2 = 0.0
+                        geo_ref.rot3 = 0.0
+                else:
+                    self.log(f"    Skipping rot1/rot2 refinement (rot3={np.degrees(geo_ref.rot3):.3f}° too large)")
+            else:
+                self.log(f"\n  Stage 3: Skipping tilt refinement (need 4+ rings with 20+ points)")
+                self.log(f"    Current: {len(ring_nums)} rings, {len(geo_ref.data)} points")
+                self.log(f"    Detector assumed perpendicular to beam")
             
-            self.log("  Refinement completed successfully!")
+            self.log("\n  Refinement completed successfully!")
             
         except Exception as e:
             import traceback
@@ -3698,10 +3745,15 @@ class CalibrateModule(GUIBase):
             
             # Display calibration result
             if MATPLOTLIB_AVAILABLE:
-                # Get control points for visualization
+                # Get control points for visualization from geo_ref.data
                 try:
-                    rings = self.geo_ref.get_control_points()
-                    self.calibration_canvas.display_calibration_image(self.current_image, rings)
+                    # geo_ref.data contains the control points in pyFAI format
+                    # Convert to format expected by display_calibration_image
+                    if hasattr(self.geo_ref, 'data') and self.geo_ref.data is not None:
+                        rings = self.geo_ref.data
+                        self.calibration_canvas.display_calibration_image(self.current_image, rings)
+                    else:
+                        self.calibration_canvas.display_calibration_image(self.current_image)
                     self.switch_display_tab("result")
                 except Exception as viz_error:
                     self.log(f"Warning: Could not display rings: {viz_error}")
