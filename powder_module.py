@@ -172,7 +172,7 @@ class PowderXRDModule(GUIBase):
         prog_layout = QVBoxLayout(prog_widget)
         prog_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        self.progress = CuteSheepProgressBar(width=780, height=80, parent=prog_widget)
+        self.progress = CuteSheepProgressBar(width=780, height=40, parent=prog_widget)  # Reduced height from 80 to 40
         prog_layout.addWidget(self.progress, alignment=Qt.AlignmentFlag.AlignCenter)
         content_layout.addWidget(prog_widget)
 
@@ -189,7 +189,7 @@ class PowderXRDModule(GUIBase):
         log_header_layout.setAlignment(Qt.AlignmentFlag.AlignLeft)
 
         emoji_label = QLabel("🐰")
-        emoji_label.setFont(QFont('Segoe UI Emoji', 14))
+        emoji_label.setFont(QFont('Segoe UI Emoji', 11))  # Reduced from 14 to 11
         emoji_label.setStyleSheet(f"background-color: {self.colors['card_bg']};")
         log_header_layout.addWidget(emoji_label)
 

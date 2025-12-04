@@ -181,7 +181,7 @@ class LatticeParamsModule(QWidget, GUIBase):
         
         # Create framed container for crystal system and wavelength
         combined_container = QFrame()
-        combined_container.setMaximumWidth(400)  # Shrink frame to fit content
+        combined_container.setMaximumWidth(370)  # Shrink frame to fit content (reduced from 400)
         combined_container.setStyleSheet(f"""
             QFrame {{
                 background-color: {self.colors['card_bg']};
