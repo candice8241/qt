@@ -139,7 +139,7 @@ class BatchFittingDialog(QWidget):
         
         # Main layout
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(3, 3, 3, 3)
+        main_layout.setContentsMargins(5, 5, 10, 5)
         main_layout.setSpacing(0)
         
         # Create content container
@@ -158,7 +158,7 @@ class BatchFittingDialog(QWidget):
         
         # Inner layout for actual content
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(8, 8, 12, 8)
         layout.setSpacing(5)
         
         # Title and controls (no border)
@@ -265,7 +265,7 @@ class BatchFittingDialog(QWidget):
         """Create right panel with plot and controls"""
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setContentsMargins(5, 5, 10, 5)
         layout.setSpacing(5)
         
         # Control bar
@@ -296,7 +296,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         main_layout = QVBoxLayout(bar)
-        main_layout.setContentsMargins(10, 5, 10, 5)
+        main_layout.setContentsMargins(10, 5, 15, 5)
         main_layout.setSpacing(5)
         
         # First row: mode and method
@@ -533,7 +533,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setContentsMargins(10, 5, 15, 5)
         
         # Current file label
         self.current_file_label = QLabel("No file loaded")
