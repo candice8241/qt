@@ -131,34 +131,15 @@ class BatchFittingDialog(QWidget):
         # Set background only
         self.setStyleSheet("""
             BatchFittingDialog {
-                background-color: #E8E8E8;
+                background-color: #FAFAFA;
                 min-width: 1400px;
                 min-height: 750px;
             }
         """)
 
-        # Main layout
-        main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(10, 10, 10, 10)
-        main_layout.setSpacing(0)
-
-        # Create border frame (VISIBLE purple border)
-        border_frame = QFrame()
-        border_frame.setObjectName("BorderFrame")
-        border_frame.setStyleSheet("""
-            QFrame#BorderFrame {
-                background-color: #FAFAFA;
-                border: 5px solid #CE93D8;
-                border-radius: 8px;
-            }
-        """)
-        border_frame.setFrameStyle(QFrame.Shape.StyledPanel)
-
-        main_layout.addWidget(border_frame)
-
-        # Inner layout for actual content
-        layout = QVBoxLayout(border_frame)
-        layout.setContentsMargins(8, 8, 15, 12)  # More margin on right and bottom for border visibility
+        # Main layout - content fills entire space
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 15, 10)  # Keep right margin for border visibility
         layout.setSpacing(5)
         
         # Title and controls
