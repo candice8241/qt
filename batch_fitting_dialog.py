@@ -139,7 +139,7 @@ class BatchFittingDialog(QWidget):
         
         # Main layout
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(5, 0, 15, 10)
+        main_layout.setContentsMargins(3, 0, 8, 5)
         main_layout.setSpacing(0)
         
         # Create content container
@@ -158,7 +158,7 @@ class BatchFittingDialog(QWidget):
         
         # Inner layout for actual content
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(5, 5, 5, 5)
         layout.setSpacing(4)
         
         # Title and controls (no border)
@@ -171,7 +171,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(8, 5, 8, 5)
+        header_layout.setContentsMargins(5, 3, 5, 3)
         
         title = QLabel("📊 Batch Peak Fitting - Interactive Mode")
         title.setFont(QFont('Arial', 13, QFont.Weight.Bold))
@@ -221,7 +221,7 @@ class BatchFittingDialog(QWidget):
         panel.setFrameStyle(QFrame.Shape.NoFrame)
         panel.setStyleSheet("background-color: #F5F5F5; border: none; border-radius: 5px;")
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(5, 5, 5, 5)
         
         # Title (smaller, no emphasis)
         title = QLabel("File List")
@@ -296,8 +296,8 @@ class BatchFittingDialog(QWidget):
             }
         """)
         main_layout = QVBoxLayout(bar)
-        main_layout.setContentsMargins(8, 5, 8, 5)
-        main_layout.setSpacing(5)
+        main_layout.setContentsMargins(5, 3, 5, 3)
+        main_layout.setSpacing(4)
         
         # First row: mode and method
         row1 = QHBoxLayout()
@@ -533,7 +533,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(8, 5, 8, 5)
+        layout.setContentsMargins(5, 3, 5, 3)
         
         # Current file label
         self.current_file_label = QLabel("No file loaded")
