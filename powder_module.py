@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Powder XRD Module - Qt Version
-Contains integration, peak fitting, phase analysis, and Birch-Murnaghan fitting
+Contains integration, peak fitting, and Birch-Murnaghan fitting
 
 Migration Status:
 ✓ Integration module UI - Complete with all parameters
@@ -11,14 +11,12 @@ Migration Status:
   - Stacked plot options
   - Full batch integration functionality using batch_integration.py
 
-✓ Analysis module UI - Complete with all parameters
-  - Phase analysis section with wavelength, crystal system, N points
-  - Birch-Murnaghan/EoS fitting section
-  - Full phase analysis functionality using batch_cal_volume.py
-
 ✓ Progress bar and logging - Complete
   - Cute sheep progress animation
   - Comprehensive process logging
+
+Note:
+  - Lattice parameters calculation has been moved to lattice_params_module.py
 
 TODO: 
   - Peak fitting functionality
@@ -137,15 +135,6 @@ class PowderXRDModule(GUIBase):
         # Bin configuration for azimuthal binning (unified config dialog)
         self.bin_config = None  # Single sectors (bins)
         self.sector_config = None  # Multiple sectors
-
-        # Phase analysis variables (now handled by lattice_params_module)
-        # Kept for backward compatibility if needed
-        self.phase_peak_csv = ""
-        self.phase_volume_csv = ""
-        self.phase_volume_system = 'FCC'
-        self.phase_volume_output = ""
-        self.phase_wavelength = 0.4133
-        self.phase_n_points = 4
 
         # Birch-Murnaghan / EoS variables
         self.bm_input_file = ""
@@ -681,9 +670,6 @@ class PowderXRDModule(GUIBase):
         int_layout.addLayout(columns)
 
         parent_layout.addWidget(int_card)
-
-    # Lattice Parameters module has been moved to lattice_params_module.py
-    # This module now only handles integration functionality
 
     def create_file_input(self, parent_layout, label_text, var_name):
         """Create a file input widget"""
@@ -1313,8 +1299,6 @@ except Exception as e:
         # The main GUI now manages the interactive fitting window directly
         self.log("Interactive Fitting GUI is now managed by the main window")
         pass
-
-    # Phase analysis methods have been moved to lattice_params_module.py
 
     def run_birch_murnaghan(self):
         """TODO: Implement Birch-Murnaghan fitting"""
