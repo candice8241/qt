@@ -138,7 +138,8 @@ class PowderXRDModule(GUIBase):
         self.bin_config = None  # Single sectors (bins)
         self.sector_config = None  # Multiple sectors
 
-        # Phase analysis variables
+        # Phase analysis variables (now handled by lattice_params_module)
+        # Kept for backward compatibility if needed
         self.phase_peak_csv = ""
         self.phase_volume_csv = ""
         self.phase_volume_system = 'FCC'
@@ -175,7 +176,6 @@ class PowderXRDModule(GUIBase):
 
         # Setup modules
         self.setup_integration_module(content_layout)
-        self.setup_analysis_module(content_layout)
 
         # Progress bar section
         prog_widget = QWidget()
@@ -682,215 +682,8 @@ class PowderXRDModule(GUIBase):
 
         parent_layout.addWidget(int_card)
 
-    def setup_analysis_module(self, parent_layout):
-        """Setup analysis module UI following provided mockups"""
-
-        analysis_card = self.create_card_frame(None)
-        analysis_layout = QVBoxLayout(analysis_card)
-        analysis_layout.setContentsMargins(20, 15, 20, 15)
-        analysis_layout.setSpacing(12)
-
-        header = QLabel("📊 Lattice Parameters Calculation")
-        header.setFont(QFont('Arial', 14, QFont.Weight.Bold))
-        header.setStyleSheet(f"color: {self.colors['text_dark']}; background-color: {self.colors['card_bg']};")
-        analysis_layout.addWidget(header)
-
-        columns = QHBoxLayout()
-        columns.setSpacing(16)
-
-        # Left column: file inputs
-        left_panel = QWidget()
-        left_panel.setMinimumWidth(550)  # Set minimum width to ensure alignment with upper module
-        from PyQt6.QtWidgets import QSizePolicy
-        left_panel.setSizePolicy(QSizePolicy.Policy.MinimumExpanding, QSizePolicy.Policy.Minimum)
-        left_panel.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        left_layout = QVBoxLayout(left_panel)
-        left_layout.setContentsMargins(0, 4, 0, 4)
-        left_layout.setSpacing(10)
-
-        left_title = QLabel("")
-        left_title.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-        left_title.setStyleSheet(f"color: {self.colors['primary']}; background-color: {self.colors['card_bg']};")
-        left_layout.addWidget(left_title)
-
-        self.create_file_input(left_layout, "Input CSV (Volume Calculation):", "phase_peak_csv")
-        self.create_folder_input(left_layout, "Output Directory:", "phase_volume_output")
-
-        # Add Calculate Lattice Parameters button centered in left panel
-        btn_row = QWidget()
-        btn_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        btn_layout = QHBoxLayout(btn_row)
-        btn_layout.setContentsMargins(0, 10, 0, 0)
-        btn_layout.setSpacing(12)
-
-        # Center the button by adding stretch before and after
-        btn_layout.addStretch()
-        phase_btn = ModernButton(
-            "Calculate Lattice Parameters",
-            self.run_phase_analysis,
-            bg_color=self.colors['secondary'],
-            hover_color=self.colors['primary_hover'],
-            width=200, height=36,
-            parent=btn_row
-        )
-        phase_btn.setFont(QFont('Arial', 10))
-        btn_layout.addWidget(phase_btn)
-        btn_layout.addStretch()
-
-        left_layout.addWidget(btn_row)
-        left_layout.addStretch()
-
-        # Right column: crystal system and wavelength
-        right_panel = QWidget()
-        from PyQt6.QtWidgets import QSizePolicy
-        right_panel.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Minimum)
-        right_panel.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        right_layout = QVBoxLayout(right_panel)
-        right_layout.setContentsMargins(0, 4, 0, 4)
-        right_layout.setSpacing(10)
-        right_layout.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignTop)  # Center horizontally
-
-        # Create a single frame for both crystal system and wavelength
-        combined_frame = QFrame()
-        combined_frame.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)  # Fixed size to fit content
-        combined_frame.setStyleSheet(f"""
-            QFrame {{
-                background-color: {self.colors['card_bg']};
-                border: 2px solid #888888;
-                border-radius: 6px;
-            }}
-        """)
-
-        combined_frame_layout = QVBoxLayout(combined_frame)
-        combined_frame_layout.setContentsMargins(10, 8, 10, 8)
-        combined_frame_layout.setSpacing(15)
-
-        # Crystal System title inside the frame
-        right_title = QLabel("Crystal System")
-        right_title.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        right_title.setStyleSheet(f"color: {self.colors['text_dark']};border: none; background-color: {self.colors['card_bg']};")
-        combined_frame_layout.addWidget(right_title)
-
-        # First row of crystal systems
-        row1 = QWidget()
-        row1.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        row1_layout = QHBoxLayout(row1)
-        row1_layout.setContentsMargins(0, 0, 0, 0)
-        row1_layout.setSpacing(19)
-
-        # Second row of crystal systems
-        row2 = QWidget()
-        row2.setStyleSheet(f"background-color: {self.colors['card_bg']}; ")
-        row2_layout = QHBoxLayout(row2)
-        row2_layout.setContentsMargins(0, 0, 0, 0)
-        row2_layout.setSpacing(30)
-
-        systems = [
-            ('FCC', 'FCC'),
-            ('BCC', 'BCC'),
-            ('Trigonal', 'Trigonal'),
-            ('HCP', 'HCP'),
-            ('Tetragonal', 'Tetragonal'),
-            ('Orthorhombic', 'Orthorhombic'),
-            ('Monoclinic', 'Monoclinic'),
-            ('Triclinic', 'Triclinic'),
-        ]
-
-        self.phase_system_group = QButtonGroup(combined_frame)
-        
-        # Helper function to create proper closure for each radio button
-        def make_radio_handler(system_value):
-            def handler(checked):
-                if checked:
-                    self.phase_volume_system = system_value
-                    print(f"✓ Crystal system selected: {system_value}")
-            return handler
-        
-        for idx, (label, value) in enumerate(systems):
-            radio = QRadioButton(label)
-            radio.setChecked(value == self.phase_volume_system)
-            radio.setFont(QFont('Arial', 8))
-            radio.setStyleSheet(f"""
-                QRadioButton {{
-                    color: {self.colors['text_dark']};
-                    background-color: {self.colors['card_bg']};
-                }}
-                QRadioButton::indicator {{
-                    width: 10px;
-                    height: 10px;
-                    border: 1.5px solid #999999;
-                    border-radius: 2px;
-                    background-color:{self.colors['primary']} ;
-                }}
-                QRadioButton::indicator:checked {{
-                    background-color: {self.colors['primary']};
-                    
-                    border: 1.5px solid #999999;
-                    border-radius: 2px;
-                    image:url(check.png);
-                }}
-            """)
-            # Use proper closure to avoid lambda variable capture issue
-            radio.toggled.connect(make_radio_handler(value))
-            self.phase_system_group.addButton(radio)
-            if idx < 4:
-                row1_layout.addWidget(radio)
-            else:
-                row2_layout.addWidget(radio)
-
-        row1_layout.addStretch()
-        row2_layout.addStretch()
-        combined_frame_layout.addWidget(row1)
-        combined_frame_layout.addWidget(row2)
-
-        # Wavelength section inside the same frame - label and input in same row, aligned left
-        wl_row = QWidget()
-        wl_row.setStyleSheet(f"background-color: {self.colors['card_bg']};")
-        wl_row_layout = QHBoxLayout(wl_row)
-        wl_row_layout.setContentsMargins(0, 0, 0, 0)
-        wl_row_layout.setSpacing(10)
-        
-        wl_label = QLabel("Wavelength (Å)")
-        wl_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        wl_label.setStyleSheet(f"color: {self.colors['text_dark']}; border: none;background-color: transparent;")
-        wl_row_layout.addWidget(wl_label)
-        
-        self.phase_wavelength_entry = QLineEdit(str(self.phase_wavelength))
-        self.phase_wavelength_entry.setFixedWidth(80)
-        self.phase_wavelength_entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.phase_wavelength_entry.setFont(QFont('Arial', 9))
-        self.phase_wavelength_entry.setStyleSheet(f"""
-            QLineEdit {{
-                background-color: white;
-                color: {self.colors['text_dark']};
-                border: 2px solid #AAAAAA;
-                padding: 3px;
-            }}
-        """)
-        self.phase_wavelength_entry.textChanged.connect(self._on_phase_wavelength_changed)
-        wl_row_layout.addWidget(self.phase_wavelength_entry)
-        
-        wl_row_layout.addStretch()
-        
-        combined_frame_layout.addWidget(wl_row)
-
-        # Add frame directly to right layout
-        right_layout.addWidget(combined_frame)
-        right_layout.addStretch()
-
-        # Same layout as Integration Settings (2:1 ratio)
-        columns.addWidget(left_panel, stretch=2)
-        columns.addWidget(right_panel, stretch=1)
-        analysis_layout.addLayout(columns)
-
-        parent_layout.addWidget(analysis_card)
-
-    def _on_phase_wavelength_changed(self, text):
-        """Handle wavelength edits safely"""
-        try:
-            self.phase_wavelength = float(text)
-        except ValueError:
-            self.phase_wavelength = 0.0
+    # Lattice Parameters module has been moved to lattice_params_module.py
+    # This module now only handles integration functionality
 
     def create_file_input(self, parent_layout, label_text, var_name):
         """Create a file input widget"""
@@ -1521,90 +1314,7 @@ except Exception as e:
         self.log("Interactive Fitting GUI is now managed by the main window")
         pass
 
-    def run_phase_analysis(self):
-        """Run phase analysis and lattice parameter fitting"""
-        try:
-            # Validate inputs
-            if not self.phase_peak_csv:
-                self.show_error("Error", "Please select peak CSV file")
-                return
-            
-            if not os.path.exists(self.phase_peak_csv):
-                self.show_error("Error", f"Peak CSV file not found: {self.phase_peak_csv}")
-                return
-            
-            if not self.phase_volume_output:
-                self.show_error("Error", "Please select output directory")
-                return
-            
-            self.log("="*60)
-            self.log("Starting Phase Analysis...")
-            self.log(f"Peak CSV: {self.phase_peak_csv}")
-            self.log(f"Wavelength: {self.phase_wavelength} Å")
-            self.log(f"Crystal System: {self.phase_volume_system}")
-            self.log(f"N Points: {self.phase_n_points}")
-            self.log(f"Output: {self.phase_volume_output}")
-            
-            # Start progress animation
-            self.progress.start()
-            
-            # Import and run phase analysis
-            from batch_cal_volume import XRayDiffractionAnalyzer
-            
-            # Create worker thread with signals
-            def run_task():
-                analyzer = XRayDiffractionAnalyzer(
-                    wavelength=self.phase_wavelength,
-                    n_pressure_points=self.phase_n_points
-                )
-                
-                # Map crystal system names
-                system_map = {
-                    'FCC': 'cubic_FCC',
-                    'BCC': 'cubic_BCC',
-                    'Trigonal': 'Trigonal',
-                    'HCP': 'Hexagonal',
-                    'Tetragonal': 'Tetragonal',
-                    'Orthorhombic': 'Orthorhombic'
-                }
-                crystal_system = system_map.get(self.phase_volume_system, 'cubic_FCC')
-                
-                # Run analysis in auto mode
-                results = analyzer.analyze(
-                    csv_path=self.phase_peak_csv,
-                    original_system=crystal_system,
-                    new_system=crystal_system,
-                    auto_mode=True
-                )
-                
-                return results
-            
-            signals = WorkerSignals()
-            signals.finished.connect(self._on_phase_analysis_finished)
-            signals.error.connect(self._on_phase_analysis_error)
-            
-            worker = WorkerThread(run_task, signals)
-            self.running_threads.append(worker)
-            worker.start()
-            
-        except Exception as e:
-            self.progress.stop()
-            self.log(f"❌ Error: {str(e)}")
-            self.show_error("Error", f"Failed to start phase analysis:\n{str(e)}")
-    
-    def _on_phase_analysis_finished(self, message):
-        """Handle phase analysis completion"""
-        self.progress.stop()
-        self.log("✓ Phase analysis completed successfully!")
-        self.log("="*60)
-        self.show_success("Success", "Phase analysis completed!")
-    
-    def _on_phase_analysis_error(self, error_msg):
-        """Handle phase analysis error"""
-        self.progress.stop()
-        self.log(f"❌ Error: {error_msg}")
-        self.log("="*60)
-        self.show_error("Error", f"Phase analysis failed:\n{error_msg}")
+    # Phase analysis methods have been moved to lattice_params_module.py
 
     def run_birch_murnaghan(self):
         """TODO: Implement Birch-Murnaghan fitting"""
