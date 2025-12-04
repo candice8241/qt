@@ -134,30 +134,34 @@ class BatchFittingDialog(QWidget):
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         
         rect = self.rect()
-        border_width = 2
+        border_width = 3
         
-        # Draw main border with enough inset
+        # Draw main border with enough inset - using larger inset for visibility
         pen = QPen(QColor("#7E57C2"), border_width)
         pen.setStyle(Qt.PenStyle.SolidLine)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        pen.setJoinStyle(Qt.PenJoinStyle.RoundJoin)
         painter.setPen(pen)
         
-        # Draw rounded rectangle with proper insets
+        # Draw rounded rectangle with proper insets (inset more from right/bottom for visibility)
+        inset = border_width + 2  # Inset by border width + extra padding
         painter.drawRoundedRect(
-            rect.adjusted(1, 1, -8, -8),  # Larger inset on right and bottom
-            6, 6
+            rect.adjusted(inset, inset, -inset - 10, -inset - 10),  # Extra inset on right and bottom
+            8, 8
         )
         
-        # Draw EXPLICIT right border line (guaranteed visible)
-        pen_thick = QPen(QColor("#7E57C2"), 3)
+        # Draw EXPLICIT right border line (guaranteed visible) - further from edge
+        pen_thick = QPen(QColor("#7E57C2"), 4)
+        pen_thick.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(pen_thick)
         
-        # Right vertical line
-        right_x = rect.width() - 6  # 6px from right edge
-        painter.drawLine(right_x, 5, right_x, rect.height() - 5)
+        # Right vertical line - further inset from edge for visibility
+        right_x = rect.width() - 15  # 15px from right edge (was 6, now much more visible)
+        painter.drawLine(right_x, 10, right_x, rect.height() - 15)
         
-        # Bottom horizontal line on the right side
-        bottom_y = rect.height() - 6  # 6px from bottom edge
-        painter.drawLine(rect.width() - 100, bottom_y, right_x, bottom_y)
+        # Bottom horizontal line - also further inset
+        bottom_y = rect.height() - 15  # 15px from bottom edge (was 6)
+        painter.drawLine(rect.width() - 120, bottom_y, right_x, bottom_y)
         
         painter.end()
     
@@ -175,7 +179,7 @@ class BatchFittingDialog(QWidget):
         # Main layout with margins for manual border
         # Extra margins on right and bottom for border visibility
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(3, 3, 18, 12)  # Right:18px Bottom:12px for visibility
+        main_layout.setContentsMargins(5, 5, 25, 20)  # Right:25px Bottom:20px for border visibility
         main_layout.setSpacing(0)
         
         # Create content container
@@ -194,7 +198,7 @@ class BatchFittingDialog(QWidget):
         
         # Inner layout for actual content
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(8, 8, 15, 8)  # Increased right margin from 8 to 15
+        layout.setContentsMargins(8, 8, 20, 8)  # Increased right margin for border visibility
         layout.setSpacing(5)
         
         # Title and controls (no border)
@@ -207,7 +211,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(8, 5, 25, 5)  # Increased right margin from 8 to 25
+        header_layout.setContentsMargins(8, 5, 30, 5)  # Increased right margin for border visibility
         
         title = QLabel("📊 Batch Peak Fitting - Interactive Mode")
         title.setFont(QFont('Arial', 13, QFont.Weight.Bold))
@@ -301,7 +305,7 @@ class BatchFittingDialog(QWidget):
         """Create right panel with plot and controls"""
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(5, 5, 20, 5)  # Increased right margin from 5 to 20
+        layout.setContentsMargins(5, 5, 25, 5)  # Increased right margin for border visibility
         layout.setSpacing(5)
         
         # Control bar
@@ -332,7 +336,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         main_layout = QVBoxLayout(bar)
-        main_layout.setContentsMargins(10, 5, 25, 5)  # Increased right margin from 10 to 25
+        main_layout.setContentsMargins(10, 5, 30, 5)  # Increased right margin for border visibility
         main_layout.setSpacing(5)
         
         # First row: mode and method
@@ -572,7 +576,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(10, 5, 25, 5)  # Increased right margin from 10 to 25
+        layout.setContentsMargins(10, 5, 30, 5)  # Increased right margin for border visibility
         
         # Current file label
         self.current_file_label = QLabel("No file loaded")
