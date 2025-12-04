@@ -15,7 +15,7 @@ from PyQt6.QtWidgets import (QDialog, QVBoxLayout, QHBoxLayout, QLabel,
                               QListWidget, QListWidgetItem, QSplitter, QWidget,
                               QFrame, QComboBox, QLineEdit, QSizePolicy)
 from PyQt6.QtCore import Qt, QRect
-from PyQt6.QtGui import QFont, QPainter, QPen, QColor
+from PyQt6.QtGui import QFont
 from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg
 from matplotlib.figure import Figure
 import matplotlib.pyplot as plt
@@ -55,8 +55,8 @@ class BatchFittingDialog(QWidget):
         super().__init__(parent)
         # Don't set window title when used as embedded widget
         # self.setWindowTitle("Batch Peak Fitting (Interactive)")
-        self.setMinimumWidth(1400)
-        self.setMinimumHeight(800)
+        self.setMinimumWidth(1300)
+        self.setMinimumHeight(700)
         
         # Data variables
         self.file_list = []
@@ -67,6 +67,10 @@ class BatchFittingDialog(QWidget):
         self.fit_method = "pseudo"  # pseudo or voigt
         self.results = []  # Store all fitting results
         self.output_folder = None
+        
+        # Store peaks and background points for each file
+        self.file_peaks = {}  # filename -> list of peak positions
+        self.file_bg_points = {}  # filename -> list of (x, y) tuples
         
         # Mode: 'peak' or 'background'
         self.add_mode = 'peak'
@@ -125,57 +129,21 @@ class BatchFittingDialog(QWidget):
             self.reset_zoom()
         else:
             super().keyPressEvent(event)
-        
-    def paintEvent(self, event):
-        """Custom paint event to draw border with explicit right and bottom lines"""
-        super().paintEvent(event)
-        
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        
-        rect = self.rect()
-        border_width = 2
-        
-        # Draw main border with enough inset
-        pen = QPen(QColor("#7E57C2"), border_width)
-        pen.setStyle(Qt.PenStyle.SolidLine)
-        painter.setPen(pen)
-        
-        # Draw rounded rectangle with proper insets
-        painter.drawRoundedRect(
-            rect.adjusted(1, 1, -8, -8),  # Larger inset on right and bottom
-            6, 6
-        )
-        
-        # Draw EXPLICIT right border line (guaranteed visible)
-        pen_thick = QPen(QColor("#7E57C2"), 3)
-        painter.setPen(pen_thick)
-        
-        # Right vertical line
-        right_x = rect.width() - 6  # 6px from right edge
-        painter.drawLine(right_x, 5, right_x, rect.height() - 5)
-        
-        # Bottom horizontal line on the right side
-        bottom_y = rect.height() - 6  # 6px from bottom edge
-        painter.drawLine(rect.width() - 100, bottom_y, right_x, bottom_y)
-        
-        painter.end()
     
     def setup_ui(self):
         """Setup the user interface"""
         # Set background with padding for border
         self.setStyleSheet("""
             BatchFittingDialog {
-                background-color: #E8E8E8;
-                min-width: 1400px;
-                min-height: 800px;
+                background-color: #FFFFFF;
+                min-width: 1300px;
+                min-height: 700px;
             }
         """)
         
-        # Main layout with margins for manual border
-        # Extra margins on right and bottom for border visibility
+        # Main layout
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(3, 3, 18, 12)  # Right:18px Bottom:12px for visibility
+        main_layout.setContentsMargins(3, 0, 8, 5)
         main_layout.setSpacing(0)
         
         # Create content container
@@ -194,8 +162,8 @@ class BatchFittingDialog(QWidget):
         
         # Inner layout for actual content
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(8, 8, 15, 8)  # Increased right margin from 8 to 15
-        layout.setSpacing(5)
+        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setSpacing(4)
         
         # Title and controls (no border)
         header = QWidget()
@@ -207,7 +175,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(8, 5, 25, 5)  # Increased right margin from 8 to 25
+        header_layout.setContentsMargins(5, 3, 5, 3)
         
         title = QLabel("📊 Batch Peak Fitting - Interactive Mode")
         title.setFont(QFont('Arial', 13, QFont.Weight.Bold))
@@ -257,7 +225,7 @@ class BatchFittingDialog(QWidget):
         panel.setFrameStyle(QFrame.Shape.NoFrame)
         panel.setStyleSheet("background-color: #F5F5F5; border: none; border-radius: 5px;")
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setContentsMargins(5, 5, 5, 5)
         
         # Title (smaller, no emphasis)
         title = QLabel("File List")
@@ -301,15 +269,15 @@ class BatchFittingDialog(QWidget):
         """Create right panel with plot and controls"""
         panel = QWidget()
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(5, 5, 20, 5)  # Increased right margin from 5 to 20
-        layout.setSpacing(5)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
         
         # Control bar
         control_bar = self.create_control_bar()
         layout.addWidget(control_bar)
         
         # Plot canvas
-        self.canvas = MplCanvas(self, width=10, height=7, dpi=100)
+        self.canvas = MplCanvas(self, width=9, height=5.5, dpi=100)
         self.canvas.mpl_connect('button_press_event', self.on_plot_click)
         self.canvas.mpl_connect('scroll_event', self.on_scroll)
         layout.addWidget(self.canvas)
@@ -323,7 +291,7 @@ class BatchFittingDialog(QWidget):
     def create_control_bar(self):
         """Create control bar with buttons and settings"""
         bar = QWidget()
-        bar.setFixedHeight(90)
+        bar.setFixedHeight(80)
         bar.setStyleSheet("""
             QWidget {
                 background-color: #E3F2FF;
@@ -332,8 +300,8 @@ class BatchFittingDialog(QWidget):
             }
         """)
         main_layout = QVBoxLayout(bar)
-        main_layout.setContentsMargins(10, 5, 25, 5)  # Increased right margin from 10 to 25
-        main_layout.setSpacing(5)
+        main_layout.setContentsMargins(5, 3, 5, 3)
+        main_layout.setSpacing(4)
         
         # First row: mode and method
         row1 = QHBoxLayout()
@@ -553,9 +521,6 @@ class BatchFittingDialog(QWidget):
         info_label.setStyleSheet("color: #666666;")
         row2.addWidget(info_label)
         
-        # Add spacing to prevent components from extending to right edge
-        row2.addSpacing(5)
-        
         main_layout.addLayout(row2)
         
         return bar
@@ -563,7 +528,7 @@ class BatchFittingDialog(QWidget):
     def create_navigation_bar(self):
         """Create navigation bar with prev/next/save buttons"""
         bar = QWidget()
-        bar.setFixedHeight(55)
+        bar.setFixedHeight(45)
         bar.setStyleSheet("""
             QWidget {
                 background-color: #FFF9C4;
@@ -572,7 +537,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(10, 5, 25, 5)  # Increased right margin from 10 to 25
+        layout.setContentsMargins(5, 3, 5, 3)
         
         # Current file label
         self.current_file_label = QLabel("No file loaded")
@@ -634,9 +599,6 @@ class BatchFittingDialog(QWidget):
         save_btn.clicked.connect(self.save_all_results)
         layout.addWidget(save_btn)
         
-        # Add spacing after save button to prevent it from extending to right edge
-        layout.addSpacing(5)
-        
         return bar
         
     def load_folder(self):
@@ -663,6 +625,10 @@ class BatchFittingDialog(QWidget):
         self.output_folder = os.path.join(folder, "fit_output")
         os.makedirs(self.output_folder, exist_ok=True)
         
+        # Clear saved peaks and background points for new folder
+        self.file_peaks = {}
+        self.file_bg_points = {}
+        
         # Populate list widget
         self.file_list_widget.clear()
         for fname in xy_files:
@@ -682,6 +648,12 @@ class BatchFittingDialog(QWidget):
         """Handle file selection from list"""
         index = self.file_list_widget.row(item)
         if index != self.current_index:
+            # Save current file's peaks and background points before switching
+            if self.file_list and self.current_index >= 0 and self.current_index < len(self.file_list):
+                current_filename = os.path.basename(self.file_list[self.current_index])
+                self.file_peaks[current_filename] = self.peaks.copy()
+                self.file_bg_points[current_filename] = self.bg_points.copy()
+            
             self.current_index = index
             self.load_current_file()
             
@@ -691,6 +663,7 @@ class BatchFittingDialog(QWidget):
             return
             
         filepath = self.file_list[self.current_index]
+        filename = os.path.basename(filepath)
         
         try:
             # Load data
@@ -698,8 +671,38 @@ class BatchFittingDialog(QWidget):
                 data = np.genfromtxt(f, comments="#")
             
             self.current_data = data
-            self.peaks = []
-            self.bg_points = []
+            x, y = data[:, 0], data[:, 1]
+            
+            # Check if this file already has saved peaks and background points
+            if filename in self.file_peaks:
+                # Restore saved peaks and background points
+                self.peaks = self.file_peaks[filename].copy()
+                self.bg_points = self.file_bg_points[filename].copy()
+            else:
+                # If in auto-fitting mode, refine peak positions from previous file
+                if self.auto_fitting and self.peaks:
+                    refined_peaks = []
+                    search_window = (x.max() - x.min()) * 0.01  # 1% of x range for search
+                    
+                    for peak_pos in self.peaks:
+                        # Search for actual peak near the expected position
+                        mask = np.abs(x - peak_pos) < search_window
+                        if np.any(mask):
+                            y_window = y[mask]
+                            x_window = x[mask]
+                            # Find maximum in window
+                            max_idx = np.argmax(y_window)
+                            refined_peaks.append(x_window[max_idx])
+                        else:
+                            # If no data in window, keep original position
+                            refined_peaks.append(peak_pos)
+                    
+                    self.peaks = refined_peaks
+                elif not self.auto_fitting:
+                    self.peaks = []
+                    self.bg_points = []
+                # else: keep current peaks and bg_points for auto-fitting
+            
             self.current_fit_curves = []  # Clear fit curves for new file
             
             # Reset zoom limits for new file
@@ -707,11 +710,14 @@ class BatchFittingDialog(QWidget):
             self.ylim_original = None
             
             # Update display
-            filename = os.path.basename(filepath)
             self.current_file_label.setText(f"[{self.current_index + 1}/{len(self.file_list)}] {filename}")
             
-            # Auto detect peaks (this will call plot_data with preserve_zoom=False implicitly)
-            self.auto_detect_peaks()
+            # Auto detect peaks only if this file has no saved peaks and NOT in auto-fitting mode
+            if filename not in self.file_peaks and not self.auto_fitting:
+                self.auto_detect_peaks()
+            else:
+                # Just plot with existing peaks and background
+                self.plot_data(preserve_zoom=False)
             
         except Exception as e:
             QMessageBox.warning(self, "Load Error", f"Failed to load file:\n{str(e)}")
@@ -746,17 +752,35 @@ class BatchFittingDialog(QWidget):
                 (x[right_idx], right_y)
             ]
         
+        # Save current file's peaks and background points after auto detection
+        if self.file_list and self.current_index >= 0 and self.current_index < len(self.file_list):
+            current_filename = os.path.basename(self.file_list[self.current_index])
+            self.file_peaks[current_filename] = self.peaks.copy()
+            self.file_bg_points[current_filename] = self.bg_points.copy()
+        
         # Don't preserve zoom when auto-detecting peaks on new file
         self.plot_data(preserve_zoom=False)
         
     def clear_peaks(self):
         """Clear all peaks"""
         self.peaks = []
+        
+        # Save current file's peaks after clearing
+        if self.file_list and self.current_index >= 0 and self.current_index < len(self.file_list):
+            current_filename = os.path.basename(self.file_list[self.current_index])
+            self.file_peaks[current_filename] = self.peaks.copy()
+        
         self.plot_data(preserve_zoom=True)
         
     def clear_background(self):
         """Clear all background points"""
         self.bg_points = []
+        
+        # Save current file's background points after clearing
+        if self.file_list and self.current_index >= 0 and self.current_index < len(self.file_list):
+            current_filename = os.path.basename(self.file_list[self.current_index])
+            self.file_bg_points[current_filename] = self.bg_points.copy()
+        
         self.plot_data(preserve_zoom=True)
         
     def clear_all(self):
@@ -770,6 +794,9 @@ class BatchFittingDialog(QWidget):
             current_filename = os.path.basename(self.file_list[self.current_index])
             # Remove results for current file
             self.results = [r for r in self.results if r['file'] != current_filename]
+            # Update saved peaks and background points for this file
+            self.file_peaks[current_filename] = self.peaks.copy()
+            self.file_bg_points[current_filename] = self.bg_points.copy()
         
         self.plot_data(preserve_zoom=True)
         
@@ -791,7 +818,7 @@ class BatchFittingDialog(QWidget):
         x, y = self.current_data[:, 0], self.current_data[:, 1]
         
         # Find data points within search window
-        search_window = (x.max() - x.min()) * 0.02  # 2% of x range
+        search_window = (x.max() - x.min()) * 0.005  # 0.5% of x range (reduced from 2%)
         mask = np.abs(x - x_click) < search_window
         
         if not np.any(mask):
@@ -811,11 +838,23 @@ class BatchFittingDialog(QWidget):
             
         x, y = self.current_data[:, 0], self.current_data[:, 1]
         
-        # Find nearest point
-        distances = np.sqrt((x - x_click)**2 + ((y - y_click) / np.max(y) * (x.max() - x.min()))**2)
+        # Find nearest point within smaller window
+        search_window = (x.max() - x.min()) * 0.01  # 1% of x range
+        mask = np.abs(x - x_click) < search_window
+        
+        if not np.any(mask):
+            # If no points in window, use closest point
+            distances = np.sqrt((x - x_click)**2 + ((y - y_click) / np.max(y) * (x.max() - x.min()))**2)
+            min_idx = np.argmin(distances)
+            return x[min_idx], y[min_idx]
+        
+        # Find nearest point in window
+        x_window = x[mask]
+        y_window = y[mask]
+        distances = np.sqrt((x_window - x_click)**2 + ((y_window - y_click) / np.max(y) * (x.max() - x.min()))**2)
         min_idx = np.argmin(distances)
         
-        return x[min_idx], y[min_idx]
+        return x_window[min_idx], y_window[min_idx]
         
     def find_nearest_peak(self, x_click, threshold=None):
         """Find nearest peak to click position"""
@@ -824,7 +863,7 @@ class BatchFittingDialog(QWidget):
             
         if threshold is None:
             x_range = self.canvas.axes.get_xlim()
-            threshold = (x_range[1] - x_range[0]) * 0.02
+            threshold = (x_range[1] - x_range[0]) * 0.008  # Reduced from 0.02 to 0.008
             
         distances = [abs(p - x_click) for p in self.peaks]
         min_dist = min(distances)
@@ -841,8 +880,8 @@ class BatchFittingDialog(QWidget):
         if threshold is None:
             x_range = self.canvas.axes.get_xlim()
             y_range = self.canvas.axes.get_ylim()
-            threshold_x = (x_range[1] - x_range[0]) * 0.02
-            threshold_y = (y_range[1] - y_range[0]) * 0.05
+            threshold_x = (x_range[1] - x_range[0]) * 0.01  # Reduced from 0.02 to 0.01
+            threshold_y = (y_range[1] - y_range[0]) * 0.03  # Reduced from 0.05 to 0.03
         else:
             threshold_x = threshold
             threshold_y = threshold
@@ -883,6 +922,12 @@ class BatchFittingDialog(QWidget):
                 idx = self.find_nearest_bg_point(x_click, y_click)
                 if idx is not None:
                     del self.bg_points[idx]
+        
+        # Save current file's peaks and background points after modification
+        if self.file_list and self.current_index >= 0 and self.current_index < len(self.file_list):
+            current_filename = os.path.basename(self.file_list[self.current_index])
+            self.file_peaks[current_filename] = self.peaks.copy()
+            self.file_bg_points[current_filename] = self.bg_points.copy()
             
         # Preserve zoom when adding/removing peaks
         self.plot_data(preserve_zoom=True)
@@ -971,8 +1016,8 @@ class BatchFittingDialog(QWidget):
                                             markersize=4, alpha=0.9, label='BG Points', zorder=3)
                         # Interpolate background line (darker blue, more opaque)
                         bg_line_y = np.interp(x, bg_x, bg_y)
-                        self.canvas.axes.plot(x, bg_line_y, '-', color='#1E3A8A',
-                                            linewidth=2.0, alpha=0.6, label='Background', zorder=3)
+                        self.canvas.axes.plot(x, bg_line_y, '-', color='#0D47A1',
+                                            linewidth=2.5, alpha=0.8, label='Background', zorder=3)
                     
                     # Plot individual peak components (dashed lines, different colors)
                     colors = plt.cm.tab10(np.linspace(0, 1, len(fit_curves)))
@@ -1024,21 +1069,21 @@ class BatchFittingDialog(QWidget):
             self.canvas.axes.axvline(peak_x, color='#E57373', linestyle='--', 
                                      alpha=0.8, linewidth=2, zorder=3)
             
-        # Plot background points as smaller light blue squares
+        # Plot background points as smaller blue squares
         if self.bg_points:
             bg_x = [p[0] for p in self.bg_points]
             bg_y = [p[1] for p in self.bg_points]
             
-            # Use smaller light blue squares (reduced from 6 to 4)
-            self.canvas.axes.plot(bg_x, bg_y, marker='s', color='#90CAF9', 
-                                 markerfacecolor='#E3F2FD', markersize=4, 
-                                 linestyle='', markeredgewidth=1, 
+            # Use blue squares with darker edge
+            self.canvas.axes.plot(bg_x, bg_y, marker='s', color='#1976D2', 
+                                 markerfacecolor='#90CAF9', markersize=5, 
+                                 linestyle='', markeredgewidth=1.5, 
                                  label='BG', zorder=5)
             
             # Draw background line if >= 2 points
             if len(self.bg_points) >= 2:
-                self.canvas.axes.plot(bg_x, bg_y, color='#64B5F6', 
-                                     linestyle='--', alpha=0.4, linewidth=1, zorder=2)
+                self.canvas.axes.plot(bg_x, bg_y, color='#1976D2', 
+                                     linestyle='--', alpha=0.7, linewidth=1.5, zorder=2)
             
         self.canvas.axes.set_xlabel('2θ (deg)', fontsize=10, fontweight='bold')
         self.canvas.axes.set_ylabel('Intensity', fontsize=10, fontweight='bold')
@@ -1642,6 +1687,11 @@ class BatchFittingDialog(QWidget):
             }
             self.results.append(result)
             
+            # Save current file's peaks and background points after fitting
+            if self.file_list and self.current_index >= 0 and self.current_index < len(self.file_list):
+                self.file_peaks[filename] = self.peaks.copy()
+                self.file_bg_points[filename] = self.bg_points.copy()
+            
             # Redraw plot with fit curves
             self.plot_data()
             
@@ -1729,6 +1779,12 @@ class BatchFittingDialog(QWidget):
     def go_previous(self):
         """Go to previous file"""
         if self.current_index > 0:
+            # Save current file's peaks and background points before switching
+            if self.file_list and self.current_index < len(self.file_list):
+                current_filename = os.path.basename(self.file_list[self.current_index])
+                self.file_peaks[current_filename] = self.peaks.copy()
+                self.file_bg_points[current_filename] = self.bg_points.copy()
+            
             self.current_index -= 1
             self.load_current_file()
             self.file_list_widget.setCurrentRow(self.current_index)
@@ -1736,6 +1792,12 @@ class BatchFittingDialog(QWidget):
     def go_next(self):
         """Go to next file"""
         if self.current_index < len(self.file_list) - 1:
+            # Save current file's peaks and background points before switching
+            if self.file_list and self.current_index < len(self.file_list):
+                current_filename = os.path.basename(self.file_list[self.current_index])
+                self.file_peaks[current_filename] = self.peaks.copy()
+                self.file_bg_points[current_filename] = self.bg_points.copy()
+            
             self.current_index += 1
             self.load_current_file()
             self.file_list_widget.setCurrentRow(self.current_index)
