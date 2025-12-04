@@ -516,17 +516,18 @@ class InteractiveEoSGUI(QWidget):
         frame = QGroupBox("Data")
         frame.setStyleSheet(f"""
             QGroupBox {{
-                background-color: {self.palette['panel_bg']};
+                background-color: transparent;
                 color: {self.palette['text_primary']};
                 font-weight: bold;
                 font-size: 10pt;
                 border: none;
-                margin-top: 8px;
+                margin-top: 0px;
+                padding-top: 5px;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
+                left: 0px;
+                padding: 0px;
             }}
         """)
 
@@ -566,17 +567,18 @@ class InteractiveEoSGUI(QWidget):
         frame = QGroupBox("EoS Model")
         frame.setStyleSheet(f"""
             QGroupBox {{
-                background-color: {self.palette['panel_bg']};
+                background-color: transparent;
                 color: {self.palette['text_primary']};
                 font-weight: bold;
                 font-size: 10pt;
                 border: none;
-                margin-top: 8px;
+                margin-top: 0px;
+                padding-top: 5px;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
+                left: 0px;
+                padding: 0px;
             }}
         """)
 
@@ -609,17 +611,18 @@ class InteractiveEoSGUI(QWidget):
         frame = QGroupBox("EoS Parameters")
         frame.setStyleSheet(f"""
             QGroupBox {{
-                background-color: {self.palette['panel_bg']};
+                background-color: transparent;
                 color: {self.palette['text_primary']};
                 font-weight: bold;
                 font-size: 10pt;
                 border: none;
-                margin-top: 8px;
+                margin-top: 0px;
+                padding-top: 5px;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
+                left: 0px;
+                padding: 0px;
             }}
         """)
 
@@ -723,17 +726,18 @@ class InteractiveEoSGUI(QWidget):
         frame = QGroupBox("Fitting Control")
         frame.setStyleSheet(f"""
             QGroupBox {{
-                background-color: {self.palette['panel_bg']};
+                background-color: transparent;
                 color: {self.palette['text_primary']};
                 font-weight: bold;
                 font-size: 10pt;
                 border: none;
-                margin-top: 8px;
+                margin-top: 0px;
+                padding-top: 5px;
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
+                left: 0px;
+                padding: 0px;
             }}
         """)
 
