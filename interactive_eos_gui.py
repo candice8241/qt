@@ -613,7 +613,7 @@ class InteractiveEoSGUI(QWidget):
         layout.setSpacing(6)
 
         label = QLabel("Model:")
-        label.setStyleSheet(f"color: {self.palette['text_primary']}; font-weight: bold; background: transparent;")
+        label.setStyleSheet(f"color: {self.palette['text_primary']}; font-weight: bold; background: transparent; border: none;")
         layout.addWidget(label)
 
         self.eos_combo = QComboBox()
@@ -671,13 +671,13 @@ class InteractiveEoSGUI(QWidget):
         header_layout.setSpacing(8)
         param_header = QLabel("Parameter")
         param_header.setFont(QFont('Arial', 8, QFont.Weight.Bold))
-        param_header.setStyleSheet(f"color: {self.palette['muted']}; background: transparent;")
+        param_header.setStyleSheet(f"color: {self.palette['muted']}; background: transparent; border: none;")
         value_header = QLabel("Value")
         value_header.setFont(QFont('Arial', 8, QFont.Weight.Bold))
-        value_header.setStyleSheet(f"color: {self.palette['muted']}; background: transparent;")
+        value_header.setStyleSheet(f"color: {self.palette['muted']}; background: transparent; border: none;")
         lock_header = QLabel("Lock")
         lock_header.setFont(QFont('Arial', 8, QFont.Weight.Bold))
-        lock_header.setStyleSheet(f"color: {self.palette['muted']}; background: transparent;")
+        lock_header.setStyleSheet(f"color: {self.palette['muted']}; background: transparent; border: none;")
         header_layout.addWidget(param_header)
         header_layout.addWidget(value_header)
         header_layout.addWidget(lock_header)
@@ -690,7 +690,7 @@ class InteractiveEoSGUI(QWidget):
             # Parameter label
             lbl = QLabel(label)
             lbl.setFont(QFont('Arial', 9))
-            lbl.setStyleSheet(f"color: {self.palette['text_primary']}; background: transparent;")
+            lbl.setStyleSheet(f"color: {self.palette['text_primary']}; background: transparent; border: none;")
             lbl.setFixedWidth(105)
             row_layout.addWidget(lbl)
 
@@ -774,7 +774,7 @@ class InteractiveEoSGUI(QWidget):
         # Regularization strength control
         reg_label = QLabel("B0' Regularization:")
         reg_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        reg_label.setStyleSheet(f"color: {self.palette['text_primary']}; background: transparent;")
+        reg_label.setStyleSheet(f"color: {self.palette['text_primary']}; background: transparent; border: none;")
         layout.addWidget(reg_label)
 
         slider_layout = QHBoxLayout()
@@ -787,14 +787,14 @@ class InteractiveEoSGUI(QWidget):
 
         self.reg_label = QLabel("1.0")
         self.reg_label.setFixedWidth(40)
-        self.reg_label.setStyleSheet(f"color: {self.palette['text_primary']}; background: transparent;")
+        self.reg_label.setStyleSheet(f"color: {self.palette['text_primary']}; background: transparent; border: none;")
         slider_layout.addWidget(self.reg_label)
 
         layout.addLayout(slider_layout)
 
         hint_label = QLabel("(Higher = stronger constraint to B0'=4)")
         hint_label.setFont(QFont('Arial', 8))
-        hint_label.setStyleSheet(f"color: {self.palette['muted']}; font-style: italic; background: transparent;")
+        hint_label.setStyleSheet(f"color: {self.palette['muted']}; font-style: italic; background: transparent; border: none;")
         layout.addWidget(hint_label)
 
         # Fitting buttons
