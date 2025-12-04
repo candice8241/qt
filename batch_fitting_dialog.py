@@ -139,7 +139,7 @@ class BatchFittingDialog(QWidget):
         
         # Main layout
         main_layout = QVBoxLayout(self)
-        main_layout.setContentsMargins(5, 5, 15, 8)
+        main_layout.setContentsMargins(10, 10, 10, 10)
         main_layout.setSpacing(0)
         
         # Create content container
@@ -158,7 +158,7 @@ class BatchFittingDialog(QWidget):
         
         # Inner layout for actual content
         layout = QVBoxLayout(container)
-        layout.setContentsMargins(5, 5, 10, 5)
+        layout.setContentsMargins(10, 10, 10, 10)
         layout.setSpacing(5)
         
         # Title and controls (no border)
@@ -221,7 +221,7 @@ class BatchFittingDialog(QWidget):
         panel.setFrameStyle(QFrame.Shape.NoFrame)
         panel.setStyleSheet("background-color: #F5F5F5; border: none; border-radius: 5px;")
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(5, 5, 5, 5)
+        layout.setContentsMargins(8, 8, 8, 8)
         
         # Title (smaller, no emphasis)
         title = QLabel("File List")
