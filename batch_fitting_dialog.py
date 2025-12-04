@@ -207,7 +207,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         header_layout = QHBoxLayout(header)
-        header_layout.setContentsMargins(8, 5, 8, 5)
+        header_layout.setContentsMargins(8, 5, 25, 5)  # Increased right margin from 8 to 25
         
         title = QLabel("📊 Batch Peak Fitting - Interactive Mode")
         title.setFont(QFont('Arial', 13, QFont.Weight.Bold))
@@ -332,7 +332,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         main_layout = QVBoxLayout(bar)
-        main_layout.setContentsMargins(10, 5, 10, 5)
+        main_layout.setContentsMargins(10, 5, 25, 5)  # Increased right margin from 10 to 25
         main_layout.setSpacing(5)
         
         # First row: mode and method
@@ -553,6 +553,9 @@ class BatchFittingDialog(QWidget):
         info_label.setStyleSheet("color: #666666;")
         row2.addWidget(info_label)
         
+        # Add spacing to prevent components from extending to right edge
+        row2.addSpacing(5)
+        
         main_layout.addLayout(row2)
         
         return bar
@@ -569,7 +572,7 @@ class BatchFittingDialog(QWidget):
             }
         """)
         layout = QHBoxLayout(bar)
-        layout.setContentsMargins(10, 5, 10, 5)
+        layout.setContentsMargins(10, 5, 25, 5)  # Increased right margin from 10 to 25
         
         # Current file label
         self.current_file_label = QLabel("No file loaded")
@@ -630,6 +633,9 @@ class BatchFittingDialog(QWidget):
         """)
         save_btn.clicked.connect(self.save_all_results)
         layout.addWidget(save_btn)
+        
+        # Add spacing after save button to prevent it from extending to right edge
+        layout.addSpacing(5)
         
         return bar
         
