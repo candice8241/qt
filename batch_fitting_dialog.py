@@ -671,6 +671,7 @@ class BatchFittingDialog(QWidget):
                 data = np.genfromtxt(f, comments="#")
             
             self.current_data = data
+            x, y = data[:, 0], data[:, 1]
             
             # Check if this file already has saved peaks and background points
             if filename in self.file_peaks:
@@ -678,8 +679,26 @@ class BatchFittingDialog(QWidget):
                 self.peaks = self.file_peaks[filename].copy()
                 self.bg_points = self.file_bg_points[filename].copy()
             else:
-                # Only clear peaks and background points if NOT in auto-fitting mode
-                if not self.auto_fitting:
+                # If in auto-fitting mode, refine peak positions from previous file
+                if self.auto_fitting and self.peaks:
+                    refined_peaks = []
+                    search_window = (x.max() - x.min()) * 0.01  # 1% of x range for search
+                    
+                    for peak_pos in self.peaks:
+                        # Search for actual peak near the expected position
+                        mask = np.abs(x - peak_pos) < search_window
+                        if np.any(mask):
+                            y_window = y[mask]
+                            x_window = x[mask]
+                            # Find maximum in window
+                            max_idx = np.argmax(y_window)
+                            refined_peaks.append(x_window[max_idx])
+                        else:
+                            # If no data in window, keep original position
+                            refined_peaks.append(peak_pos)
+                    
+                    self.peaks = refined_peaks
+                elif not self.auto_fitting:
                     self.peaks = []
                     self.bg_points = []
                 # else: keep current peaks and bg_points for auto-fitting
