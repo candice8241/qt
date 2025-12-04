@@ -656,8 +656,12 @@ class BatchFittingDialog(QWidget):
                 data = np.genfromtxt(f, comments="#")
             
             self.current_data = data
-            self.peaks = []
-            self.bg_points = []
+            
+            # Only clear peaks and background points if NOT in auto-fitting mode
+            if not self.auto_fitting:
+                self.peaks = []
+                self.bg_points = []
+            
             self.current_fit_curves = []  # Clear fit curves for new file
             
             # Reset zoom limits for new file
@@ -668,8 +672,12 @@ class BatchFittingDialog(QWidget):
             filename = os.path.basename(filepath)
             self.current_file_label.setText(f"[{self.current_index + 1}/{len(self.file_list)}] {filename}")
             
-            # Auto detect peaks (this will call plot_data with preserve_zoom=False implicitly)
-            self.auto_detect_peaks()
+            # Auto detect peaks only if NOT in auto-fitting mode
+            if not self.auto_fitting:
+                self.auto_detect_peaks()
+            else:
+                # Just plot with existing peaks and background
+                self.plot_data(preserve_zoom=False)
             
         except Exception as e:
             QMessageBox.warning(self, "Load Error", f"Failed to load file:\n{str(e)}")
