@@ -87,11 +87,24 @@ class MaskCanvas(FigureCanvas):
         self.mpl_connect('draw_event', self.on_draw)
         
     def load_image(self, image_path):
-        """Load image for mask editing"""
+        """Load image for mask editing (memory-optimized)"""
         try:
             if FABIO_AVAILABLE:
                 img = fabio.open(image_path)
-                self.image_data = img.data
+                
+                # Check image size and warn if too large
+                img_size_mb = (img.data.nbytes / 1024 / 1024)
+                if img_size_mb > 100:
+                    print(f"WARNING: Large image ({img_size_mb:.1f} MB). Memory usage may be high.")
+                
+                # Store as float32 if image is large to save memory
+                if img_size_mb > 50:
+                    self.image_data = img.data.astype(np.float32)
+                else:
+                    self.image_data = img.data
+                
+                # Free original image data
+                del img
             else:
                 # Fallback to simple image loading
                 from PIL import Image
@@ -102,14 +115,21 @@ class MaskCanvas(FigureCanvas):
             if self.mask_data is None or self.mask_data.shape != self.image_data.shape:
                 self.mask_data = np.zeros(self.image_data.shape, dtype=bool)
             
+            # Force garbage collection for large images
+            if self.image_data.size > 10000000:  # > 10M pixels
+                import gc
+                gc.collect()
+            
             self.display_image()
             return True
         except Exception as e:
             print(f"ERROR loading image: {e}")  # Console output for errors
+            import traceback
+            traceback.print_exc()
             return False
     
     def display_image(self):
-        """Display the image with mask overlay"""
+        """Display the image with mask overlay (memory-optimized)"""
         self.axes.clear()
         if self.image_data is not None:
             # Apply contrast settings
@@ -128,12 +148,15 @@ class MaskCanvas(FigureCanvas):
                                  interpolation=interp)
             
             # Overlay mask in red with high visibility
-            if self.mask_data is not None:
-                # Create red mask overlay
-                mask_rgba = np.zeros((*self.mask_data.shape, 4))
+            if self.mask_data is not None and np.any(self.mask_data):
+                # Create red mask overlay using float32 to save 50% memory
+                mask_rgba = np.zeros((*self.mask_data.shape, 4), dtype=np.float32)
                 mask_rgba[self.mask_data, 0] = 1.0  # Red channel
                 mask_rgba[self.mask_data, 3] = 0.6  # Alpha (transparency)
                 self.axes.imshow(mask_rgba, origin='lower', interpolation='nearest')
+                
+                # Free memory immediately
+                del mask_rgba
             
             self.axes.set_title('Image with Mask (red = masked regions) - Scroll to zoom')
             
@@ -147,6 +170,11 @@ class MaskCanvas(FigureCanvas):
                 self.axes.set_ylim(self.base_ylim)
             
             # Don't add colorbar - removed per user request
+        
+        # Clean up memory
+        if self.image_data is not None and self.image_data.size > 10000000:  # > 10M pixels
+            import gc
+            gc.collect()
         
         self.figure.canvas.draw_idle()
         
