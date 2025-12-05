@@ -3740,6 +3740,38 @@ class CalibrateModule(GUIBase):
                     # Get control points for visualization from geo_ref.data
                     if hasattr(self.geo_ref, 'data') and self.geo_ref.data is not None:
                         rings = self.geo_ref.data
+                        
+                        # Convert control points to display format and show them
+                        # geo_ref.data format: list of rings, each ring is array of [[ring_num, tth, chi], ...]
+                        # We need to convert to pixel coordinates for display
+                        control_points_display = []
+                        try:
+                            for ring in rings:
+                                if len(ring) > 0 and hasattr(ring, '__iter__'):
+                                    ring_array = np.array(ring)
+                                    if len(ring_array.shape) == 2 and ring_array.shape[1] >= 3:
+                                        # ring_array has columns: [ring_num, tth, chi]
+                                        for point in ring_array:
+                                            # Convert from polar (tth, chi) to pixel (y, x)
+                                            tth_val = point[1]  # in radians
+                                            chi_val = point[2]  # in radians
+                                            
+                                            # Use AI to convert to pixel coordinates
+                                            # This is inverse of what we did during calibration
+                                            try:
+                                                y, x = self.ai.calcfrom1d(tth_val, chi_val, shape=self.current_image.shape)
+                                                if 0 <= y < self.current_image.shape[0] and 0 <= x < self.current_image.shape[1]:
+                                                    control_points_display.append([x, y, int(point[0])])
+                                            except:
+                                                pass
+                        except Exception as cp_error:
+                            self.log(f"Warning: Could not convert all control points: {cp_error}")
+                        
+                        # Add control points to canvas for display
+                        if len(control_points_display) > 0:
+                            self.calibration_canvas.manual_peaks = control_points_display
+                            self.log(f"✓ Displaying {len(control_points_display)} control points on image")
+                        
                         self.calibration_canvas.display_calibration_image(self.current_image, rings)
                     else:
                         self.calibration_canvas.display_calibration_image(self.current_image)
@@ -3784,26 +3816,33 @@ class CalibrateModule(GUIBase):
     def save_poni_file(self):
         """Save PONI file"""
         if self.ai is None:
-            QMessageBox.warning(None, "No Calibration", 
+            QMessageBox.warning(self.parent, "No Calibration", 
                               "Please run calibration first before saving PONI file.")
             return
         
-        poni_path = self.poni_entry.text()
+        poni_path = self.poni_entry.text().strip()
         if not poni_path:
+            # Use self.parent as parent for dialog
             poni_path, _ = QFileDialog.getSaveFileName(
-                None, "Save PONI File", "calibration.poni",
+                self.parent, 
+                "Save PONI File", 
+                "calibration.poni",
                 "PONI Files (*.poni);;All Files (*.*)"
             )
         
         if poni_path:
             try:
                 self.ai.save(poni_path)
-                self.log(f"PONI file saved to: {poni_path}")
-                QMessageBox.information(None, "Success", 
+                self.log(f"✓ PONI file saved to: {poni_path}")
+                QMessageBox.information(self.parent, "Success", 
                                       f"PONI file saved successfully!\n{poni_path}")
+                # Update the text field with saved path
+                self.poni_entry.setText(poni_path)
             except Exception as e:
+                import traceback
                 self.log(f"Error saving PONI: {str(e)}")
-                QMessageBox.critical(None, "Error", f"Failed to save PONI file:\n{str(e)}")
+                self.log(traceback.format_exc())
+                QMessageBox.critical(self.parent, "Error", f"Failed to save PONI file:\n{str(e)}")
 
     def on_contrast_slider_changed(self, value):
         """Handle contrast slider change (single vertical slider controls max)"""
@@ -4007,15 +4046,19 @@ class CalibrateModule(GUIBase):
         try:
             self.log("Generating Cake view (polar transformation)...")
             
+            # Apply mask if available
+            mask = self.current_mask if hasattr(self, 'current_mask') else None
+            
             # Use pyFAI's integrate2d for cake/polar transformation
-            # num_chi: number of azimuthal bins (360 for 1 degree resolution)
-            # num_2theta: number of radial bins
+            # Dioptas-style: higher resolution for better visualization
             result = self.ai.integrate2d(
                 self.current_image,
                 npt_rad=500,      # Number of radial bins (2theta)
-                npt_azim=360,     # Number of azimuthal bins (chi/azimuth)
+                npt_azim=360,     # Number of azimuthal bins (chi/azimuth) - 1°/bin
                 unit="2th_deg",   # Use 2theta in degrees
-                method="splitpixel"
+                mask=mask,        # Apply mask if available
+                method="splitpixel",
+                correctSolidAngle=True  # Important for accurate intensities
             )
             
             # Result is (cake_image, 2theta_array, chi_array)
@@ -4026,12 +4069,15 @@ class CalibrateModule(GUIBase):
             # Clear and plot
             self.cake_axes.clear()
             
+            # Log scale for better visualization
+            cake_display = np.log10(cake + 1)  # Add 1 to avoid log(0)
+            
             # Display cake image with proper extent
             # extent: [left, right, bottom, top]
             extent = [tth_rad.min(), tth_rad.max(), chi_azim.min(), chi_azim.max()]
             
             im = self.cake_axes.imshow(
-                cake,
+                cake_display,
                 aspect='auto',
                 origin='lower',
                 extent=extent,
@@ -4041,13 +4087,37 @@ class CalibrateModule(GUIBase):
             
             self.cake_axes.set_xlabel('2θ (degrees)', fontsize=10)
             self.cake_axes.set_ylabel('χ (degrees)', fontsize=10)
-            self.cake_axes.set_title('Cake/Polar View', fontsize=11, fontweight='bold')
+            self.cake_axes.set_title('Cake/Polar View (Dioptas-style)', fontsize=11, fontweight='bold')
+            
+            # Add calibrant lines if available (should appear as vertical lines)
+            if hasattr(self, 'calibrant_name') and self.calibrant_name:
+                try:
+                    calibrant = ALL_CALIBRANTS[self.calibrant_name]
+                    calibrant.wavelength = self.ai.wavelength
+                    tth_calibrant = calibrant.get_2th()
+                    tth_calibrant_deg = np.degrees(tth_calibrant)
+                    
+                    # Draw vertical lines for calibrant peaks (should be straight if calibration is good)
+                    tth_min, tth_max = tth_rad.min(), tth_rad.max()
+                    visible_peaks = tth_calibrant_deg[(tth_calibrant_deg >= tth_min) & 
+                                                       (tth_calibrant_deg <= tth_max)]
+                    for peak_pos in visible_peaks[:15]:
+                        self.cake_axes.axvline(peak_pos, color='red', linestyle='--', 
+                                             alpha=0.3, linewidth=0.5)
+                except Exception as e:
+                    self.log(f"Warning: Could not add calibrant lines to cake: {e}")
             
             # Add colorbar if not exists
             if not hasattr(self, 'cake_colorbar') or self.cake_colorbar is None:
-                self.cake_colorbar = self.cake_canvas.figure.colorbar(im, ax=self.cake_axes)
+                try:
+                    self.cake_colorbar = self.cake_canvas.figure.colorbar(im, ax=self.cake_axes)
+                except:
+                    pass
             else:
-                self.cake_colorbar.update_normal(im)
+                try:
+                    self.cake_colorbar.update_normal(im)
+                except:
+                    pass
             
             self.cake_canvas.draw()
             self.log(f"Cake view updated: {cake.shape[1]}x{cake.shape[0]} (2θ × χ)")
@@ -4065,12 +4135,17 @@ class CalibrateModule(GUIBase):
         try:
             self.log("Generating 1D integrated pattern...")
             
+            # Apply mask if available
+            mask = self.current_mask if hasattr(self, 'current_mask') else None
+            
             # Use pyFAI's integrate1d for azimuthal integration
             result = self.ai.integrate1d(
                 self.current_image,
                 npt=2048,         # Number of points in output
                 unit="2th_deg",   # Use 2theta in degrees
-                method="splitpixel"
+                mask=mask,        # Apply mask if available
+                method="splitpixel",
+                correctSolidAngle=True  # Important for accurate intensities
             )
             
             # Result is (2theta_array, intensity_array)
@@ -4081,13 +4156,18 @@ class CalibrateModule(GUIBase):
             self.pattern_axes.clear()
             
             # Plot 1D pattern
-            self.pattern_axes.plot(tth, intensity, 'b-', linewidth=1)
+            self.pattern_axes.plot(tth, intensity, 'b-', linewidth=1.2)
             self.pattern_axes.set_xlabel('2θ (degrees)', fontsize=10)
             self.pattern_axes.set_ylabel('Intensity (a.u.)', fontsize=10)
-            self.pattern_axes.set_title('1D Integrated Pattern', fontsize=11, fontweight='bold')
+            self.pattern_axes.set_title('1D Integrated Pattern (Dioptas-style)', fontsize=11, fontweight='bold')
             self.pattern_axes.grid(True, alpha=0.3)
             
+            # Set reasonable y-axis limits (remove outliers)
+            y_max = np.percentile(intensity, 99.5)  # Use 99.5 percentile to avoid spikes
+            self.pattern_axes.set_ylim(0, y_max * 1.1)
+            
             # Add calibrant peak positions if available
+            peak_count = 0
             if hasattr(self, 'calibrant_name') and self.calibrant_name:
                 try:
                     calibrant = ALL_CALIBRANTS[self.calibrant_name]
@@ -4103,12 +4183,12 @@ class CalibrateModule(GUIBase):
                                                        (tth_calibrant_deg <= tth_max)]
                     
                     # Draw vertical lines for calibrant peaks
-                    y_max = intensity.max()
                     for peak_pos in visible_peaks[:20]:  # Limit to first 20 peaks
                         self.pattern_axes.axvline(peak_pos, color='red', linestyle='--', 
                                                  alpha=0.5, linewidth=0.8)
+                        peak_count += 1
                     
-                    self.log(f"Added {len(visible_peaks)} calibrant peak positions")
+                    self.log(f"Added {peak_count} calibrant peak positions (of {len(visible_peaks)} in range)")
                 except Exception as cal_error:
                     self.log(f"Could not add calibrant peaks: {cal_error}")
             
