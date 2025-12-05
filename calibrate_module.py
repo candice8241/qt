@@ -34,6 +34,9 @@ from custom_widgets import CustomSpinbox
 # Import Canvas classes (moved to separate file)
 from calibration_canvas import MaskCanvas, CalibrationCanvas
 
+# Constants
+INT32_MAX = 2147483647  # Maximum value for 32-bit signed integer (Qt widgets use int32)
+
 # Import pyFAI and related libraries
 try:
     import pyFAI
@@ -2225,10 +2228,11 @@ class CalibrateModule(GUIBase):
                 self.unified_canvas.contrast_min = vmin
                 self.unified_canvas.contrast_max = vmax
                 
-                # Update slider to match
+                # Update slider to match (clamp to int32 range to prevent overflow)
                 if hasattr(self, 'contrast_slider'):
-                    self.contrast_slider.setMaximum(int(np.max(self.current_image)))
-                    self.contrast_slider.setValue(int(vmax))
+                    img_max = min(int(np.max(self.current_image)), INT32_MAX)
+                    self.contrast_slider.setMaximum(img_max)
+                    self.contrast_slider.setValue(min(int(vmax), img_max))
                 
                 # Display image immediately with forced update
                 self.unified_canvas.display_calibration_image(self.current_image)
@@ -3555,13 +3559,14 @@ class CalibrateModule(GUIBase):
             # Calculate percentiles for auto-contrast
             vmin = np.percentile(self.current_image, 1)
             vmax = np.percentile(self.current_image, 99)
-            
-            # Update slider
+
+            # Update slider (clamp to prevent overflow)
             if hasattr(self, 'contrast_slider'):
-                self.contrast_slider.setValue(int(vmax))
-            
+                clamped_vmax = min(int(vmax), INT32_MAX)
+                self.contrast_slider.setValue(clamped_vmax)
+
             # Apply
-            self.apply_contrast_from_slider(int(vmax))
+            self.apply_contrast_from_slider(min(int(vmax), INT32_MAX))
             self.log(f"Auto-contrast applied: 0 - {vmax:.0f}")
         except Exception as e:
             self.log(f"Auto-contrast failed: {str(e)}")
