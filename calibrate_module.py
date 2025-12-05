@@ -3472,9 +3472,12 @@ class CalibrateModule(GUIBase):
         geo_ref.poni2 = shape[1] * pixel_size / 2  # Center X in meters
         geo_ref.pixel1 = pixel_size
         geo_ref.pixel2 = pixel_size
-        geo_ref.rot1 = 0.0  # Initial rotation
-        geo_ref.rot2 = 0.0
-        geo_ref.rot3 = 0.0
+        
+        # Initialize rotations to ZERO (perpendicular detector assumption)
+        # This is the most common and safest configuration
+        geo_ref.rot1 = 0.0  # Tilt around X-axis
+        geo_ref.rot2 = 0.0  # Tilt around Y-axis  
+        geo_ref.rot3 = 0.0  # In-plane rotation
         
         self.log(f"Initial geometry:")
         self.log(f"  Distance: {geo_ref.dist*1000:.2f} mm")
@@ -3527,27 +3530,125 @@ class CalibrateModule(GUIBase):
                 rms = np.sqrt(geo_ref.chi2())
                 self.log(f"  RMS error: {rms:.3f} pixels")
             
-            # Stage 2: Full refinement including rotation parameters (Dioptas default)
-            # This is the KEY difference - Dioptas ALWAYS refines rotations
-            self.log("\nStage 2: Full geometry refinement (including rotations)...")
-            self.log("  Optimizing all 6 parameters: dist, poni1, poni2, rot1, rot2, rot3")
+            # Stage 2: Careful rotation refinement with validation
+            # Only refine rotations if data quality is sufficient AND angles stay small
+            self.log("\nStage 2: Rotation refinement with validation...")
             
-            # Save current state for comparison
+            # Save current state for comparison and potential rollback
             dist_before = geo_ref.dist
             poni1_before = geo_ref.poni1
             poni2_before = geo_ref.poni2
+            rot1_before = geo_ref.rot1
+            rot2_before = geo_ref.rot2
+            rot3_before = geo_ref.rot3
             
-            # FULL REFINEMENT - This is what Dioptas does!
-            geo_ref.refine2(fix=["wavelength"])  # Only fix wavelength
+            # Calculate RMS before rotation refinement
+            rms_before = 999.0
+            if hasattr(geo_ref, 'chi2') and geo_ref.chi2 is not None:
+                try:
+                    rms_before = np.sqrt(geo_ref.chi2())
+                except:
+                    pass
             
-            # Log refined parameters
-            self.log(f"\n  Refined Parameters:")
-            self.log(f"    Distance: {geo_ref.dist*1000:.3f} mm (Δ={( geo_ref.dist-dist_before)*1000:.3f} mm)")
-            self.log(f"    PONI1: {geo_ref.poni1*1000:.3f} mm (Δ={(geo_ref.poni1-poni1_before)*1000:.3f} mm)")
-            self.log(f"    PONI2: {geo_ref.poni2*1000:.3f} mm (Δ={(geo_ref.poni2-poni2_before)*1000:.3f} mm)")
-            self.log(f"    Rot1: {np.degrees(geo_ref.rot1):.4f}° (tilt around axis 1)")
-            self.log(f"    Rot2: {np.degrees(geo_ref.rot2):.4f}° (tilt around axis 2)")
-            self.log(f"    Rot3: {np.degrees(geo_ref.rot3):.4f}° (rotation in plane)")
+            # Decide whether to refine rotations based on data quality
+            should_refine_rotations = False
+            
+            # Criteria for enabling rotation refinement:
+            # 1. Good number of control points (>= 50)
+            # 2. Multiple rings (>= 4)
+            # 3. Reasonable initial RMS (< 5 pixels)
+            if len(geo_ref.data) >= 50 and len(ring_nums) >= 4 and rms_before < 5.0:
+                should_refine_rotations = True
+                self.log(f"  Data quality sufficient for rotation refinement")
+                self.log(f"  Control points: {len(geo_ref.data)}, Rings: {len(ring_nums)}, RMS: {rms_before:.3f}")
+            else:
+                should_refine_rotations = False
+                self.log(f"  Data quality insufficient - skipping rotation refinement")
+                self.log(f"  Control points: {len(geo_ref.data)}, Rings: {len(ring_nums)}, RMS: {rms_before:.3f}")
+                self.log(f"  (Need: >= 50 points, >= 4 rings, RMS < 5 pixels)")
+            
+            if should_refine_rotations:
+                try:
+                    # Try full refinement including rotations
+                    self.log(f"  Attempting full geometry refinement (all 6 parameters)...")
+                    geo_ref.refine2(fix=["wavelength"])  # Only fix wavelength
+                    
+                    # Validate rotation angles - they should be SMALL
+                    rot1_deg = np.degrees(geo_ref.rot1)
+                    rot2_deg = np.degrees(geo_ref.rot2)
+                    rot3_deg = np.degrees(geo_ref.rot3)
+                    
+                    # Calculate RMS after refinement
+                    rms_after = 999.0
+                    if hasattr(geo_ref, 'chi2') and geo_ref.chi2 is not None:
+                        try:
+                            rms_after = np.sqrt(geo_ref.chi2())
+                        except:
+                            pass
+                    
+                    # Check if rotation angles are reasonable (< 3 degrees is typical)
+                    max_rot = max(abs(rot1_deg), abs(rot2_deg), abs(rot3_deg))
+                    
+                    if max_rot > 3.0:
+                        # Angles too large - probably unstable refinement
+                        self.log(f"  ⚠ Warning: Rotation angles too large!")
+                        self.log(f"    Rot1={rot1_deg:.4f}°, Rot2={rot2_deg:.4f}°, Rot3={rot3_deg:.4f}°")
+                        self.log(f"    Max angle: {max_rot:.4f}° > 3.0° (threshold)")
+                        self.log(f"  → Reverting to perpendicular detector assumption (rot=0)")
+                        
+                        # Revert rotations to zero
+                        geo_ref.rot1 = 0.0
+                        geo_ref.rot2 = 0.0
+                        geo_ref.rot3 = 0.0
+                        geo_ref.dist = dist_before
+                        geo_ref.poni1 = poni1_before
+                        geo_ref.poni2 = poni2_before
+                        
+                    elif rms_after >= rms_before * 0.95:
+                        # RMS didn't improve significantly - rotation refinement not helpful
+                        self.log(f"  ⚠ Warning: RMS did not improve with rotation refinement")
+                        self.log(f"    RMS before: {rms_before:.3f}, after: {rms_after:.3f}")
+                        self.log(f"  → Reverting to perpendicular detector assumption (rot=0)")
+                        
+                        # Revert rotations to zero
+                        geo_ref.rot1 = 0.0
+                        geo_ref.rot2 = 0.0
+                        geo_ref.rot3 = 0.0
+                        geo_ref.dist = dist_before
+                        geo_ref.poni1 = poni1_before
+                        geo_ref.poni2 = poni2_before
+                        
+                    else:
+                        # Refinement successful and reasonable
+                        self.log(f"  ✓ Rotation refinement successful!")
+                        self.log(f"    Rot1: {rot1_deg:.4f}° (tilt around axis 1)")
+                        self.log(f"    Rot2: {rot2_deg:.4f}° (tilt around axis 2)")
+                        self.log(f"    Rot3: {rot3_deg:.4f}° (rotation in plane)")
+                        self.log(f"    RMS improved: {rms_before:.3f} → {rms_after:.3f} pixels")
+                        
+                except Exception as rot_error:
+                    self.log(f"  ⚠ Rotation refinement failed: {rot_error}")
+                    self.log(f"  → Keeping perpendicular detector assumption (rot=0)")
+                    
+                    # Revert to safe state
+                    geo_ref.rot1 = 0.0
+                    geo_ref.rot2 = 0.0
+                    geo_ref.rot3 = 0.0
+                    geo_ref.dist = dist_before
+                    geo_ref.poni1 = poni1_before
+                    geo_ref.poni2 = poni2_before
+            else:
+                # Skip rotation refinement - keep rotations at zero
+                self.log(f"  Rotations kept at zero (perpendicular detector)")
+            
+            # Log final refined parameters
+            self.log(f"\n  Final Refined Parameters:")
+            self.log(f"    Distance: {geo_ref.dist*1000:.3f} mm")
+            self.log(f"    PONI1 (Y): {geo_ref.poni1*1000:.3f} mm")
+            self.log(f"    PONI2 (X): {geo_ref.poni2*1000:.3f} mm")
+            self.log(f"    Rot1: {np.degrees(geo_ref.rot1):.4f}°")
+            self.log(f"    Rot2: {np.degrees(geo_ref.rot2):.4f}°")
+            self.log(f"    Rot3: {np.degrees(geo_ref.rot3):.4f}°")
             
             # Calculate final RMS error
             if hasattr(geo_ref, 'chi2') and geo_ref.chi2 is not None:
