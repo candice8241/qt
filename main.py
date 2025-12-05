@@ -30,11 +30,13 @@ class XRDProcessingGUI(QMainWindow, GUIBase):
         QMainWindow.__init__(self)
         GUIBase.__init__(self)
 
-        # Hide the window while heavy UI construction occurs to avoid visible flashes
-        self.hide()
-
-        # Set window close behavior
+        # Set window attributes before construction to prevent flash
         self.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_DontShowOnScreen, False)
+        
+        # Explicitly hide the window during construction to avoid visible flashes
+        self.setWindowFlags(self.windowFlags())
+        self.hide()
         
         #self.setWindowTitle("XRD Data Post-Processing")
         self.setGeometry(100, 100, 1100, 950)

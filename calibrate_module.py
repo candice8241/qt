@@ -48,12 +48,22 @@ INT32_MAX = 2147483647  # Maximum value for 32-bit signed integer (Qt widgets us
 try:
     import pyFAI
     from pyFAI.calibrant import Calibrant, ALL_CALIBRANTS
+    try:
+        from pyFAI.calibrant import get_calibrant
+    except ImportError:
+        # Fallback for older versions - create wrapper function
+        def get_calibrant(name):
+            if name in ALL_CALIBRANTS:
+                return Calibrant(name)
+            return None
     from pyFAI.geometryRefinement import GeometryRefinement
     from pyFAI.azimuthalIntegrator import AzimuthalIntegrator
     PYFAI_AVAILABLE = True
 except ImportError:
     PYFAI_AVAILABLE = False
     print("Warning: pyFAI not available. Install with: pip install pyFAI")
+    def get_calibrant(name):
+        return None
 
 try:
     import fabio
@@ -267,13 +277,12 @@ class CalibrateModule(GUIBase):
             # Horizontal layout for canvas and contrast slider
             canvas_container = QWidget()
             canvas_layout = QHBoxLayout(canvas_container)
-            canvas_layout.setContentsMargins(2, 2, 2, 2)
-            canvas_layout.setSpacing(2)
+            canvas_layout.setContentsMargins(0, 0, 0, 0)
+            canvas_layout.setSpacing(1)
             
             try:
-                # Create canvas with moderate size - balanced for visibility
-                # Reduced to make room for wider right panel
-                self.unified_canvas = CalibrationCanvas(canvas_container, width=14, height=14, dpi=100)
+                # Create canvas with larger size for better visibility
+                self.unified_canvas = CalibrationCanvas(canvas_container, width=24, height=24, dpi=100)
                 canvas_layout.addWidget(self.unified_canvas)
             except Exception as e:
                 # Simplified error message
@@ -284,34 +293,52 @@ class CalibrateModule(GUIBase):
                 canvas_layout.addWidget(placeholder)
                 self.unified_canvas = None
             
-            # Vertical contrast slider on right side (limited height)
-            contrast_widget = QWidget()
-            contrast_widget.setMinimumWidth(150)
-            contrast_widget.setMaximumWidth(180)
-            contrast_layout = QVBoxLayout(contrast_widget)
-            contrast_layout.setContentsMargins(5, 5, 5, 5)
-            contrast_layout.setSpacing(3)
+            # Right side panel with position label and controls
+            right_panel_widget = QWidget()
+            right_panel_widget.setMinimumWidth(200)
+            right_panel_widget.setMaximumWidth(220)
+            right_panel_layout = QVBoxLayout(right_panel_widget)
+            right_panel_layout.setContentsMargins(2, 2, 2, 2)
+            right_panel_layout.setSpacing(5)
 
             # Position label at top (more visible, no background)
             self.position_lbl = QLabel("Position: x=0, y=0")
-            self.position_lbl.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-            self.position_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.position_lbl.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+            self.position_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)  # Align left
             self.position_lbl.setStyleSheet("""
                 color: #333333;
                 padding: 5px;
+                padding-left: 10px;
             """)
-            self.position_lbl.setMinimumHeight(30)
-            contrast_layout.addWidget(self.position_lbl)
+            self.position_lbl.setMinimumHeight(25)
+            right_panel_layout.addWidget(self.position_lbl)
 
-            # Add stretch
-            contrast_layout.addStretch(1)
+            # Add stretch to center controls vertically
+            right_panel_layout.addStretch(2)
 
-            # Contrast percentage label (top)
-            contrast_top_lbl = QLabel("100% Contrast")
-            contrast_top_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            contrast_top_lbl.setFont(QFont('Arial', 8))
-            contrast_top_lbl.setStyleSheet("color: #555;")
-            contrast_layout.addWidget(contrast_top_lbl)
+            # Calibrate button (above slider)
+            button_width = 140
+            button_height = 40
+            
+            self.calibrate_btn = ModernButton("Calibrate",
+                                             self.run_calibration,
+                                             "",
+                                             bg_color=self.colors['primary'],
+                                             hover_color=self.colors['primary_hover'],
+                                             width=button_width, height=button_height,
+                                             font_size=10,
+                                             parent=right_panel_widget)
+            right_panel_layout.addWidget(self.calibrate_btn, 0, Qt.AlignmentFlag.AlignCenter)
+            
+            # Add spacing
+            right_panel_layout.addSpacing(15)
+            
+            # Current contrast percentage display
+            self.contrast_pct_lbl = QLabel("Contrast: 100%")
+            self.contrast_pct_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.contrast_pct_lbl.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+            self.contrast_pct_lbl.setStyleSheet("color: #2E5C8A; padding: 3px;")
+            right_panel_layout.addWidget(self.contrast_pct_lbl)
             
             # Vertical slider with reasonable range (0-100 for percentage)
             self.contrast_slider = QSlider(Qt.Orientation.Vertical)
@@ -319,7 +346,7 @@ class CalibrateModule(GUIBase):
             self.contrast_slider.setMaximum(100)  # Use percentage scale
             self.contrast_slider.setValue(100)  # Default to max
             self.contrast_slider.setInvertedAppearance(True)  # Max at top
-            self.contrast_slider.setFixedHeight(550)  # Match canvas height (14x14)
+            self.contrast_slider.setFixedHeight(400)  # Adjusted height
             self.contrast_slider.setStyleSheet("""
                 QSlider::groove:vertical {
                     width: 25px;
@@ -343,72 +370,32 @@ class CalibrateModule(GUIBase):
                 }
             """)
             self.contrast_slider.valueChanged.connect(self.on_contrast_slider_changed)
-            contrast_layout.addWidget(self.contrast_slider)
+            right_panel_layout.addWidget(self.contrast_slider, 0, Qt.AlignmentFlag.AlignCenter)
 
             # Store image statistics for contrast mapping
             self.image_vmin = 0
             self.image_vmax = 65535  # Will be updated when image is loaded
-
-            # Contrast percentage label (bottom)
-            contrast_bottom_lbl = QLabel("0% Contrast")
-            contrast_bottom_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            contrast_bottom_lbl.setFont(QFont('Arial', 8))
-            contrast_bottom_lbl.setStyleSheet("color: #555;")
-            contrast_layout.addWidget(contrast_bottom_lbl)
             
-            # Add stretch at bottom
-            contrast_layout.addStretch(1)
+            # Add spacing
+            right_panel_layout.addSpacing(15)
             
-            canvas_layout.addWidget(contrast_widget)
-            
-            image_layout.addWidget(canvas_container)
-
-            # Status bar with control buttons - inside image_layout for proper alignment
-            status_frame = QFrame()
-            status_frame.setMaximumHeight(40)
-            status_layout = QHBoxLayout(status_frame)
-            status_layout.setContentsMargins(3, 1, 3, 1)
-            status_layout.setSpacing(3)
-
-            # Display control buttons with consistent width for symmetry
-            button_width = 110
-            reset_zoom_btn = ModernButton("Reset Zoom",
-                                         self.reset_zoom,
-                                         "",
-                                         bg_color=self.colors['secondary'],
-                                         hover_color=self.colors['primary'],
-                                         width=button_width, height=32,
-                                         font_size=9,
-                                         parent=status_frame)
-
-            self.calibrate_btn = ModernButton("Calibrate",
-                                             self.run_calibration,
-                                             "",
-                                             bg_color=self.colors['primary'],
-                                             hover_color=self.colors['primary_hover'],
-                                             width=button_width, height=32,
-                                             font_size=9,
-                                             parent=status_frame)
-
+            # Refine button (below slider)
             self.refine_btn = ModernButton("Refine",
                                            self.refine_calibration,
                                            "",
                                            bg_color=self.colors['secondary'],
                                            hover_color=self.colors['primary'],
-                                           width=button_width, height=32,
-                                           font_size=9,
-                                           parent=status_frame)
-
-            # Distribute buttons evenly with space between them
-            status_layout.addStretch(2)
-            status_layout.addWidget(reset_zoom_btn)
-            status_layout.addStretch(1)
-            status_layout.addWidget(self.calibrate_btn)
-            status_layout.addStretch(1)
-            status_layout.addWidget(self.refine_btn)
-            status_layout.addStretch(2)
-
-            image_layout.addWidget(status_frame)
+                                           width=button_width, height=button_height,
+                                           font_size=10,
+                                           parent=right_panel_widget)
+            right_panel_layout.addWidget(self.refine_btn, 0, Qt.AlignmentFlag.AlignCenter)
+            
+            # Add stretch at bottom
+            right_panel_layout.addStretch(2)
+            
+            canvas_layout.addWidget(right_panel_widget)
+            
+            image_layout.addWidget(canvas_container)
 
             # Keep references for compatibility
             self.calibration_canvas = self.unified_canvas
@@ -587,6 +574,7 @@ class CalibrateModule(GUIBase):
         
         bottom_layout.addWidget(self.load_calibration_btn)
         bottom_layout.addWidget(self.save_calibration_btn)
+        bottom_layout.addStretch()  # Push buttons to the left
         
         right_layout.addWidget(bottom_frame)
         
@@ -1609,7 +1597,7 @@ class CalibrateModule(GUIBase):
                 try:
                     calibrant_name = self.calibrant_combo.currentText()
                     if calibrant_name in ALL_CALIBRANTS:
-                        self.calibrant = ALL_CALIBRANTS[calibrant_name]
+                        self.calibrant = get_calibrant(calibrant_name)
                 except:
                     pass
     
@@ -2196,10 +2184,17 @@ class CalibrateModule(GUIBase):
 
     def browse_and_load_image(self):
         """Browse for calibration image and load it immediately"""
-        filename, _ = QFileDialog.getOpenFileName(
-            None, "Select Calibration Image", "",
-            "Image Files (*.tif *.tiff *.edf *.cbf *.mar3450 *.img *.h5 *.hdf5);;HDF5 Files (*.h5 *.hdf5);;TIFF Files (*.tif *.tiff);;EDF Files (*.edf);;All Files (*.*)"
-        )
+        # Create file dialog with proper parent to avoid flashing
+        dialog = QFileDialog(self.parent if hasattr(self, 'parent') and self.parent else None)
+        dialog.setWindowTitle("Select Calibration Image")
+        dialog.setNameFilter("Image Files (*.tif *.tiff *.edf *.cbf *.mar3450 *.img *.h5 *.hdf5);;HDF5 Files (*.h5 *.hdf5);;TIFF Files (*.tif *.tiff);;EDF Files (*.edf);;All Files (*.*)")
+        dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
+        dialog.setOption(QFileDialog.Option.DontUseNativeDialog, False)  # Use native dialog for better performance
+        
+        if dialog.exec() == QFileDialog.DialogCode.Accepted:
+            filename = dialog.selectedFiles()[0]
+        else:
+            filename = None
         if filename:
             self.image_path = filename
             # Update filename display
@@ -2322,6 +2317,9 @@ class CalibrateModule(GUIBase):
                 # Set slider to 100% (full contrast)
                 if hasattr(self, 'contrast_slider'):
                     self.contrast_slider.setValue(100)
+                    # Update percentage label
+                    if hasattr(self, 'contrast_pct_lbl'):
+                        self.contrast_pct_lbl.setText("Contrast: 100%")
                 
                 # Display image immediately with forced update
                 self.unified_canvas.display_calibration_image(self.current_image)
@@ -2454,7 +2452,7 @@ class CalibrateModule(GUIBase):
             if self.calibrant is None:
                 calibrant_name = self.calibrant_combo.currentText()
                 if calibrant_name in ALL_CALIBRANTS:
-                    self.calibrant = ALL_CALIBRANTS[calibrant_name]
+                    self.calibrant = get_calibrant(calibrant_name)
                 else:
                     return
             
@@ -2824,7 +2822,10 @@ class CalibrateModule(GUIBase):
             self.log(f"Pixel size: {pixel_size*1e6:.1f} μm")
             
             # Create calibrant
-            calibrant = ALL_CALIBRANTS[calibrant_name]
+            calibrant = get_calibrant(calibrant_name)
+            if calibrant is None:
+                self.log(f"Error: Invalid calibrant '{calibrant_name}'")
+                return
             calibrant.wavelength = wavelength
             
             # Get mask - use imported mask if "use mask" is checked
@@ -3618,6 +3619,10 @@ class CalibrateModule(GUIBase):
 
     def on_contrast_slider_changed(self, value):
         """Handle contrast slider change (single vertical slider controls max)"""
+        # Update percentage label
+        if hasattr(self, 'contrast_pct_lbl'):
+            self.contrast_pct_lbl.setText(f"Contrast: {value}%")
+        
         # Use timer to debounce slider changes
         if hasattr(self, '_contrast_timer') and self._contrast_timer is not None:
             self._contrast_timer.stop()
@@ -3635,6 +3640,7 @@ class CalibrateModule(GUIBase):
             return
 
         # Calculate actual vmax based on slider percentage
+        # slider_value is 0-100, representing percentage of the full range
         percentage = slider_value / 100.0
         vmin = self.image_vmin
         vmax = self.image_vmin + (self.image_vmax - self.image_vmin) * percentage
@@ -3649,6 +3655,10 @@ class CalibrateModule(GUIBase):
 
             if hasattr(self, 'mask_canvas'):
                 self.mask_canvas.set_contrast(vmin, vmax)
+        
+        # Log the percentage being applied (only occasionally to avoid spam)
+        if slider_value % 10 == 0 or slider_value == 100 or slider_value == 0:
+            self.log(f"Contrast adjusted to {slider_value}% (range: {vmin:.0f} - {vmax:.0f})")
     
     def auto_contrast(self):
         """Auto-adjust contrast based on image statistics"""
@@ -3659,15 +3669,18 @@ class CalibrateModule(GUIBase):
             # Calculate percentiles for auto-contrast
             vmin = np.percentile(self.current_image, 1)
             vmax = np.percentile(self.current_image, 99)
+            
+            # Update image statistics for percentage mapping
+            self.image_vmin = vmin
+            self.image_vmax = vmax
 
-            # Update slider (clamp to prevent overflow)
+            # Set slider to 100% (full contrast range)
             if hasattr(self, 'contrast_slider'):
-                clamped_vmax = min(int(vmax), INT32_MAX)
-                self.contrast_slider.setValue(clamped_vmax)
+                self.contrast_slider.setValue(100)
 
-            # Apply
-            self.apply_contrast_from_slider(min(int(vmax), INT32_MAX))
-            self.log(f"Auto-contrast applied: 0 - {vmax:.0f}")
+            # Apply contrast at 100%
+            self.apply_contrast_from_slider(100)
+            self.log(f"Auto-contrast applied: {vmin:.0f} - {vmax:.0f} (100%)")
         except Exception as e:
             self.log(f"Auto-contrast failed: {str(e)}")
     
