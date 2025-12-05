@@ -286,8 +286,8 @@ class CalibrateModule(GUIBase):
             
             # Vertical contrast slider on right side (limited height)
             contrast_widget = QWidget()
-            contrast_widget.setMinimumWidth(150)
-            contrast_widget.setMaximumWidth(180)
+            contrast_widget.setMinimumWidth(200)  # Increased from 150
+            contrast_widget.setMaximumWidth(240)  # Increased from 180
             contrast_layout = QVBoxLayout(contrast_widget)
             contrast_layout.setContentsMargins(5, 5, 5, 5)
             contrast_layout.setSpacing(3)
@@ -295,10 +295,11 @@ class CalibrateModule(GUIBase):
             # Position label at top (more visible, no background)
             self.position_lbl = QLabel("Position: x=0, y=0")
             self.position_lbl.setFont(QFont('Arial', 10, QFont.Weight.Bold))
-            self.position_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.position_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)  # Align left
             self.position_lbl.setStyleSheet("""
                 color: #333333;
                 padding: 5px;
+                padding-left: 10px;
             """)
             self.position_lbl.setMinimumHeight(30)
             contrast_layout.addWidget(self.position_lbl)
@@ -307,11 +308,18 @@ class CalibrateModule(GUIBase):
             contrast_layout.addStretch(1)
 
             # Contrast percentage label (top)
-            contrast_top_lbl = QLabel("100% Contrast")
+            contrast_top_lbl = QLabel("100%")
             contrast_top_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             contrast_top_lbl.setFont(QFont('Arial', 8))
             contrast_top_lbl.setStyleSheet("color: #555;")
             contrast_layout.addWidget(contrast_top_lbl)
+            
+            # Current contrast percentage display
+            self.contrast_pct_lbl = QLabel("Contrast: 100%")
+            self.contrast_pct_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.contrast_pct_lbl.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+            self.contrast_pct_lbl.setStyleSheet("color: #2E5C8A; padding: 3px;")
+            contrast_layout.addWidget(self.contrast_pct_lbl)
             
             # Vertical slider with reasonable range (0-100 for percentage)
             self.contrast_slider = QSlider(Qt.Orientation.Vertical)
@@ -350,7 +358,7 @@ class CalibrateModule(GUIBase):
             self.image_vmax = 65535  # Will be updated when image is loaded
 
             # Contrast percentage label (bottom)
-            contrast_bottom_lbl = QLabel("0% Contrast")
+            contrast_bottom_lbl = QLabel("0%")
             contrast_bottom_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             contrast_bottom_lbl.setFont(QFont('Arial', 8))
             contrast_bottom_lbl.setStyleSheet("color: #555;")
@@ -587,6 +595,7 @@ class CalibrateModule(GUIBase):
         
         bottom_layout.addWidget(self.load_calibration_btn)
         bottom_layout.addWidget(self.save_calibration_btn)
+        bottom_layout.addStretch()  # Push buttons to the left
         
         right_layout.addWidget(bottom_frame)
         
@@ -2322,6 +2331,9 @@ class CalibrateModule(GUIBase):
                 # Set slider to 100% (full contrast)
                 if hasattr(self, 'contrast_slider'):
                     self.contrast_slider.setValue(100)
+                    # Update percentage label
+                    if hasattr(self, 'contrast_pct_lbl'):
+                        self.contrast_pct_lbl.setText("Contrast: 100%")
                 
                 # Display image immediately with forced update
                 self.unified_canvas.display_calibration_image(self.current_image)
@@ -3618,6 +3630,10 @@ class CalibrateModule(GUIBase):
 
     def on_contrast_slider_changed(self, value):
         """Handle contrast slider change (single vertical slider controls max)"""
+        # Update percentage label
+        if hasattr(self, 'contrast_pct_lbl'):
+            self.contrast_pct_lbl.setText(f"Contrast: {value}%")
+        
         # Use timer to debounce slider changes
         if hasattr(self, '_contrast_timer') and self._contrast_timer is not None:
             self._contrast_timer.stop()
@@ -3635,6 +3651,7 @@ class CalibrateModule(GUIBase):
             return
 
         # Calculate actual vmax based on slider percentage
+        # slider_value is 0-100, representing percentage of the full range
         percentage = slider_value / 100.0
         vmin = self.image_vmin
         vmax = self.image_vmin + (self.image_vmax - self.image_vmin) * percentage
@@ -3649,6 +3666,10 @@ class CalibrateModule(GUIBase):
 
             if hasattr(self, 'mask_canvas'):
                 self.mask_canvas.set_contrast(vmin, vmax)
+        
+        # Log the percentage being applied (only occasionally to avoid spam)
+        if slider_value % 10 == 0 or slider_value == 100 or slider_value == 0:
+            self.log(f"Contrast adjusted to {slider_value}% (range: {vmin:.0f} - {vmax:.0f})")
     
     def auto_contrast(self):
         """Auto-adjust contrast based on image statistics"""
@@ -3659,15 +3680,18 @@ class CalibrateModule(GUIBase):
             # Calculate percentiles for auto-contrast
             vmin = np.percentile(self.current_image, 1)
             vmax = np.percentile(self.current_image, 99)
+            
+            # Update image statistics for percentage mapping
+            self.image_vmin = vmin
+            self.image_vmax = vmax
 
-            # Update slider (clamp to prevent overflow)
+            # Set slider to 100% (full contrast range)
             if hasattr(self, 'contrast_slider'):
-                clamped_vmax = min(int(vmax), INT32_MAX)
-                self.contrast_slider.setValue(clamped_vmax)
+                self.contrast_slider.setValue(100)
 
-            # Apply
-            self.apply_contrast_from_slider(min(int(vmax), INT32_MAX))
-            self.log(f"Auto-contrast applied: 0 - {vmax:.0f}")
+            # Apply contrast at 100%
+            self.apply_contrast_from_slider(100)
+            self.log(f"Auto-contrast applied: {vmin:.0f} - {vmax:.0f} (100%)")
         except Exception as e:
             self.log(f"Auto-contrast failed: {str(e)}")
     
