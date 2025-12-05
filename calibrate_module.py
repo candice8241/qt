@@ -12,6 +12,8 @@ Features:
 
 Created: 2025
 @author: XRD Processing Suite
+
+NOTE: Canvas classes have been moved to calibration_canvas.py for better modularity
 """
 
 from PyQt6.QtWidgets import (QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton,
@@ -28,6 +30,9 @@ import numpy as np
 from gui_base import GUIBase
 from theme_module import ModernButton
 from custom_widgets import CustomSpinbox
+
+# Import Canvas classes (moved to separate file)
+from calibration_canvas import MaskCanvas, CalibrationCanvas
 
 # Import pyFAI and related libraries
 try:
@@ -87,911 +92,6 @@ class CalibrationWorkerThread(QThread):
             self.error.emit(error_msg)
 
 
-class MaskCanvas(FigureCanvas):
-    """Canvas for displaying and editing masks"""
-    
-    def __init__(self, parent=None, width=6, height=6, dpi=100):
-        self.fig = Figure(figsize=(width, height), dpi=dpi)
-        self.axes = self.fig.add_subplot(111)
-        super().__init__(self.fig)
-        self.setParent(parent)
-        
-        self.image_data = None
-        self.mask_data = None
-        self.drawing = False
-        self.mask_mode = 'rectangle'  # rectangle, circle, polygon, threshold
-        self.mask_value = True  # True = mask (hide), False = unmask (show)
-        self.start_point = None
-        self.temp_patches = []
-        self.preview_patch = None  # Temporary preview shape
-        
-        # Zoom and contrast settings
-        self.zoom_level = 1.0
-        self.contrast_min = None
-        self.contrast_max = None
-        self.base_xlim = None
-        self.base_ylim = None
-        
-        # Performance optimization
-        self._last_preview_pos = None
-        self._background = None  # Store background for blitting
-        
-        # Connect mouse events
-        self.mpl_connect('button_press_event', self.on_mouse_press)
-        self.mpl_connect('button_release_event', self.on_mouse_release)
-        self.mpl_connect('motion_notify_event', self.on_mouse_move)
-        self.mpl_connect('scroll_event', self.on_scroll)
-        
-        # Enable blitting for better performance
-        self.mpl_connect('draw_event', self.on_draw)
-        
-    def load_image(self, image_path):
-        """Load image for mask editing"""
-        try:
-            if FABIO_AVAILABLE:
-                img = fabio.open(image_path)
-                self.image_data = img.data
-            else:
-                # Fallback to simple image loading
-                from PIL import Image
-                img = Image.open(image_path)
-                self.image_data = np.array(img)
-            
-            # Initialize mask if needed
-            if self.mask_data is None or self.mask_data.shape != self.image_data.shape:
-                self.mask_data = np.zeros(self.image_data.shape, dtype=bool)
-            
-            self.display_image()
-            return True
-        except Exception as e:
-            print(f"Error loading image: {e}")
-            return False
-    
-    def display_image(self):
-        """Display the image with mask overlay"""
-        self.axes.clear()
-        if self.image_data is not None:
-            # Apply contrast settings
-            if self.contrast_min is not None and self.contrast_max is not None:
-                display_data = np.clip(self.image_data, self.contrast_min, self.contrast_max)
-                vmin, vmax = np.log10(self.contrast_min + 1), np.log10(self.contrast_max + 1)
-            else:
-                display_data = self.image_data
-                vmin, vmax = None, None
-            
-            # Display image with log scale
-            # Use lower interpolation for large images
-            interp = 'nearest' if self.image_data.size > 4000000 else 'bilinear'
-            im = self.axes.imshow(np.log10(display_data + 1), cmap='viridis', 
-                                 origin='lower', vmin=vmin, vmax=vmax, 
-                                 interpolation=interp)
-            
-            # Overlay mask in red with high visibility
-            if self.mask_data is not None:
-                # Create red mask overlay
-                mask_rgba = np.zeros((*self.mask_data.shape, 4))
-                mask_rgba[self.mask_data, 0] = 1.0  # Red channel
-                mask_rgba[self.mask_data, 3] = 0.6  # Alpha (transparency)
-                self.axes.imshow(mask_rgba, origin='lower', interpolation='nearest')
-            
-            self.axes.set_title('Image with Mask (red = masked regions) - Scroll to zoom')
-            
-            # Store base limits for zoom
-            if self.base_xlim is None:
-                self.base_xlim = self.axes.get_xlim()
-                self.base_ylim = self.axes.get_ylim()
-            else:
-                # Restore zoom level
-                self.axes.set_xlim(self.base_xlim)
-                self.axes.set_ylim(self.base_ylim)
-            
-            # Don't add colorbar - removed per user request
-        
-        self.figure.canvas.draw_idle()
-        
-        # Reset background for blitting
-        self._background = None
-    
-    def on_draw(self, event):
-        """Capture background for blitting"""
-        # Store background after drawing completes
-        if self.image_data is not None and self.image_data.size > 4000000:
-            self._background = self.copy_from_bbox(self.axes.bbox)
-    
-    def on_scroll(self, event):
-        """Handle mouse scroll for zoom"""
-        if event.inaxes != self.axes:
-            return
-        
-        # Get current axis limits
-        cur_xlim = self.axes.get_xlim()
-        cur_ylim = self.axes.get_ylim()
-        
-        # Get mouse position
-        xdata, ydata = event.xdata, event.ydata
-        
-        # Zoom factor
-        if event.button == 'up':
-            scale_factor = 0.9  # Zoom in
-        elif event.button == 'down':
-            scale_factor = 1.1  # Zoom out
-        else:
-            return
-        
-        # Calculate new limits
-        new_width = (cur_xlim[1] - cur_xlim[0]) * scale_factor
-        new_height = (cur_ylim[1] - cur_ylim[0]) * scale_factor
-        
-        relx = (cur_xlim[1] - xdata) / (cur_xlim[1] - cur_xlim[0])
-        rely = (cur_ylim[1] - ydata) / (cur_ylim[1] - cur_ylim[0])
-        
-        # Set new limits centered on mouse position
-        self.axes.set_xlim([xdata - new_width * (1 - relx), xdata + new_width * relx])
-        self.axes.set_ylim([ydata - new_height * (1 - rely), ydata + new_height * rely])
-        
-        # Update zoom level
-        self.zoom_level = (self.base_xlim[1] - self.base_xlim[0]) / new_width
-        
-        self.draw_idle()
-    
-    def reset_zoom(self):
-        """Reset zoom to original view"""
-        if self.base_xlim is not None:
-            self.axes.set_xlim(self.base_xlim)
-            self.axes.set_ylim(self.base_ylim)
-            self.zoom_level = 1.0
-            self.draw_idle()
-    
-    def set_contrast(self, vmin, vmax):
-        """Set contrast limits"""
-        self.contrast_min = vmin
-        self.contrast_max = vmax
-        
-        # Only update if image data exists
-        if self.image_data is not None:
-            # Update image without full redraw
-            self.update_image_contrast()
-    
-    def on_mouse_press(self, event):
-        """Handle mouse press events"""
-        if event.inaxes != self.axes:
-            return
-        # Check for left mouse button (can be 1 or MouseButton.LEFT)
-        if event.button not in [1, 'MouseButton.LEFT']:
-            return
-        self.drawing = True
-        self.start_point = (int(event.xdata), int(event.ydata))
-        print(f"Mouse press at: {self.start_point}")  # Debug
-    
-    def on_mouse_release(self, event):
-        """Handle mouse release events"""
-        if not self.drawing:
-            return
-        
-        # Get end point (even if outside axes, use last valid position)
-        if event.inaxes != self.axes:
-            if not hasattr(self, '_last_mouse_pos'):
-                self.drawing = False
-                return
-            end_point = self._last_mouse_pos
-        else:
-            end_point = (int(event.xdata), int(event.ydata))
-        
-        print(f"Mouse release at: {end_point}")  # Debug
-        
-        # Remove preview
-        if self.preview_patch is not None:
-            self.preview_patch.remove()
-            self.preview_patch = None
-        
-        # Apply mask
-        try:
-            if self.mask_mode == 'rectangle':
-                self.apply_rectangle_mask(self.start_point, end_point)
-                print("Applied rectangle mask")
-            elif self.mask_mode == 'circle':
-                self.apply_circle_mask(self.start_point, end_point)
-                print("Applied circle mask")
-        except Exception as e:
-            print(f"Error applying mask: {e}")
-        
-        self.drawing = False
-        self.display_image()
-    
-    def on_mouse_move(self, event):
-        """Handle mouse move events with real-time preview"""
-        if not self.drawing:
-            return
-        
-        if event.inaxes != self.axes:
-            return
-        
-        if self.start_point is None:
-            return
-        
-        # Throttle updates for large images (only update every N pixels)
-        current_point = (int(event.xdata), int(event.ydata))
-        self._last_mouse_pos = current_point  # Store for release event
-        
-        # Skip update if moved less than 5 pixels (for performance)
-        if hasattr(self, '_last_preview_pos'):
-            dx = abs(current_point[0] - self._last_preview_pos[0])
-            dy = abs(current_point[1] - self._last_preview_pos[1])
-            if dx < 5 and dy < 5:
-                return
-        
-        self._last_preview_pos = current_point
-        
-        # Remove old preview
-        if self.preview_patch is not None:
-            try:
-                self.preview_patch.remove()
-            except:
-                pass
-            self.preview_patch = None
-        
-        # Draw preview shape
-        try:
-            if self.mask_mode == 'rectangle':
-                self.preview_patch = self.draw_rectangle_preview(self.start_point, current_point)
-            elif self.mask_mode == 'circle':
-                self.preview_patch = self.draw_circle_preview(self.start_point, current_point)
-        except Exception as e:
-            print(f"Error drawing preview: {e}")
-        
-        # Use draw_idle for faster updates
-        self.figure.canvas.draw_idle()
-    
-    def draw_rectangle_preview(self, start, end):
-        """Draw rectangle preview"""
-        from matplotlib.patches import Rectangle
-        
-        x1, y1 = start
-        x2, y2 = end
-        
-        width = x2 - x1
-        height = y2 - y1
-        
-        rect = Rectangle((x1, y1), width, height, 
-                        linewidth=2, edgecolor='yellow', 
-                        facecolor='red', alpha=0.3)
-        self.axes.add_patch(rect)
-        return rect
-    
-    def draw_circle_preview(self, center, edge):
-        """Draw circle preview"""
-        from matplotlib.patches import Circle
-        
-        cx, cy = center
-        ex, ey = edge
-        radius = np.sqrt((ex - cx)**2 + (ey - cy)**2)
-        
-        circle = Circle((cx, cy), radius, 
-                       linewidth=2, edgecolor='yellow',
-                       facecolor='red', alpha=0.3)
-        self.axes.add_patch(circle)
-        return circle
-    
-    def apply_rectangle_mask(self, start, end):
-        """Apply rectangular mask"""
-        if self.mask_data is None:
-            print("No mask data initialized!")
-            return
-        
-        x1, y1 = min(start[0], end[0]), min(start[1], end[1])
-        x2, y2 = max(start[0], end[0]), max(start[1], end[1])
-        
-        print(f"Applying rectangle mask: ({x1}, {y1}) to ({x2}, {y2})")
-        
-        # Clamp to image bounds
-        x1 = max(0, min(x1, self.mask_data.shape[1]-1))
-        x2 = max(0, min(x2, self.mask_data.shape[1]-1))
-        y1 = max(0, min(y1, self.mask_data.shape[0]-1))
-        y2 = max(0, min(y2, self.mask_data.shape[0]-1))
-        
-        # Apply mask value
-        self.mask_data[y1:y2+1, x1:x2+1] = self.mask_value
-        
-        print(f"Masked {(y2-y1+1)*(x2-x1+1)} pixels")
-    
-    def apply_circle_mask(self, center, edge):
-        """Apply circular mask"""
-        if self.mask_data is None:
-            print("No mask data initialized!")
-            return
-        
-        cx, cy = center
-        ex, ey = edge
-        radius = np.sqrt((ex - cx)**2 + (ey - cy)**2)
-        
-        print(f"Applying circle mask: center=({cx}, {cy}), radius={radius:.2f}")
-        
-        # Clamp center to image bounds
-        cy = max(0, min(cy, self.mask_data.shape[0] - 1))
-        cx = max(0, min(cx, self.mask_data.shape[1] - 1))
-        
-        # Create circular mask
-        y, x = np.ogrid[:self.mask_data.shape[0], :self.mask_data.shape[1]]
-        mask_circle = (x - cx)**2 + (y - cy)**2 <= radius**2
-        
-        # Apply mask value
-        self.mask_data[mask_circle] = self.mask_value
-        
-        print(f"Masked {np.sum(mask_circle)} pixels")
-    
-    def apply_threshold_mask(self, threshold_min, threshold_max):
-        """Apply intensity threshold mask"""
-        if self.image_data is None or self.mask_data is None:
-            return
-        
-        mask_threshold = (self.image_data < threshold_min) | (self.image_data > threshold_max)
-        self.mask_data[mask_threshold] = self.mask_value
-        self.display_image()
-    
-    def clear_mask(self):
-        """Clear all mask"""
-        if self.mask_data is not None:
-            self.mask_data = np.zeros(self.mask_data.shape, dtype=bool)
-            self.display_image()
-    
-    def update_image_contrast(self):
-        """Update image contrast without full redraw"""
-        if self.image_data is None:
-            return
-        
-        # Find existing image artists
-        for artist in self.axes.images:
-            if hasattr(artist, 'set_clim'):
-                if self.contrast_min is not None and self.contrast_max is not None:
-                    vmin = np.log10(self.contrast_min + 1)
-                    vmax = np.log10(self.contrast_max + 1)
-                    artist.set_clim(vmin, vmax)
-        
-    
-    def invert_mask(self):
-        """Invert mask"""
-        if self.mask_data is not None:
-            self.mask_data = ~self.mask_data
-            self.display_image()
-    
-    def get_mask(self):
-        """Get current mask data"""
-        return self.mask_data
-    
-    def set_mask(self, mask):
-        """Set mask data"""
-        self.mask_data = mask.astype(bool) if mask is not None else None
-        self.display_image()
-
-
-class CalibrationCanvas(FigureCanvas):
-    """Canvas for displaying calibration results"""
-    
-    def __init__(self, parent=None, width=6, height=6, dpi=100):
-        try:
-            # Use smaller DPI to reduce memory usage
-            actual_dpi = min(dpi, 80)
-            
-            self.fig = Figure(figsize=(width, height), dpi=actual_dpi)
-            self.axes = self.fig.add_subplot(111)
-            super().__init__(self.fig)
-            self.setParent(parent)
-            
-            # Zoom and contrast settings
-            self.zoom_level = 1.0
-            self.contrast_min = None
-            self.contrast_max = None
-            self.base_xlim = None
-            self.base_ylim = None
-            
-            # Tool modes
-            self.peak_picking_mode = False
-            self.mask_editing_mode = False
-            self.manual_peaks = []  # List of (x, y, ring_num)
-            self.peak_markers = []  # List of matplotlib artists
-            
-            # Mask editing state
-            self.mask_data = None
-            self.image_data = None
-            self.mask_mode = 'rectangle'  # rectangle, circle
-            self.mask_value = True  # True = mask, False = unmask
-            self.drawing = False
-            self.start_point = None
-            self.preview_patch = None
-            self._last_mouse_pos = None
-            
-            # Ring display properties (fixed, Dioptas style)
-            self.show_rings = True  # Always show rings
-            self.num_rings_display = 50  # Show all available rings (Dioptas default)
-            self.ring_alpha = 1.0  # Full opacity (Dioptas default)
-            self.ring_color = 'red'  # Red color (Dioptas default)
-            self.calibration_points = None  # Store calibration points
-            
-            # Connect events with error handling
-            try:
-                self.mpl_connect('scroll_event', self.on_scroll)
-                self.mpl_connect('button_press_event', self.on_unified_click)
-                self.mpl_connect('button_release_event', self.on_mouse_release)
-                self.mpl_connect('motion_notify_event', self.on_mouse_move)
-            except Exception as e:
-                print(f"Warning: Could not connect canvas events: {e}")
-                
-        except Exception as e:
-            print(f"ERROR creating CalibrationCanvas: {e}")
-            import traceback
-            traceback.print_exc()
-            raise
-        
-    def display_calibration_image(self, image_data, calibration_points=None):
-        """Display calibration image with detected points"""
-        if image_data is None:
-            return
-        
-        # Store image data
-        self.image_data = image_data
-        
-        # Initialize mask if needed
-        if self.mask_data is None and image_data is not None:
-            self.mask_data = np.zeros(image_data.shape, dtype=bool)
-        
-        # Store current manual peaks before clearing
-        temp_manual_peaks = self.manual_peaks.copy()
-        
-        self.axes.clear()
-        
-        # Clear peak markers list
-        self.peak_markers = []
-        
-        # Apply contrast settings
-        if self.contrast_min is not None and self.contrast_max is not None:
-            display_data = np.clip(image_data, self.contrast_min, self.contrast_max)
-            vmin, vmax = np.log10(self.contrast_min + 1), np.log10(self.contrast_max + 1)
-        else:
-            display_data = image_data
-            vmin, vmax = None, None
-        
-        self.axes.imshow(np.log10(display_data + 1), cmap='viridis', origin='lower',
-                        vmin=vmin, vmax=vmax, interpolation='nearest')
-        
-        # Store calibration points for later updates
-        if calibration_points is not None:
-            self.calibration_points = calibration_points
-            
-            # Plot calibration rings (with display control)
-            if self.show_rings:
-                # Limit number of rings displayed
-                rings_to_display = min(len(self.calibration_points), self.num_rings_display)
-                for i, ring in enumerate(self.calibration_points[:rings_to_display]):
-                    if len(ring) > 0:
-                        ring = np.array(ring)
-                        self.axes.plot(ring[:, 1], ring[:, 0], '.', 
-                                     color=self.ring_color,
-                                     markersize=2,
-                                     alpha=self.ring_alpha)
-        
-        # Restore manual peaks
-        if temp_manual_peaks:
-            for x, y, ring_num in temp_manual_peaks:
-                # Draw marker as red filled circle
-                marker = self.axes.plot(x, y, 'ro', markersize=8, markerfacecolor='red', 
-                                       markeredgecolor='white', markeredgewidth=1)[0]
-                self.peak_markers.append(marker)
-                
-                # Add ring number label above marker
-                label = self.axes.text(x, y + 15, f'{ring_num}', color='red', fontsize=9,
-                                      horizontalalignment='center', verticalalignment='bottom',
-                                      fontweight='bold')
-                self.peak_markers.append(label)
-        
-        # Overlay mask if exists (semi-transparent red)
-        if self.mask_data is not None and np.any(self.mask_data):
-            mask_rgba = np.zeros((*self.mask_data.shape, 4), dtype=np.float32)
-            mask_rgba[self.mask_data, 0] = 1.0  # Red channel
-            mask_rgba[self.mask_data, 3] = 0.5  # Alpha (semi-transparent)
-            self.axes.imshow(mask_rgba, origin='lower', interpolation='nearest', zorder=2)
-        
-        # Dynamic title based on mode
-        if self.peak_picking_mode:
-            title = 'Peak Selection Mode - Click on diffraction rings'
-        elif self.mask_editing_mode:
-            title = 'Mask Editing Mode - Draw masks on image'
-        else:
-            title = 'Calibration Image - Scroll to zoom'
-        
-        self.axes.set_title(title)
-        
-        # Store base limits for zoom
-        if self.base_xlim is None:
-            self.base_xlim = self.axes.get_xlim()
-            self.base_ylim = self.axes.get_ylim()
-        
-        # Use draw_idle() for better performance
-        self.draw_idle()
-    
-    def on_scroll(self, event):
-        """Handle mouse scroll for zoom"""
-        if event.inaxes != self.axes:
-            return
-        
-        # Get current axis limits
-        cur_xlim = self.axes.get_xlim()
-        cur_ylim = self.axes.get_ylim()
-        
-        # Get mouse position
-        xdata, ydata = event.xdata, event.ydata
-        
-        # Zoom factor
-        if event.button == 'up':
-            scale_factor = 0.9  # Zoom in
-        elif event.button == 'down':
-            scale_factor = 1.1  # Zoom out
-        else:
-            return
-        
-        # Calculate new limits
-        new_width = (cur_xlim[1] - cur_xlim[0]) * scale_factor
-        new_height = (cur_ylim[1] - cur_ylim[0]) * scale_factor
-        
-        relx = (cur_xlim[1] - xdata) / (cur_xlim[1] - cur_xlim[0])
-        rely = (cur_ylim[1] - ydata) / (cur_ylim[1] - cur_ylim[0])
-        
-        # Set new limits centered on mouse position
-        self.axes.set_xlim([xdata - new_width * (1 - relx), xdata + new_width * relx])
-        self.axes.set_ylim([ydata - new_height * (1 - rely), ydata + new_height * rely])
-        
-        # Update zoom level
-        self.zoom_level = (self.base_xlim[1] - self.base_xlim[0]) / new_width
-        
-        self.draw_idle()
-    
-    def reset_zoom(self):
-        """Reset zoom to original view"""
-        if self.base_xlim is not None:
-            self.axes.set_xlim(self.base_xlim)
-            self.axes.set_ylim(self.base_ylim)
-            self.zoom_level = 1.0
-            self.draw_idle()
-    
-    def set_contrast(self, vmin, vmax):
-        """Set contrast limits"""
-        self.contrast_min = vmin
-        self.contrast_max = vmax
-        
-        # Update contrast without full redraw
-        if hasattr(self, '_last_image_data') and self._last_image_data is not None:
-            self.update_image_contrast()
-    
-    def update_image_contrast(self):
-        """Update image contrast without full redraw"""
-        if not hasattr(self, '_last_image_data') or self._last_image_data is None:
-            return
-        
-        # Find existing image artists and update their color limits
-        for artist in self.axes.images:
-            if hasattr(artist, 'set_clim'):
-                if self.contrast_min is not None and self.contrast_max is not None:
-                    vmin = np.log10(self.contrast_min + 1)
-                    vmax = np.log10(self.contrast_max + 1)
-                    artist.set_clim(vmin, vmax)
-        
-    
-    def on_unified_click(self, event):
-        """Handle mouse click for peak selection or mask editing"""
-        if event.inaxes != self.axes:
-            return
-        
-        # Peak picking mode
-        if self.peak_picking_mode and event.button == 1:
-            x, y = event.xdata, event.ydata
-            
-            # Get ring number from parent
-            # Get ring number from parent (support both main UI and compact UI)
-            ring_num = 1  # Default to ring 1
-            if hasattr(self, 'parent_module') and self.parent_module is not None:
-                # Try main UI spinbox first
-                if hasattr(self.parent_module, 'ring_number_spinbox'):
-                    try:
-                        ring_num = self.parent_module.ring_number_spinbox.value()
-                    except:
-                        ring_num = 1
-                # Fall back to compact UI entry
-                elif hasattr(self.parent_module, 'ring_number_entry'):
-                    try:
-                        ring_num = int(self.parent_module.ring_number_entry.text())
-                    except (ValueError, AttributeError):
-                        ring_num = 1
-            
-            # Add peak
-            self.manual_peaks.append((x, y, ring_num))
-            
-            # Draw marker as red filled circle
-            marker = self.axes.plot(x, y, 'ro', markersize=8, markerfacecolor='red', 
-                                   markeredgecolor='white', markeredgewidth=1)[0]
-            self.peak_markers.append(marker)
-            
-            # Add ring number label above marker
-            label = self.axes.text(x, y + 15, f'{ring_num}', color='red', fontsize=9,
-                                  horizontalalignment='center', verticalalignment='bottom',
-                                  fontweight='bold')
-            self.peak_markers.append(label)
-            
-            # Use draw_idle() instead of immediate draw for better performance
-            self.draw_idle()
-            
-            # Auto-increment ring number for next peak (Dioptas style)
-            if hasattr(self, 'parent_module') and self.parent_module is not None:
-                self.parent_module.update_peak_count()
-                
-                # Check if auto increment is enabled
-                auto_inc = False
-                if hasattr(self.parent_module, 'automatic_peak_num_inc_cb'):
-                    try:
-                        auto_inc = self.parent_module.automatic_peak_num_inc_cb.isChecked()
-                    except:
-                        auto_inc = False
-                
-                if auto_inc:
-                    next_ring_num = ring_num + 1
-                    # Update main UI spinbox
-                    if hasattr(self.parent_module, 'ring_number_spinbox'):
-                        try:
-                            self.parent_module.ring_number_spinbox.setValue(next_ring_num)
-                        except:
-                            pass
-                    # Update compact UI entry
-                    elif hasattr(self.parent_module, 'ring_number_entry'):
-                        try:
-                            self.parent_module.ring_number_entry.setText(str(next_ring_num))
-                        except:
-                            pass
-        
-        # Mask editing mode
-        elif self.mask_editing_mode and event.button == 1:
-            # Start drawing mask
-            if event.inaxes == self.axes:
-                self.drawing = True
-                self.start_point = (int(event.xdata), int(event.ydata))
-    
-    def on_mouse_release(self, event):
-        """Handle mouse release for mask drawing"""
-        if not self.mask_editing_mode or not self.drawing:
-            return
-        
-        # Remove preview
-        if self.preview_patch is not None:
-            try:
-                self.preview_patch.remove()
-            except:
-                pass
-            self.preview_patch = None
-        
-        # Use last valid position if released outside axes
-        if event.inaxes != self.axes:
-            if self._last_mouse_pos is not None:
-                end_point = self._last_mouse_pos
-            else:
-                self.drawing = False
-                return
-        else:
-            end_point = (int(event.xdata), int(event.ydata))
-        
-        # Apply mask
-        try:
-            if self.mask_mode == 'rectangle':
-                self.apply_rectangle_mask(self.start_point, end_point)
-            elif self.mask_mode == 'circle':
-                self.apply_circle_mask(self.start_point, end_point)
-        except Exception as e:
-            print(f"Error applying mask: {e}")
-        
-        self.drawing = False
-        self.start_point = None
-        self._last_mouse_pos = None
-        self.display_calibration_image(self.image_data)
-    
-    def on_mouse_move(self, event):
-        """Handle mouse move for mask preview"""
-        if not self.mask_editing_mode or not self.drawing:
-            return
-        
-        if event.inaxes != self.axes or self.start_point is None:
-            return
-        
-        current_point = (int(event.xdata), int(event.ydata))
-        self._last_mouse_pos = current_point
-        
-        # Remove old preview
-        if self.preview_patch is not None:
-            try:
-                self.preview_patch.remove()
-            except:
-                pass
-            self.preview_patch = None
-        
-        # Draw preview shape
-        try:
-            from matplotlib.patches import Rectangle, Circle
-            
-            if self.mask_mode == 'rectangle':
-                x0, y0 = self.start_point
-                x1, y1 = current_point
-                width = x1 - x0
-                height = y1 - y0
-                self.preview_patch = Rectangle((x0, y0), width, height,
-                                              edgecolor='yellow', facecolor='red',
-                                              alpha=0.3, linewidth=2)
-                self.axes.add_patch(self.preview_patch)
-            elif self.mask_mode == 'circle':
-                x0, y0 = self.start_point
-                x1, y1 = current_point
-                radius = np.sqrt((x1 - x0)**2 + (y1 - y0)**2)
-                self.preview_patch = Circle((x0, y0), radius,
-                                           edgecolor='yellow', facecolor='red',
-                                           alpha=0.3, linewidth=2)
-                self.axes.add_patch(self.preview_patch)
-        except Exception as e:
-            print(f"Error drawing preview: {e}")
-        
-    
-    def apply_rectangle_mask(self, start, end):
-        """Apply rectangular mask"""
-        if self.mask_data is None or self.image_data is None:
-            return
-        
-        x0, y0 = start
-        x1, y1 = end
-        
-        # Ensure proper ordering
-        x_min, x_max = min(x0, x1), max(x0, x1)
-        y_min, y_max = min(y0, y1), max(y0, y1)
-        
-        # Clamp to image bounds
-        height, width = self.mask_data.shape
-        x_min = max(0, min(x_min, width - 1))
-        x_max = max(0, min(x_max, width - 1))
-        y_min = max(0, min(y_min, height - 1))
-        y_max = max(0, min(y_max, height - 1))
-        
-        # Apply mask
-        self.mask_data[int(y_min):int(y_max)+1, int(x_min):int(x_max)+1] = self.mask_value
-    
-    def apply_circle_mask(self, center, edge):
-        """Apply circular mask"""
-        if self.mask_data is None or self.image_data is None:
-            return
-        
-        cx, cy = center
-        ex, ey = edge
-        radius = np.sqrt((ex - cx)**2 + (ey - cy)**2)
-        
-        height, width = self.mask_data.shape
-        y, x = np.ogrid[0:height, 0:width]
-        
-        # Create circular mask
-        circle_mask = (x - cx)**2 + (y - cy)**2 <= radius**2
-        self.mask_data[circle_mask] = self.mask_value
-    
-    def get_mask(self):
-        """Get current mask data"""
-        return self.mask_data
-    
-    def set_mask_mode(self, mode):
-        """Set mask drawing mode"""
-        self.mask_mode = mode
-    
-    def clear_manual_peaks(self):
-        """Clear all manually selected peaks"""
-        self.manual_peaks = []
-        for marker in self.peak_markers:
-            marker.remove()
-        self.peak_markers = []
-    
-    def get_manual_control_points(self):
-        """Get manual peaks as control points array (N, 3) - Dioptas format"""
-        if not self.manual_peaks:
-            return None
-        
-        # Convert (x, y, ring) to (y, x, ring) for pyFAI
-        # x=column, y=row in image coordinates
-        control_points = []
-        for x, y, ring_num in self.manual_peaks:
-            # pyFAI expects [row, col, ring] format
-            control_points.append([y, x, ring_num])
-        
-        control_points_array = np.array(control_points)
-        
-        # Debug output
-        print(f"\n=== Control Points Debug ===")
-        print(f"Total points: {len(control_points_array)}")
-        if len(control_points_array) > 0:
-            print(f"Format: [row, col, ring]")
-            for i, cp in enumerate(control_points_array[:5]):  # Show first 5
-                print(f"  Point {i+1}: row={cp[0]:.1f}, col={cp[1]:.1f}, ring={cp[2]}")
-        print(f"===========================\n")
-        
-        return control_points_array
-    
-    def display_calibration_image(self, image_data, calibration_points=None):
-        """Display calibration image with detected points"""
-        # Store for contrast adjustment
-        self._last_image_data = image_data
-        self._last_calib_points = calibration_points
-        
-        # Store current manual peaks before clearing
-        temp_manual_peaks = self.manual_peaks.copy()
-        
-        self.axes.clear()
-        
-        # Clear peak markers list (they're gone after axes.clear())
-        self.peak_markers = []
-        
-        # Apply contrast settings
-        if self.contrast_min is not None and self.contrast_max is not None:
-            display_data = np.clip(image_data, self.contrast_min, self.contrast_max)
-            vmin, vmax = np.log10(self.contrast_min + 1), np.log10(self.contrast_max + 1)
-        else:
-            display_data = image_data
-            vmin, vmax = None, None
-        
-        self.axes.imshow(np.log10(display_data + 1), cmap='viridis', origin='lower',
-                        vmin=vmin, vmax=vmax, interpolation='nearest')
-        
-        if calibration_points is not None:
-            # Plot calibration rings in red
-            for ring in calibration_points:
-                if len(ring) > 0:
-                    ring = np.array(ring)
-                    self.axes.plot(ring[:, 1], ring[:, 0], 'r.', markersize=2)
-        
-        # Restore manual peaks
-        if temp_manual_peaks:
-            for x, y, ring_num in temp_manual_peaks:
-                # Draw marker as red filled circle
-                marker = self.axes.plot(x, y, 'ro', markersize=8, markerfacecolor='red', 
-                                       markeredgecolor='white', markeredgewidth=1)[0]
-                self.peak_markers.append(marker)
-                
-                # Add ring number label above marker
-                label = self.axes.text(x, y + 15, f'{ring_num}', color='red', fontsize=9,
-                                      horizontalalignment='center', verticalalignment='bottom',
-                                      fontweight='bold')
-                self.peak_markers.append(label)
-        
-        # Overlay mask if in mask editing mode
-        if self.mask_data is not None:
-            mask_rgba = np.zeros((*self.mask_data.shape, 4))
-            mask_rgba[self.mask_data, 0] = 1.0  # Red channel
-            mask_rgba[self.mask_data, 3] = 0.6  # Alpha
-            self.axes.imshow(mask_rgba, origin='lower', interpolation='nearest')
-        
-        # Dynamic title based on mode
-        if self.peak_picking_mode:
-            title = 'Peak Selection Mode - Click on diffraction rings'
-        elif self.mask_editing_mode:
-            title = 'Mask Editing Mode - Draw masks on image'
-        else:
-            title = 'Calibration Image - Scroll to zoom'
-        
-        self.axes.set_title(title)
-        
-        # Store base limits for zoom
-        if self.base_xlim is None:
-            self.base_xlim = self.axes.get_xlim()
-            self.base_ylim = self.axes.get_ylim()
-        
-        # Don't add colorbar - removed per user request
-        self.figure.canvas.draw_idle()
-    
-    def display_integrated_pattern(self, tth, intensity):
-        """Display integrated 1D pattern"""
-        self.axes.clear()
-        self.axes.plot(tth, intensity)
-        self.axes.set_xlabel('2θ (degrees)')
-        self.axes.set_ylabel('Intensity')
-        self.axes.set_title('Integrated Diffraction Pattern')
-        self.axes.grid(True, alpha=0.3)
-
-
 class CalibrateModule(GUIBase):
     """Detector calibration module using Dioptas/pyFAI functionality"""
 
@@ -1048,6 +148,9 @@ class CalibrateModule(GUIBase):
         # Mask from mask module
         self.imported_mask = None
         self.mask_module_reference = None
+        
+        # Initialize use_mask_cb early to avoid AttributeError
+        self.use_mask_cb = None
 
     def _init_variables(self):
         """Initialize all variables"""
@@ -1141,9 +244,9 @@ class CalibrateModule(GUIBase):
             canvas_layout.setSpacing(5)
             
             try:
-                # Create canvas with reduced size to prevent memory issues
-                # Using smaller dimensions and DPI
-                self.unified_canvas = CalibrationCanvas(canvas_container, width=8, height=6, dpi=80)
+                # Create canvas with enlarged size for better visibility
+                # Using larger dimensions for better user experience (increased per user request)
+                self.unified_canvas = CalibrationCanvas(canvas_container, width=14, height=14, dpi=100)
                 canvas_layout.addWidget(self.unified_canvas)
                 print("✅ CalibrationCanvas created successfully")
             except Exception as e:
@@ -1178,7 +281,29 @@ class CalibrateModule(GUIBase):
             self.contrast_slider.setMaximum(65535)
             self.contrast_slider.setValue(65535)
             self.contrast_slider.setInvertedAppearance(True)  # Max at top
-            self.contrast_slider.setFixedHeight(300)  # Limit height
+            self.contrast_slider.setFixedHeight(550)  # Increase height to match larger canvas (14x14)
+            self.contrast_slider.setStyleSheet("""
+                QSlider::groove:vertical {
+                    width: 25px;
+                    background: #E0E0E0;
+                    border: 1px solid #BDBDBD;
+                    border-radius: 4px;
+                }
+                QSlider::handle:vertical {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 #5C9FD6, stop:1 #4A90E2);
+                    border: 2px solid #2E5C8A;
+                    height: 25px;
+                    width: 25px;
+                    margin: 0 -13px;
+                    border-radius: 4px;  /* Square with slightly rounded corners */
+                }
+                QSlider::handle:vertical:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 #6BB0E7, stop:1 #5BA1D3);
+                    border: 2px solid #1E4C7A;
+                }
+            """)
             self.contrast_slider.valueChanged.connect(self.on_contrast_slider_changed)
             contrast_layout.addWidget(self.contrast_slider)
             
@@ -1369,7 +494,8 @@ class CalibrateModule(GUIBase):
         self.setup_detector_groupbox(calib_params_layout)
         self.setup_start_values_groupbox(calib_params_layout)
         self.setup_peak_selection_groupbox(calib_params_layout)
-        self.setup_refinement_options_groupbox(calib_params_layout)
+        # Refinement options hidden per user request
+        # self.setup_refinement_options_groupbox(calib_params_layout)
         
         calib_params_layout.addStretch()
         
@@ -1715,11 +841,11 @@ class CalibrateModule(GUIBase):
         self.peak_mode_group.addButton(self.select_peak_rb, 1)
         peak_layout.addWidget(self.select_peak_rb)
         
-        # Current Ring Number (Dioptas style)
+        # Current Ring Number (Dioptas style) - OLD UI, keep for compatibility
         ring_num_row = QHBoxLayout()
         ring_num_row.addWidget(QLabel("Current Ring #:"))
         self.ring_number_spinbox = QSpinBox()
-        self.ring_number_spinbox.setMinimum(0)
+        self.ring_number_spinbox.setMinimum(1)  # Start from 1 per user request
         self.ring_number_spinbox.setMaximum(50)
         self.ring_number_spinbox.setValue(1)  # Default to ring 1
         self.ring_number_spinbox.setFixedWidth(60)
@@ -1730,6 +856,8 @@ class CalibrateModule(GUIBase):
                 padding: 3px;
             }
         """)
+        # Sync with main ring_num_input if it exists
+        self.ring_number_spinbox.valueChanged.connect(self.on_ring_number_changed)
         ring_num_row.addWidget(self.ring_number_spinbox)
         ring_num_row.addStretch()
         peak_layout.addLayout(ring_num_row)
@@ -2642,10 +1770,14 @@ class CalibrateModule(GUIBase):
         ring_label.setStyleSheet(f"color: {self.colors['text_dark']}; font-weight: bold;")
         ring_layout.addWidget(ring_label)
         
-        self.ring_number_entry = QLineEdit("1")
-        self.ring_number_entry.setFixedWidth(50)
-        self.ring_number_entry.setStyleSheet(f"""
-            QLineEdit {{
+        # Use SpinBox for ring number (unified name: ring_num_input)
+        self.ring_num_input = QSpinBox()
+        self.ring_num_input.setMinimum(1)  # Start from 1 per user request
+        self.ring_num_input.setMaximum(50)
+        self.ring_num_input.setValue(1)  # Default to ring 1
+        self.ring_num_input.setFixedWidth(50)
+        self.ring_num_input.setStyleSheet(f"""
+            QSpinBox {{
                 background-color: #FFF8DC;
                 color: {self.colors['text_dark']};
                 border: 2px solid {self.colors['primary']};
@@ -2653,7 +1785,9 @@ class CalibrateModule(GUIBase):
                 font-weight: bold;
             }}
         """)
-        ring_layout.addWidget(self.ring_number_entry)
+        # Connect to update canvas when value changes
+        self.ring_num_input.valueChanged.connect(self.on_ring_number_changed)
+        ring_layout.addWidget(self.ring_num_input)
         
         ring_layout.addStretch()
         card_layout.addWidget(ring_frame)
@@ -2969,6 +2103,10 @@ class CalibrateModule(GUIBase):
         if not PYFAI_AVAILABLE:
             return
         
+        # Ensure calibrant_info_text exists
+        if not hasattr(self, 'calibrant_info_text'):
+            return
+        
         try:
             # Get current calibrant
             if self.calibrant is None:
@@ -2992,7 +2130,8 @@ class CalibrateModule(GUIBase):
                 self.calibrant_info_text.setText("No d-spacing data available")
                 
         except Exception as e:
-            self.calibrant_info_text.setText(f"Error: {str(e)}")
+            if hasattr(self, 'calibrant_info_text'):
+                self.calibrant_info_text.setText(f"Error: {str(e)}")
             self.log(f"Warning: Could not load calibrant info: {str(e)}")
 
     def on_detector_changed(self, detector_name):
@@ -3143,6 +2282,21 @@ class CalibrateModule(GUIBase):
         self.mask_module_reference = mask_module
         self.log("Mask module reference set")
 
+    def on_ring_number_changed(self, value):
+        """Handle ring number change from SpinBox"""
+        # Update canvas current_ring_num if in peak picking mode
+        if hasattr(self, 'unified_canvas'):
+            self.unified_canvas.current_ring_num = value
+    
+    def update_ring_number_display(self, ring_num):
+        """Update ring number display after auto-increment"""
+        if hasattr(self, 'ring_num_input'):
+            self.ring_num_input.setValue(ring_num)
+            self.log(f"Ring number auto-incremented to: {ring_num}")
+        # Also sync the old spinbox if it exists
+        if hasattr(self, 'ring_number_spinbox'):
+            self.ring_number_spinbox.setValue(ring_num)
+    
     def on_peak_mode_changed(self):
         """Handle peak selection mode change"""
         if hasattr(self, 'select_peak_rb') and self.select_peak_rb.isChecked():
@@ -3150,6 +2304,14 @@ class CalibrateModule(GUIBase):
             self.peak_picking_mode = True
             if MATPLOTLIB_AVAILABLE and hasattr(self, 'unified_canvas'):
                 self.unified_canvas.peak_picking_mode = True
+                # Set canvas ring number from spin box
+                if hasattr(self, 'ring_num_input'):
+                    self.unified_canvas.current_ring_num = self.ring_num_input.value()
+                # Set auto-increment flag from checkbox
+                if hasattr(self, 'automatic_peak_num_inc_cb'):
+                    self.unified_canvas.auto_increment_ring = self.automatic_peak_num_inc_cb.isChecked()
+                # Set parent module reference
+                self.unified_canvas.parent_module = self
                 # Update canvas title
                 if self.current_image is not None:
                     self.unified_canvas.display_calibration_image(self.current_image)
@@ -3212,11 +2374,19 @@ class CalibrateModule(GUIBase):
     
     
     def clear_manual_peaks(self):
-        """Clear manually selected peaks"""
-        if MATPLOTLIB_AVAILABLE and hasattr(self, 'calibration_canvas'):
-            self.calibration_canvas.clear_manual_peaks()
+        """Clear manually selected peaks and reset ring number to 1"""
+        if MATPLOTLIB_AVAILABLE and hasattr(self, 'unified_canvas'):
+            self.unified_canvas.clear_manual_peaks()
             self.update_peak_count()
-            self.log("Cleared all manual peaks")
+            # Reset ring number to 1 (per user request)
+            if hasattr(self, 'ring_num_input'):
+                self.ring_num_input.setValue(1)
+            if hasattr(self, 'ring_number_spinbox'):
+                self.ring_number_spinbox.setValue(1)
+            # Reset canvas ring number
+            if hasattr(self, 'unified_canvas'):
+                self.unified_canvas.current_ring_num = 1
+            self.log("Cleared all manual peaks and reset ring number to 1")
     
     def update_peak_count(self):
         """Update peak count display"""
@@ -3298,7 +2468,7 @@ class CalibrateModule(GUIBase):
             
             # Get mask - use imported mask if "use mask" is checked
             mask = None
-            if self.use_mask_cb.isChecked() and self.imported_mask is not None:
+            if hasattr(self, 'use_mask_cb') and self.use_mask_cb is not None and self.use_mask_cb.isChecked() and self.imported_mask is not None:
                 mask = self.imported_mask
                 self.log(f"Using imported mask with {np.sum(mask)} masked pixels")
             elif MATPLOTLIB_AVAILABLE and hasattr(self, 'unified_canvas'):
@@ -3320,6 +2490,7 @@ class CalibrateModule(GUIBase):
             )
             worker.finished.connect(self.on_calibration_finished)
             worker.error.connect(self.on_calibration_error)
+            worker.progress.connect(self.on_calibration_progress)
             worker.calibration_result.connect(self.on_calibration_result)
             
             self.running_threads.append(worker)
@@ -3391,9 +2562,12 @@ class CalibrateModule(GUIBase):
         geo_ref.poni2 = shape[1] * pixel_size / 2  # Center X in meters
         geo_ref.pixel1 = pixel_size
         geo_ref.pixel2 = pixel_size
-        geo_ref.rot1 = 0.0  # Initial rotation
-        geo_ref.rot2 = 0.0
-        geo_ref.rot3 = 0.0
+        
+        # Initialize rotations to ZERO (perpendicular detector assumption)
+        # This is the most common and safest configuration
+        geo_ref.rot1 = 0.0  # Tilt around X-axis
+        geo_ref.rot2 = 0.0  # Tilt around Y-axis  
+        geo_ref.rot3 = 0.0  # In-plane rotation
         
         self.log(f"Initial geometry:")
         self.log(f"  Distance: {geo_ref.dist*1000:.2f} mm")
@@ -3408,7 +2582,15 @@ class CalibrateModule(GUIBase):
         # Extract control points (only if not using manual peaks)
         if manual_control_points is None or len(manual_control_points) == 0:
             try:
+                self.log("Extracting control points automatically...")
                 geo_ref.extract_cp(max_rings=10, pts_per_deg=1.0)
+                
+                # Display detected points in real-time (Dioptas-style)
+                if hasattr(geo_ref, 'data') and geo_ref.data is not None:
+                    self.log(f"Found {len(geo_ref.data)} rings with control points")
+                    # Signal to display points (will be processed in main thread)
+                    self.progress.emit(f"AUTO_POINTS:{len(geo_ref.data)}")
+                    
             except Exception as e:
                 raise ValueError(f"Failed to extract control points: {str(e)}. "
                                "Please check image quality or use Manual Peak Selection.")
@@ -3418,10 +2600,12 @@ class CalibrateModule(GUIBase):
             raise ValueError(f"Not enough control points: {len(geo_ref.data) if hasattr(geo_ref, 'data') and geo_ref.data is not None else 0}. "
                            "Need at least 3 points. Use Manual Peak Selection to add more peaks.")
         
-        # Refine geometry (Conservative approach: NO rotation refinement by default)
-        # This avoids unrealistic tilt angles that can occur with limited data
+        # Refine geometry (Dioptas-style: Full refinement with all parameters)
+        # This matches the Dioptas implementation which optimizes all 6 parameters
         try:
-            self.log("\nStarting geometry refinement...")
+            self.log("\n" + "="*60)
+            self.log("Starting Geometry Refinement (Dioptas-style)")
+            self.log("="*60)
             self.log(f"Number of control points: {len(geo_ref.data)}")
             
             # Count rings
@@ -3431,73 +2615,165 @@ class CalibrateModule(GUIBase):
                     ring_nums.add(point[0])
             self.log(f"Number of rings: {len(ring_nums)}")
             
-            # Stage 1: Refine distance only (most sensitive parameter)
-            # Fix everything else for initial convergence
-            self.log("\n  Stage 1: Refining distance only...")
-            geo_ref.refine2(fix=["wavelength", "poni1", "poni2", "rot1", "rot2", "rot3"])
-            stage1_distance = geo_ref.dist
-            self.log(f"    Distance: {stage1_distance*1000:.2f} mm")
+            # Dioptas-style multi-stage refinement
+            # Stage 1: Refine distance and beam center only (most critical parameters)
+            self.log("\nStage 1: Refining distance and beam center...")
+            geo_ref.refine2(fix=["wavelength", "rot1", "rot2", "rot3"])
+            self.log(f"  Distance: {geo_ref.dist*1000:.3f} mm")
+            self.log(f"  PONI1 (Y): {geo_ref.poni1*1000:.3f} mm")
+            self.log(f"  PONI2 (X): {geo_ref.poni2*1000:.3f} mm")
             
-            # Stage 2: Refine beam center ONLY (keep distance from Stage 1)
-            # Distance is already correct from Stage 1, only optimize beam center
-            self.log("\n  Stage 2: Refining beam center only (keeping Stage 1 distance)...")
-            geo_ref.refine2(fix=["wavelength", "dist", "rot1", "rot2", "rot3"])
-            self.log(f"    Distance: {geo_ref.dist*1000:.2f} mm (unchanged)")
-            self.log(f"    Beam center: ({geo_ref.poni2*1000:.2f}, {geo_ref.poni1*1000:.2f}) mm")
+            # Calculate initial RMS error
+            if hasattr(geo_ref, 'chi2') and geo_ref.chi2 is not None:
+                rms = np.sqrt(geo_ref.chi2())
+                self.log(f"  RMS error: {rms:.3f} pixels")
             
-            # Stage 3: SKIP rotation refinement by default
-            # Rotation refinement is DISABLED to avoid unrealistic angles
-            # In most cases, detector is nearly perpendicular to beam (rot1≈0, rot2≈0, rot3≈0)
-            self.log("\n  Stage 3: Rotation refinement DISABLED")
-            self.log(f"    Detector assumed perpendicular to beam (rot1=0°, rot2=0°, rot3=0°)")
-            self.log(f"    This is the safest and most common configuration.")
+            # Stage 2: Careful rotation refinement with validation
+            # Only refine rotations if data quality is sufficient AND angles stay small
+            self.log("\nStage 2: Rotation refinement with validation...")
             
-            # Optional: Only refine rotations if EXCELLENT data (strict criteria)
-            # Uncomment the block below if you want to enable rotation refinement for very high quality data
-            """
-            if len(ring_nums) >= 8 and len(geo_ref.data) >= 100:
-                self.log("\n  [OPTIONAL] Stage 3b: High-quality data detected, attempting rotation refinement...")
+            # Save current state for comparison and potential rollback
+            dist_before = geo_ref.dist
+            poni1_before = geo_ref.poni1
+            poni2_before = geo_ref.poni2
+            rot1_before = geo_ref.rot1
+            rot2_before = geo_ref.rot2
+            rot3_before = geo_ref.rot3
+            
+            # Calculate RMS before rotation refinement
+            rms_before = 999.0
+            if hasattr(geo_ref, 'chi2') and geo_ref.chi2 is not None:
                 try:
-                    # Save current state
-                    dist_backup = geo_ref.dist
-                    poni1_backup = geo_ref.poni1
-                    poni2_backup = geo_ref.poni2
+                    rms_before = np.sqrt(geo_ref.chi2())
+                except:
+                    pass
+            
+            # Decide whether to refine rotations based on data quality
+            should_refine_rotations = False
+            
+            # Criteria for enabling rotation refinement:
+            # 1. Good number of control points (>= 50)
+            # 2. Multiple rings (>= 4)
+            # 3. Reasonable initial RMS (< 5 pixels)
+            if len(geo_ref.data) >= 50 and len(ring_nums) >= 4 and rms_before < 5.0:
+                should_refine_rotations = True
+                self.log(f"  Data quality sufficient for rotation refinement")
+                self.log(f"  Control points: {len(geo_ref.data)}, Rings: {len(ring_nums)}, RMS: {rms_before:.3f}")
+            else:
+                should_refine_rotations = False
+                self.log(f"  Data quality insufficient - skipping rotation refinement")
+                self.log(f"  Control points: {len(geo_ref.data)}, Rings: {len(ring_nums)}, RMS: {rms_before:.3f}")
+                self.log(f"  (Need: >= 50 points, >= 4 rings, RMS < 5 pixels)")
+            
+            if should_refine_rotations:
+                try:
+                    # Try full refinement including rotations
+                    self.log(f"  Attempting full geometry refinement (all 6 parameters)...")
+                    geo_ref.refine2(fix=["wavelength"])  # Only fix wavelength
                     
-                    # Try rotation refinement
-                    geo_ref.refine2(fix=["wavelength"])
-                    
+                    # Validate rotation angles - they should be SMALL
                     rot1_deg = np.degrees(geo_ref.rot1)
                     rot2_deg = np.degrees(geo_ref.rot2)
                     rot3_deg = np.degrees(geo_ref.rot3)
                     
-                    # Check if result is reasonable
-                    if abs(rot1_deg) > 5 or abs(rot2_deg) > 5 or abs(rot3_deg) > 5:
-                        self.log(f"    Warning: Unrealistic rotations detected!")
-                        self.log(f"    rot1={rot1_deg:.3f}°, rot2={rot2_deg:.3f}°, rot3={rot3_deg:.3f}°")
-                        self.log(f"    Reverting to zero rotations (perpendicular detector)")
-                        # Revert
+                    # Calculate RMS after refinement
+                    rms_after = 999.0
+                    if hasattr(geo_ref, 'chi2') and geo_ref.chi2 is not None:
+                        try:
+                            rms_after = np.sqrt(geo_ref.chi2())
+                        except:
+                            pass
+                    
+                    # Check if rotation angles are reasonable (< 3 degrees is typical)
+                    max_rot = max(abs(rot1_deg), abs(rot2_deg), abs(rot3_deg))
+                    
+                    if max_rot > 3.0:
+                        # Angles too large - probably unstable refinement
+                        self.log(f"  ⚠ Warning: Rotation angles too large!")
+                        self.log(f"    Rot1={rot1_deg:.4f}°, Rot2={rot2_deg:.4f}°, Rot3={rot3_deg:.4f}°")
+                        self.log(f"    Max angle: {max_rot:.4f}° > 3.0° (threshold)")
+                        self.log(f"  → Reverting to perpendicular detector assumption (rot=0)")
+                        
+                        # Revert rotations to zero
                         geo_ref.rot1 = 0.0
                         geo_ref.rot2 = 0.0
                         geo_ref.rot3 = 0.0
-                        geo_ref.dist = dist_backup
-                        geo_ref.poni1 = poni1_backup
-                        geo_ref.poni2 = poni2_backup
+                        geo_ref.dist = dist_before
+                        geo_ref.poni1 = poni1_before
+                        geo_ref.poni2 = poni2_before
+                        
+                    elif rms_after >= rms_before * 0.95:
+                        # RMS didn't improve significantly - rotation refinement not helpful
+                        self.log(f"  ⚠ Warning: RMS did not improve with rotation refinement")
+                        self.log(f"    RMS before: {rms_before:.3f}, after: {rms_after:.3f}")
+                        self.log(f"  → Reverting to perpendicular detector assumption (rot=0)")
+                        
+                        # Revert rotations to zero
+                        geo_ref.rot1 = 0.0
+                        geo_ref.rot2 = 0.0
+                        geo_ref.rot3 = 0.0
+                        geo_ref.dist = dist_before
+                        geo_ref.poni1 = poni1_before
+                        geo_ref.poni2 = poni2_before
+                        
                     else:
-                        self.log(f"    Rotations accepted: rot1={rot1_deg:.4f}°, rot2={rot2_deg:.4f}°, rot3={rot3_deg:.4f}°")
+                        # Refinement successful and reasonable
+                        self.log(f"  ✓ Rotation refinement successful!")
+                        self.log(f"    Rot1: {rot1_deg:.4f}° (tilt around axis 1)")
+                        self.log(f"    Rot2: {rot2_deg:.4f}° (tilt around axis 2)")
+                        self.log(f"    Rot3: {rot3_deg:.4f}° (rotation in plane)")
+                        self.log(f"    RMS improved: {rms_before:.3f} → {rms_after:.3f} pixels")
+                        
                 except Exception as rot_error:
-                    self.log(f"    Rotation refinement failed: {rot_error}")
-                    self.log(f"    Keeping rotations at zero")
+                    self.log(f"  ⚠ Rotation refinement failed: {rot_error}")
+                    self.log(f"  → Keeping perpendicular detector assumption (rot=0)")
+                    
+                    # Revert to safe state
                     geo_ref.rot1 = 0.0
                     geo_ref.rot2 = 0.0
                     geo_ref.rot3 = 0.0
-            """
+                    geo_ref.dist = dist_before
+                    geo_ref.poni1 = poni1_before
+                    geo_ref.poni2 = poni2_before
+            else:
+                # Skip rotation refinement - keep rotations at zero
+                self.log(f"  Rotations kept at zero (perpendicular detector)")
             
-            self.log("\n  Refinement completed successfully!")
+            # Log final refined parameters
+            self.log(f"\n  Final Refined Parameters:")
+            self.log(f"    Distance: {geo_ref.dist*1000:.3f} mm")
+            self.log(f"    PONI1 (Y): {geo_ref.poni1*1000:.3f} mm")
+            self.log(f"    PONI2 (X): {geo_ref.poni2*1000:.3f} mm")
+            self.log(f"    Rot1: {np.degrees(geo_ref.rot1):.4f}°")
+            self.log(f"    Rot2: {np.degrees(geo_ref.rot2):.4f}°")
+            self.log(f"    Rot3: {np.degrees(geo_ref.rot3):.4f}°")
+            
+            # Calculate final RMS error
+            if hasattr(geo_ref, 'chi2') and geo_ref.chi2 is not None:
+                try:
+                    rms = np.sqrt(geo_ref.chi2())
+                    self.log(f"\n  Final RMS error: {rms:.3f} pixels")
+                    
+                    # Quality assessment (Dioptas-style)
+                    if rms < 1.0:
+                        self.log(f"  Quality: Excellent ✓✓✓")
+                    elif rms < 2.0:
+                        self.log(f"  Quality: Good ✓✓")
+                    elif rms < 3.0:
+                        self.log(f"  Quality: Acceptable ✓")
+                    else:
+                        self.log(f"  Quality: Poor - consider re-calibration")
+                except:
+                    pass
+            
+            self.log("\n" + "="*60)
+            self.log("Geometry Refinement Completed!")
+            self.log("="*60 + "\n")
             
         except Exception as e:
             import traceback
             error_detail = traceback.format_exc()
-            self.log(f"Refinement error details:\n{error_detail}")
+            self.log(f"\nRefinement error details:\n{error_detail}")
             raise ValueError(f"Geometry refinement failed: {str(e)}")
         
         # Create AzimuthalIntegrator from refined parameters
@@ -3530,40 +2806,84 @@ class CalibrateModule(GUIBase):
         return result
 
     def on_calibration_result(self, result):
-        """Handle calibration result"""
+        """Handle calibration result with real-time ring overlay (Dioptas-style)"""
         try:
             # Store results first
             self.ai = result['ai']
             self.geo_ref = result['geo_ref']
             
             # Log results
-            self.log("\n=== Calibration Results ===")
-            self.log(f"Distance: {result['dist']*1000:.2f} mm")
-            self.log(f"PONI1: {result['poni1']*1000:.2f} mm")
-            self.log(f"PONI2: {result['poni2']*1000:.2f} mm")
-            self.log(f"Rot1: {np.degrees(result['rot1']):.3f}°")
-            self.log(f"Rot2: {np.degrees(result['rot2']):.3f}°")
-            self.log(f"Rot3: {np.degrees(result['rot3']):.3f}°")
+            self.log("\n" + "="*60)
+            self.log("CALIBRATION RESULTS (Dioptas-style)")
+            self.log("="*60)
+            self.log(f"Distance: {result['dist']*1000:.3f} mm")
+            self.log(f"PONI1 (Y): {result['poni1']*1000:.3f} mm")
+            self.log(f"PONI2 (X): {result['poni2']*1000:.3f} mm")
+            self.log(f"Rot1: {np.degrees(result['rot1']):.4f}°")
+            self.log(f"Rot2: {np.degrees(result['rot2']):.4f}°")
+            self.log(f"Rot3: {np.degrees(result['rot3']):.4f}°")
             self.log(f"Wavelength: {result['wavelength']*1e10:.4f} Å")
-            self.log("=" * 30)
+            self.log("="*60 + "\n")
             
             # Update UI with calibration results
             self.update_ui_from_calibration()
             
-            # Display calibration result
+            # Display calibration result with theoretical ring overlay (Dioptas-style)
             if MATPLOTLIB_AVAILABLE:
-                # Get control points for visualization from geo_ref.data
                 try:
-                    # geo_ref.data contains the control points in pyFAI format
-                    # Convert to format expected by display_calibration_image
+                    # Update canvas with calibration AI for theoretical rings
+                    self.calibration_canvas.ai = self.ai
+                    self.calibration_canvas.show_theoretical_rings = True
+                    
+                    # Get control points for visualization from geo_ref.data
                     if hasattr(self.geo_ref, 'data') and self.geo_ref.data is not None:
                         rings = self.geo_ref.data
+                        
+                        # Convert control points to display format and show them
+                        # geo_ref.data format: list of rings, each ring is array of [[ring_num, tth, chi], ...]
+                        # We need to convert to pixel coordinates for display
+                        control_points_display = []
+                        try:
+                            for ring in rings:
+                                if len(ring) > 0 and hasattr(ring, '__iter__'):
+                                    ring_array = np.array(ring)
+                                    if len(ring_array.shape) == 2 and ring_array.shape[1] >= 3:
+                                        # ring_array has columns: [ring_num, tth, chi]
+                                        for point in ring_array:
+                                            # Convert from polar (tth, chi) to pixel (y, x)
+                                            tth_val = point[1]  # in radians
+                                            chi_val = point[2]  # in radians
+                                            
+                                            # Use AI to convert to pixel coordinates
+                                            # This is inverse of what we did during calibration
+                                            try:
+                                                y, x = self.ai.calcfrom1d(tth_val, chi_val, shape=self.current_image.shape)
+                                                if 0 <= y < self.current_image.shape[0] and 0 <= x < self.current_image.shape[1]:
+                                                    control_points_display.append([x, y, int(point[0])])
+                                            except:
+                                                pass
+                        except Exception as cp_error:
+                            self.log(f"Warning: Could not convert all control points: {cp_error}")
+                        
+                        # Add control points to canvas for display
+                        if len(control_points_display) > 0:
+                            self.calibration_canvas.manual_peaks = control_points_display
+                            self.log(f"✓ Displaying {len(control_points_display)} control points on image")
+                        
                         self.calibration_canvas.display_calibration_image(self.current_image, rings)
                     else:
                         self.calibration_canvas.display_calibration_image(self.current_image)
+                    
+                    # Log overlay status
+                    self.log("✓ Theoretical calibration rings overlaid on image")
+                    self.log("  (Red circles show expected ring positions)")
+                    
                     self.switch_display_tab("result")
+                    
                 except Exception as viz_error:
+                    import traceback
                     self.log(f"Warning: Could not display rings: {viz_error}")
+                    self.log(traceback.format_exc())
                     self.calibration_canvas.display_calibration_image(self.current_image)
                     self.switch_display_tab("result")
                 
@@ -3571,6 +2891,7 @@ class CalibrateModule(GUIBase):
                 try:
                     self.update_cake_view()
                     self.update_pattern_view()
+                    self.log("✓ Cake and pattern views updated")
                 except Exception as view_error:
                     self.log(f"Warning: Could not update Cake/Pattern views: {view_error}")
                     
@@ -3580,6 +2901,15 @@ class CalibrateModule(GUIBase):
             self.log(error_msg)
             QMessageBox.critical(None, "Error", f"Error processing results:\n{str(e)}")
 
+    def on_calibration_progress(self, message):
+        """Handle calibration progress updates including auto-detected points"""
+        if message.startswith("AUTO_POINTS:"):
+            # Extract number of rings
+            num_rings = int(message.split(":")[1])
+            self.log(f"✓ Automatically detected control points on {num_rings} rings")
+        else:
+            self.log(message)
+    
     def on_calibration_finished(self, message):
         """Handle calibration completion"""
         self.log(message)
@@ -3593,26 +2923,33 @@ class CalibrateModule(GUIBase):
     def save_poni_file(self):
         """Save PONI file"""
         if self.ai is None:
-            QMessageBox.warning(None, "No Calibration", 
+            QMessageBox.warning(self.parent, "No Calibration", 
                               "Please run calibration first before saving PONI file.")
             return
         
-        poni_path = self.poni_entry.text()
+        poni_path = self.poni_entry.text().strip()
         if not poni_path:
+            # Use self.parent as parent for dialog
             poni_path, _ = QFileDialog.getSaveFileName(
-                None, "Save PONI File", "calibration.poni",
+                self.parent, 
+                "Save PONI File", 
+                "calibration.poni",
                 "PONI Files (*.poni);;All Files (*.*)"
             )
         
         if poni_path:
             try:
                 self.ai.save(poni_path)
-                self.log(f"PONI file saved to: {poni_path}")
-                QMessageBox.information(None, "Success", 
+                self.log(f"✓ PONI file saved to: {poni_path}")
+                QMessageBox.information(self.parent, "Success", 
                                       f"PONI file saved successfully!\n{poni_path}")
+                # Update the text field with saved path
+                self.poni_entry.setText(poni_path)
             except Exception as e:
+                import traceback
                 self.log(f"Error saving PONI: {str(e)}")
-                QMessageBox.critical(None, "Error", f"Failed to save PONI file:\n{str(e)}")
+                self.log(traceback.format_exc())
+                QMessageBox.critical(self.parent, "Error", f"Failed to save PONI file:\n{str(e)}")
 
     def on_contrast_slider_changed(self, value):
         """Handle contrast slider change (single vertical slider controls max)"""
@@ -3816,15 +3153,19 @@ class CalibrateModule(GUIBase):
         try:
             self.log("Generating Cake view (polar transformation)...")
             
+            # Apply mask if available
+            mask = self.current_mask if hasattr(self, 'current_mask') else None
+            
             # Use pyFAI's integrate2d for cake/polar transformation
-            # num_chi: number of azimuthal bins (360 for 1 degree resolution)
-            # num_2theta: number of radial bins
+            # Dioptas-style: higher resolution for better visualization
             result = self.ai.integrate2d(
                 self.current_image,
                 npt_rad=500,      # Number of radial bins (2theta)
-                npt_azim=360,     # Number of azimuthal bins (chi/azimuth)
+                npt_azim=360,     # Number of azimuthal bins (chi/azimuth) - 1°/bin
                 unit="2th_deg",   # Use 2theta in degrees
-                method="splitpixel"
+                mask=mask,        # Apply mask if available
+                method="splitpixel",
+                correctSolidAngle=True  # Important for accurate intensities
             )
             
             # Result is (cake_image, 2theta_array, chi_array)
@@ -3835,12 +3176,15 @@ class CalibrateModule(GUIBase):
             # Clear and plot
             self.cake_axes.clear()
             
+            # Log scale for better visualization
+            cake_display = np.log10(cake + 1)  # Add 1 to avoid log(0)
+            
             # Display cake image with proper extent
             # extent: [left, right, bottom, top]
             extent = [tth_rad.min(), tth_rad.max(), chi_azim.min(), chi_azim.max()]
             
             im = self.cake_axes.imshow(
-                cake,
+                cake_display,
                 aspect='auto',
                 origin='lower',
                 extent=extent,
@@ -3850,13 +3194,37 @@ class CalibrateModule(GUIBase):
             
             self.cake_axes.set_xlabel('2θ (degrees)', fontsize=10)
             self.cake_axes.set_ylabel('χ (degrees)', fontsize=10)
-            self.cake_axes.set_title('Cake/Polar View', fontsize=11, fontweight='bold')
+            self.cake_axes.set_title('Cake/Polar View (Dioptas-style)', fontsize=11, fontweight='bold')
+            
+            # Add calibrant lines if available (should appear as vertical lines)
+            if hasattr(self, 'calibrant_name') and self.calibrant_name:
+                try:
+                    calibrant = ALL_CALIBRANTS[self.calibrant_name]
+                    calibrant.wavelength = self.ai.wavelength
+                    tth_calibrant = calibrant.get_2th()
+                    tth_calibrant_deg = np.degrees(tth_calibrant)
+                    
+                    # Draw vertical lines for calibrant peaks (should be straight if calibration is good)
+                    tth_min, tth_max = tth_rad.min(), tth_rad.max()
+                    visible_peaks = tth_calibrant_deg[(tth_calibrant_deg >= tth_min) & 
+                                                       (tth_calibrant_deg <= tth_max)]
+                    for peak_pos in visible_peaks[:15]:
+                        self.cake_axes.axvline(peak_pos, color='red', linestyle='--', 
+                                             alpha=0.3, linewidth=0.5)
+                except Exception as e:
+                    self.log(f"Warning: Could not add calibrant lines to cake: {e}")
             
             # Add colorbar if not exists
             if not hasattr(self, 'cake_colorbar') or self.cake_colorbar is None:
-                self.cake_colorbar = self.cake_canvas.figure.colorbar(im, ax=self.cake_axes)
+                try:
+                    self.cake_colorbar = self.cake_canvas.figure.colorbar(im, ax=self.cake_axes)
+                except:
+                    pass
             else:
-                self.cake_colorbar.update_normal(im)
+                try:
+                    self.cake_colorbar.update_normal(im)
+                except:
+                    pass
             
             self.cake_canvas.draw()
             self.log(f"Cake view updated: {cake.shape[1]}x{cake.shape[0]} (2θ × χ)")
@@ -3874,12 +3242,17 @@ class CalibrateModule(GUIBase):
         try:
             self.log("Generating 1D integrated pattern...")
             
+            # Apply mask if available
+            mask = self.current_mask if hasattr(self, 'current_mask') else None
+            
             # Use pyFAI's integrate1d for azimuthal integration
             result = self.ai.integrate1d(
                 self.current_image,
                 npt=2048,         # Number of points in output
                 unit="2th_deg",   # Use 2theta in degrees
-                method="splitpixel"
+                mask=mask,        # Apply mask if available
+                method="splitpixel",
+                correctSolidAngle=True  # Important for accurate intensities
             )
             
             # Result is (2theta_array, intensity_array)
@@ -3890,13 +3263,18 @@ class CalibrateModule(GUIBase):
             self.pattern_axes.clear()
             
             # Plot 1D pattern
-            self.pattern_axes.plot(tth, intensity, 'b-', linewidth=1)
+            self.pattern_axes.plot(tth, intensity, 'b-', linewidth=1.2)
             self.pattern_axes.set_xlabel('2θ (degrees)', fontsize=10)
             self.pattern_axes.set_ylabel('Intensity (a.u.)', fontsize=10)
-            self.pattern_axes.set_title('1D Integrated Pattern', fontsize=11, fontweight='bold')
+            self.pattern_axes.set_title('1D Integrated Pattern (Dioptas-style)', fontsize=11, fontweight='bold')
             self.pattern_axes.grid(True, alpha=0.3)
             
+            # Set reasonable y-axis limits (remove outliers)
+            y_max = np.percentile(intensity, 99.5)  # Use 99.5 percentile to avoid spikes
+            self.pattern_axes.set_ylim(0, y_max * 1.1)
+            
             # Add calibrant peak positions if available
+            peak_count = 0
             if hasattr(self, 'calibrant_name') and self.calibrant_name:
                 try:
                     calibrant = ALL_CALIBRANTS[self.calibrant_name]
@@ -3912,12 +3290,12 @@ class CalibrateModule(GUIBase):
                                                        (tth_calibrant_deg <= tth_max)]
                     
                     # Draw vertical lines for calibrant peaks
-                    y_max = intensity.max()
                     for peak_pos in visible_peaks[:20]:  # Limit to first 20 peaks
                         self.pattern_axes.axvline(peak_pos, color='red', linestyle='--', 
                                                  alpha=0.5, linewidth=0.8)
+                        peak_count += 1
                     
-                    self.log(f"Added {len(visible_peaks)} calibrant peak positions")
+                    self.log(f"Added {peak_count} calibrant peak positions (of {len(visible_peaks)} in range)")
                 except Exception as cal_error:
                     self.log(f"Could not add calibrant peaks: {cal_error}")
             
