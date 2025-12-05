@@ -355,7 +355,53 @@ class CalibrateModule(GUIBase):
             canvas_layout.addWidget(contrast_widget)
             
             image_layout.addWidget(canvas_container)
-            
+
+            # Status bar with control buttons - inside image_layout for proper alignment
+            status_frame = QFrame()
+            status_frame.setMaximumHeight(40)
+            status_layout = QHBoxLayout(status_frame)
+            status_layout.setContentsMargins(3, 1, 3, 1)
+            status_layout.setSpacing(3)
+
+            # Display control buttons (Auto Contrast removed, contrast now via slider)
+            reset_zoom_btn = ModernButton("Reset Zoom",
+                                         self.reset_zoom,
+                                         "",
+                                         bg_color=self.colors['secondary'],
+                                         hover_color=self.colors['primary'],
+                                         width=100, height=32,
+                                         font_size=8,
+                                         parent=status_frame)
+
+            self.calibrate_btn = ModernButton("Calibrate",
+                                             self.run_calibration,
+                                             "",
+                                             bg_color=self.colors['primary'],
+                                             hover_color=self.colors['primary_hover'],
+                                             width=120, height=32,
+                                             font_size=9,
+                                             parent=status_frame)
+
+            self.refine_btn = ModernButton("Refine",
+                                           self.refine_calibration,
+                                           "",
+                                           bg_color=self.colors['secondary'],
+                                           hover_color=self.colors['primary'],
+                                           width=100, height=32,
+                                           font_size=9,
+                                           parent=status_frame)
+
+            # Center buttons relative to canvas_container width
+            status_layout.addStretch(1)
+            status_layout.addWidget(reset_zoom_btn)
+            status_layout.addStretch(1)
+            status_layout.addWidget(self.calibrate_btn)
+            status_layout.addStretch(1)
+            status_layout.addWidget(self.refine_btn)
+            status_layout.addStretch(1)
+
+            image_layout.addWidget(status_frame)
+
             # Keep references for compatibility
             self.calibration_canvas = self.unified_canvas
             self.mask_canvas = MaskCanvas(image_tab, width=10, height=8, dpi=100)
@@ -364,7 +410,7 @@ class CalibrateModule(GUIBase):
             no_plot_label = QLabel("Matplotlib not available")
             no_plot_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             image_layout.addWidget(no_plot_label)
-        
+
         self.display_tab_widget.addTab(image_tab, "Image")
         
         # Cake tab (Dioptas-style polar transformation)
@@ -413,54 +459,8 @@ class CalibrateModule(GUIBase):
             pattern_layout.addWidget(pattern_label)
         
         self.display_tab_widget.addTab(pattern_tab, "Pattern")
-        
+
         left_layout.addWidget(self.display_tab_widget)
-        
-        # Status bar with display controls and Calibrate/Refine buttons
-        status_frame = QFrame()
-        status_frame.setMaximumHeight(40)  # Limit status bar height
-        status_layout = QHBoxLayout(status_frame)
-        status_layout.setContentsMargins(3, 1, 3, 1)
-        status_layout.setSpacing(3)
-
-        # Display control buttons (Auto Contrast removed, contrast now via slider)
-        reset_zoom_btn = ModernButton("Reset Zoom",
-                                     self.reset_zoom,
-                                     "",
-                                     bg_color=self.colors['secondary'],
-                                     hover_color=self.colors['primary'],
-                                     width=100, height=32,
-                                     font_size=8,
-                                     parent=status_frame)
-
-        self.calibrate_btn = ModernButton("Calibrate",
-                                         self.run_calibration,
-                                         "",
-                                         bg_color=self.colors['primary'],
-                                         hover_color=self.colors['primary_hover'],
-                                         width=120, height=32,
-                                         font_size=9,
-                                         parent=status_frame)
-
-        self.refine_btn = ModernButton("Refine",
-                                       self.refine_calibration,
-                                       "",
-                                       bg_color=self.colors['secondary'],
-                                       hover_color=self.colors['primary'],
-                                       width=100, height=32,
-                                       font_size=9,
-                                       parent=status_frame)
-
-        # Distribute three buttons evenly relative to image area
-        status_layout.addStretch(2)
-        status_layout.addWidget(reset_zoom_btn)
-        status_layout.addStretch(1)
-        status_layout.addWidget(self.calibrate_btn)
-        status_layout.addStretch(1)
-        status_layout.addWidget(self.refine_btn)
-        status_layout.addStretch(2)
-        
-        left_layout.addWidget(status_frame)
         
         # ============== RIGHT PANEL: CONTROL WIDGET ==============
         # Use scroll area to ensure all controls are accessible

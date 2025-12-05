@@ -465,13 +465,20 @@ class CalibrationCanvas(FigureCanvas):
         
         # Apply contrast settings
         if self.contrast_min is not None and self.contrast_max is not None:
+            # Clip image data to contrast range
             display_data = np.clip(image_data, self.contrast_min, self.contrast_max)
-            vmin, vmax = np.log10(self.contrast_min + 1), np.log10(self.contrast_max + 1)
+            # Apply log10 transformation
+            log_data = np.log10(display_data + 1)
+            # Set display range based on clipped values (in log space)
+            vmin = np.log10(self.contrast_min + 1)
+            vmax = np.log10(self.contrast_max + 1)
         else:
+            # No contrast adjustment, use full range
             display_data = image_data
+            log_data = np.log10(display_data + 1)
             vmin, vmax = None, None
-        
-        self.axes.imshow(np.log10(display_data + 1), cmap='viridis', origin='lower',
+
+        self.axes.imshow(log_data, cmap='viridis', origin='lower',
                         vmin=vmin, vmax=vmax, interpolation='nearest')
         
         # Store calibration points for later updates
