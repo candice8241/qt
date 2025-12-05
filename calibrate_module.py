@@ -271,9 +271,8 @@ class CalibrateModule(GUIBase):
             canvas_layout.setSpacing(2)
             
             try:
-                # Create canvas with moderate size - balanced for visibility
-                # Reduced to make room for wider right panel
-                self.unified_canvas = CalibrationCanvas(canvas_container, width=14, height=14, dpi=100)
+                # Create canvas with larger size for better visibility
+                self.unified_canvas = CalibrationCanvas(canvas_container, width=16, height=16, dpi=100)
                 canvas_layout.addWidget(self.unified_canvas)
             except Exception as e:
                 # Simplified error message
@@ -284,25 +283,62 @@ class CalibrateModule(GUIBase):
                 canvas_layout.addWidget(placeholder)
                 self.unified_canvas = None
             
-            # Vertical contrast slider on right side (limited height)
+            # Right side panel with controls
             contrast_widget = QWidget()
-            contrast_widget.setMinimumWidth(200)  # Increased from 150
-            contrast_widget.setMaximumWidth(240)  # Increased from 180
+            contrast_widget.setMinimumWidth(180)
+            contrast_widget.setMaximumWidth(200)
             contrast_layout = QVBoxLayout(contrast_widget)
             contrast_layout.setContentsMargins(5, 5, 5, 5)
             contrast_layout.setSpacing(3)
 
             # Position label at top (more visible, no background)
             self.position_lbl = QLabel("Position: x=0, y=0")
-            self.position_lbl.setFont(QFont('Arial', 10, QFont.Weight.Bold))
+            self.position_lbl.setFont(QFont('Arial', 9, QFont.Weight.Bold))
             self.position_lbl.setAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter)  # Align left
             self.position_lbl.setStyleSheet("""
                 color: #333333;
                 padding: 5px;
                 padding-left: 10px;
             """)
-            self.position_lbl.setMinimumHeight(30)
+            self.position_lbl.setMinimumHeight(25)
             contrast_layout.addWidget(self.position_lbl)
+
+            # Add small spacer
+            contrast_layout.addSpacing(10)
+
+            # Control buttons (vertical arrangement)
+            button_width = 160
+            button_height = 35
+            
+            reset_zoom_btn = ModernButton("Reset Zoom",
+                                         self.reset_zoom,
+                                         "",
+                                         bg_color=self.colors['secondary'],
+                                         hover_color=self.colors['primary'],
+                                         width=button_width, height=button_height,
+                                         font_size=9,
+                                         parent=contrast_widget)
+            contrast_layout.addWidget(reset_zoom_btn)
+
+            self.calibrate_btn = ModernButton("Calibrate",
+                                             self.run_calibration,
+                                             "",
+                                             bg_color=self.colors['primary'],
+                                             hover_color=self.colors['primary_hover'],
+                                             width=button_width, height=button_height,
+                                             font_size=9,
+                                             parent=contrast_widget)
+            contrast_layout.addWidget(self.calibrate_btn)
+
+            self.refine_btn = ModernButton("Refine",
+                                           self.refine_calibration,
+                                           "",
+                                           bg_color=self.colors['secondary'],
+                                           hover_color=self.colors['primary'],
+                                           width=button_width, height=button_height,
+                                           font_size=9,
+                                           parent=contrast_widget)
+            contrast_layout.addWidget(self.refine_btn)
 
             # Add stretch
             contrast_layout.addStretch(1)
@@ -327,7 +363,7 @@ class CalibrateModule(GUIBase):
             self.contrast_slider.setMaximum(100)  # Use percentage scale
             self.contrast_slider.setValue(100)  # Default to max
             self.contrast_slider.setInvertedAppearance(True)  # Max at top
-            self.contrast_slider.setFixedHeight(550)  # Match canvas height (14x14)
+            self.contrast_slider.setFixedHeight(450)  # Adjusted for new layout
             self.contrast_slider.setStyleSheet("""
                 QSlider::groove:vertical {
                     width: 25px;
@@ -370,53 +406,6 @@ class CalibrateModule(GUIBase):
             canvas_layout.addWidget(contrast_widget)
             
             image_layout.addWidget(canvas_container)
-
-            # Status bar with control buttons - inside image_layout for proper alignment
-            status_frame = QFrame()
-            status_frame.setMaximumHeight(40)
-            status_layout = QHBoxLayout(status_frame)
-            status_layout.setContentsMargins(3, 1, 3, 1)
-            status_layout.setSpacing(3)
-
-            # Display control buttons with consistent width for symmetry
-            button_width = 110
-            reset_zoom_btn = ModernButton("Reset Zoom",
-                                         self.reset_zoom,
-                                         "",
-                                         bg_color=self.colors['secondary'],
-                                         hover_color=self.colors['primary'],
-                                         width=button_width, height=32,
-                                         font_size=9,
-                                         parent=status_frame)
-
-            self.calibrate_btn = ModernButton("Calibrate",
-                                             self.run_calibration,
-                                             "",
-                                             bg_color=self.colors['primary'],
-                                             hover_color=self.colors['primary_hover'],
-                                             width=button_width, height=32,
-                                             font_size=9,
-                                             parent=status_frame)
-
-            self.refine_btn = ModernButton("Refine",
-                                           self.refine_calibration,
-                                           "",
-                                           bg_color=self.colors['secondary'],
-                                           hover_color=self.colors['primary'],
-                                           width=button_width, height=32,
-                                           font_size=9,
-                                           parent=status_frame)
-
-            # Distribute buttons evenly with space between them
-            status_layout.addStretch(2)
-            status_layout.addWidget(reset_zoom_btn)
-            status_layout.addStretch(1)
-            status_layout.addWidget(self.calibrate_btn)
-            status_layout.addStretch(1)
-            status_layout.addWidget(self.refine_btn)
-            status_layout.addStretch(2)
-
-            image_layout.addWidget(status_frame)
 
             # Keep references for compatibility
             self.calibration_canvas = self.unified_canvas
