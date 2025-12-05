@@ -1315,56 +1315,105 @@ class CalibrateModule(GUIBase):
         right_scroll = QScrollArea()
         right_scroll.setWidgetResizable(True)
         right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        right_scroll.setMinimumWidth(310)
-        right_scroll.setMaximumWidth(310)
-        
+        right_scroll.setMinimumWidth(320)
+        right_scroll.setMaximumWidth(320)
+
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(5, 5, 5, 5)
-        right_layout.setSpacing(5)
+        right_layout.setContentsMargins(8, 8, 8, 8)
+        right_layout.setSpacing(10)
         
         # File loading section
         file_frame = QFrame()
+        file_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: {self.colors['card_bg']};
+                border-radius: 6px;
+                padding: 8px;
+            }}
+        """)
         file_layout = QHBoxLayout(file_frame)
-        file_layout.setContentsMargins(5, 5, 5, 5)
-        
+        file_layout.setContentsMargins(8, 8, 8, 8)
+        file_layout.setSpacing(6)
+
         self.load_img_btn = ModernButton("Load Image File",
                                          self.browse_and_load_image,
                                          "",
                                          bg_color=self.colors['secondary'],
                                          hover_color=self.colors['primary'],
-                                         width=180, height=30,
+                                         width=185, height=32,
                                          font_size=9,
                                          parent=file_frame)
-        
+
         self.load_previous_img_btn = QPushButton("<")
-        self.load_previous_img_btn.setMaximumWidth(50)
-        self.load_previous_img_btn.setStyleSheet("padding: 5px;")
-        
+        self.load_previous_img_btn.setFixedWidth(45)
+        self.load_previous_img_btn.setFixedHeight(32)
+        self.load_previous_img_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.colors['secondary']};
+                border-radius: 4px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {self.colors['primary']};
+            }}
+        """)
+
         self.load_next_img_btn = QPushButton(">")
-        self.load_next_img_btn.setMaximumWidth(50)
-        self.load_next_img_btn.setStyleSheet("padding: 5px;")
-        
+        self.load_next_img_btn.setFixedWidth(45)
+        self.load_next_img_btn.setFixedHeight(32)
+        self.load_next_img_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.colors['secondary']};
+                border-radius: 4px;
+                font-weight: bold;
+            }}
+            QPushButton:hover {{
+                background-color: {self.colors['primary']};
+            }}
+        """)
+
         file_layout.addWidget(self.load_img_btn)
         file_layout.addWidget(self.load_previous_img_btn)
         file_layout.addWidget(self.load_next_img_btn)
-        
+
         right_layout.addWidget(file_frame)
-        
+
         # Filename display
         self.filename_txt = QLineEdit()
         self.filename_txt.setReadOnly(True)
         self.filename_txt.setPlaceholderText("No file loaded")
+        self.filename_txt.setStyleSheet(f"""
+            QLineEdit {{
+                background-color: {self.colors['card_bg']};
+                border: 1px solid {self.colors['border']};
+                border-radius: 4px;
+                padding: 6px 10px;
+                color: {self.colors['text_dark']};
+            }}
+        """)
         right_layout.addWidget(self.filename_txt)
         
         # Toolbox for parameters (Dioptas style)
         self.toolbox = QToolBox()
-        self.toolbox.setStyleSheet("QToolBox::tab { font-weight: bold; }")
-        
+        self.toolbox.setStyleSheet(f"""
+            QToolBox::tab {{
+                font-weight: bold;
+                background-color: {self.colors['secondary']};
+                border-radius: 4px;
+                padding: 8px;
+            }}
+            QToolBox::tab:selected {{
+                background-color: {self.colors['primary']};
+                color: white;
+            }}
+        """)
+
         # Calibration Parameters page
         calib_params_widget = QWidget()
         calib_params_layout = QVBoxLayout(calib_params_widget)
-        calib_params_layout.setSpacing(5)
+        calib_params_layout.setSpacing(12)
+        calib_params_layout.setContentsMargins(5, 10, 5, 10)
         
         self.setup_detector_groupbox(calib_params_layout)
         self.setup_start_values_groupbox(calib_params_layout)
@@ -1468,22 +1517,27 @@ class CalibrateModule(GUIBase):
                 font-weight: bold;
                 font-size: 10pt;
                 border: 2px solid {self.colors['border']};
-                border-radius: 5px;
-                margin-top: 15px;
-                margin-bottom: 10px;
-                padding: 15px 10px 10px 10px;
+                border-radius: 6px;
+                margin-top: 10px;
+                margin-bottom: 5px;
+                padding-top: 18px;
+                padding-bottom: 12px;
+                padding-left: 12px;
+                padding-right: 12px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
+                left: 12px;
+                padding: 0 8px 0 8px;
                 color: {self.colors['text_dark']};
+                background-color: {self.colors['card_bg']};
                 text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
             }}
         """)
         detector_layout = QVBoxLayout(detector_gb)
-        detector_layout.setSpacing(8)
+        detector_layout.setSpacing(10)
+        detector_layout.setContentsMargins(8, 8, 8, 8)
         
         # Detector selection combo box
         self.detector_combo = QComboBox()
@@ -1495,44 +1549,67 @@ class CalibrateModule(GUIBase):
         
         # Pixel size grid
         pixel_grid = QHBoxLayout()
-        
-        pixel_grid.addWidget(QLabel("Pixel width:"))
+        pixel_grid.setSpacing(8)
+
+        width_label = QLabel("Pixel width:")
+        width_label.setMinimumWidth(80)
+        pixel_grid.addWidget(width_label)
         self.pixel_width_txt = QLineEdit(str(self.pixel_size * 1e6))
-        self.pixel_width_txt.setFixedWidth(60)
+        self.pixel_width_txt.setFixedWidth(70)
         pixel_grid.addWidget(self.pixel_width_txt)
         pixel_grid.addWidget(QLabel("μm"))
         pixel_grid.addStretch()
-        
+
         detector_layout.addLayout(pixel_grid)
-        
+
         pixel_grid2 = QHBoxLayout()
-        pixel_grid2.addWidget(QLabel("Pixel height:"))
+        pixel_grid2.setSpacing(8)
+
+        height_label = QLabel("Pixel height:")
+        height_label.setMinimumWidth(80)
+        pixel_grid2.addWidget(height_label)
         self.pixel_height_txt = QLineEdit(str(self.pixel_size * 1e6))
-        self.pixel_height_txt.setFixedWidth(60)
+        self.pixel_height_txt.setFixedWidth(70)
         pixel_grid2.addWidget(self.pixel_height_txt)
         pixel_grid2.addWidget(QLabel("μm"))
         pixel_grid2.addStretch()
-        
+
         detector_layout.addLayout(pixel_grid2)
         
         # Distortion/Spline file
         distortion_layout = QHBoxLayout()
-        distortion_layout.addWidget(QLabel("Distortion:"))
+        distortion_layout.setSpacing(8)
+
+        distortion_label = QLabel("Distortion:")
+        distortion_label.setMinimumWidth(80)
+        distortion_layout.addWidget(distortion_label)
         self.spline_name_lbl = QLabel("None")
-        self.spline_name_lbl.setStyleSheet("color: gray;")
+        self.spline_name_lbl.setStyleSheet("color: gray; font-style: italic;")
         distortion_layout.addWidget(self.spline_name_lbl)
         distortion_layout.addStretch()
-        
+
         self.spline_load_btn = QPushButton("Load")
-        self.spline_load_btn.setMaximumWidth(50)
+        self.spline_load_btn.setFixedWidth(55)
         self.spline_load_btn.setToolTip("Load spline correction file")
+        self.spline_load_btn.setStyleSheet("""
+            QPushButton {
+                padding: 4px 8px;
+                border-radius: 3px;
+            }
+        """)
         distortion_layout.addWidget(self.spline_load_btn)
-        
+
         self.spline_reset_btn = QPushButton("Reset")
-        self.spline_reset_btn.setMaximumWidth(50)
+        self.spline_reset_btn.setFixedWidth(55)
         self.spline_reset_btn.setEnabled(False)
+        self.spline_reset_btn.setStyleSheet("""
+            QPushButton {
+                padding: 4px 8px;
+                border-radius: 3px;
+            }
+        """)
         distortion_layout.addWidget(self.spline_reset_btn)
-        
+
         detector_layout.addLayout(distortion_layout)
         
         parent_layout.addWidget(detector_gb)
@@ -1545,26 +1622,35 @@ class CalibrateModule(GUIBase):
                 font-weight: bold;
                 font-size: 10pt;
                 border: 2px solid {self.colors['border']};
-                border-radius: 5px;
-                margin-top: 15px;
-                margin-bottom: 10px;
-                padding: 15px 10px 10px 10px;
+                border-radius: 6px;
+                margin-top: 10px;
+                margin-bottom: 5px;
+                padding-top: 18px;
+                padding-bottom: 12px;
+                padding-left: 12px;
+                padding-right: 12px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
+                left: 12px;
+                padding: 0 8px 0 8px;
                 color: {self.colors['text_dark']};
+                background-color: {self.colors['card_bg']};
                 text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
             }}
         """)
         sv_layout = QVBoxLayout(sv_gb)
-        sv_layout.setSpacing(8)
+        sv_layout.setSpacing(10)
+        sv_layout.setContentsMargins(8, 8, 8, 8)
         
         # Calibrant selection
         calib_layout = QHBoxLayout()
-        calib_layout.addWidget(QLabel("Calibrant:"))
+        calib_layout.setSpacing(8)
+
+        calib_label = QLabel("Calibrant:")
+        calib_label.setMinimumWidth(80)
+        calib_layout.addWidget(calib_label)
         self.calibrant_combo = QComboBox()
         if PYFAI_AVAILABLE:
             calibrants = sorted(ALL_CALIBRANTS.keys())
@@ -1574,12 +1660,16 @@ class CalibrateModule(GUIBase):
         self.calibrant_combo.currentTextChanged.connect(self.on_calibrant_changed)
         calib_layout.addWidget(self.calibrant_combo)
         sv_layout.addLayout(calib_layout)
-        
+
         # Distance with refinement checkbox
         dist_layout = QHBoxLayout()
-        dist_layout.addWidget(QLabel("Distance:"))
+        dist_layout.setSpacing(8)
+
+        dist_label = QLabel("Distance:")
+        dist_label.setMinimumWidth(80)
+        dist_layout.addWidget(dist_label)
         self.distance_txt = QLineEdit(str(self.distance * 1000))  # Convert to mm
-        self.distance_txt.setFixedWidth(80)
+        self.distance_txt.setFixedWidth(85)
         dist_layout.addWidget(self.distance_txt)
         dist_layout.addWidget(QLabel("mm"))
         self.distance_cb = QCheckBox("refine")
@@ -1590,9 +1680,13 @@ class CalibrateModule(GUIBase):
         
         # Wavelength with refinement checkbox
         wl_layout = QHBoxLayout()
-        wl_layout.addWidget(QLabel("Wavelength:"))
+        wl_layout.setSpacing(8)
+
+        wl_label = QLabel("Wavelength:")
+        wl_label.setMinimumWidth(80)
+        wl_layout.addWidget(wl_label)
         self.wavelength_txt = QLineEdit(str(self.wavelength))
-        self.wavelength_txt.setFixedWidth(80)
+        self.wavelength_txt.setFixedWidth(85)
         wl_layout.addWidget(self.wavelength_txt)
         wl_layout.addWidget(QLabel("Å"))
         self.wavelength_cb = QCheckBox("refine")
@@ -1600,51 +1694,98 @@ class CalibrateModule(GUIBase):
         wl_layout.addWidget(self.wavelength_cb)
         wl_layout.addStretch()
         sv_layout.addLayout(wl_layout)
-        
+
         # Polarization factor
         pol_layout = QHBoxLayout()
-        pol_layout.addWidget(QLabel("Polarization:"))
+        pol_layout.setSpacing(8)
+
+        pol_label = QLabel("Polarization:")
+        pol_label.setMinimumWidth(80)
+        pol_layout.addWidget(pol_label)
         self.polarization_txt = QLineEdit("0.99")
-        self.polarization_txt.setFixedWidth(80)
+        self.polarization_txt.setFixedWidth(85)
         pol_layout.addWidget(self.polarization_txt)
         pol_layout.addStretch()
         sv_layout.addLayout(pol_layout)
         
         # Image transformation buttons
         transform_frame = QFrame()
-        transform_frame.setFrameShape(QFrame.Shape.StyledPanel)
+        transform_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: rgba(240, 240, 240, 0.3);
+                border: 1px solid {self.colors['border']};
+                border-radius: 5px;
+                padding: 10px;
+                margin-top: 8px;
+            }}
+        """)
         transform_layout = QVBoxLayout(transform_frame)
-        transform_layout.setSpacing(3)
-        
+        transform_layout.setSpacing(8)
+        transform_layout.setContentsMargins(8, 8, 8, 8)
+
         transform_label = QLabel("Image transformations:")
-        transform_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))
+        transform_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
         transform_layout.addWidget(transform_label)
-        
+
         # Rotation buttons
         rot_layout = QHBoxLayout()
+        rot_layout.setSpacing(6)
+
         self.rotate_m90_btn = QPushButton("↶ -90°")
-        self.rotate_m90_btn.setStyleSheet("padding: 3px;")
+        self.rotate_m90_btn.setStyleSheet("""
+            QPushButton {
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-size: 9pt;
+            }
+        """)
         self.rotate_p90_btn = QPushButton("↷ +90°")
-        self.rotate_p90_btn.setStyleSheet("padding: 3px;")
+        self.rotate_p90_btn.setStyleSheet("""
+            QPushButton {
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-size: 9pt;
+            }
+        """)
         rot_layout.addWidget(self.rotate_m90_btn)
         rot_layout.addWidget(self.rotate_p90_btn)
         transform_layout.addLayout(rot_layout)
-        
+
         # Flip buttons
         flip_layout = QHBoxLayout()
+        flip_layout.setSpacing(6)
+
         self.flip_horizontal_btn = QPushButton("Flip H")
-        self.flip_horizontal_btn.setStyleSheet("padding: 3px;")
+        self.flip_horizontal_btn.setStyleSheet("""
+            QPushButton {
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-size: 9pt;
+            }
+        """)
         self.flip_vertical_btn = QPushButton("Flip V")
-        self.flip_vertical_btn.setStyleSheet("padding: 3px;")
+        self.flip_vertical_btn.setStyleSheet("""
+            QPushButton {
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-size: 9pt;
+            }
+        """)
         flip_layout.addWidget(self.flip_horizontal_btn)
         flip_layout.addWidget(self.flip_vertical_btn)
         transform_layout.addLayout(flip_layout)
-        
+
         # Reset button
         self.reset_transformations_btn = QPushButton("Reset Transformations")
-        self.reset_transformations_btn.setStyleSheet("padding: 3px;")
+        self.reset_transformations_btn.setStyleSheet("""
+            QPushButton {
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-size: 9pt;
+            }
+        """)
         transform_layout.addWidget(self.reset_transformations_btn)
-        
+
         sv_layout.addWidget(transform_frame)
         
         parent_layout.addWidget(sv_gb)
@@ -1657,22 +1798,27 @@ class CalibrateModule(GUIBase):
                 font-weight: bold;
                 font-size: 10pt;
                 border: 2px solid {self.colors['border']};
-                border-radius: 5px;
-                margin-top: 15px;
-                margin-bottom: 10px;
-                padding: 15px 10px 10px 10px;
+                border-radius: 6px;
+                margin-top: 10px;
+                margin-bottom: 5px;
+                padding-top: 18px;
+                padding-bottom: 12px;
+                padding-left: 12px;
+                padding-right: 12px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
+                left: 12px;
+                padding: 0 8px 0 8px;
                 color: {self.colors['text_dark']};
+                background-color: {self.colors['card_bg']};
                 text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
             }}
         """)
         peak_layout = QVBoxLayout(peak_gb)
-        peak_layout.setSpacing(8)
+        peak_layout.setSpacing(10)
+        peak_layout.setContentsMargins(8, 8, 8, 8)
         
         # Radio buttons for peak selection mode
         self.peak_mode_group = QButtonGroup()
@@ -1717,37 +1863,57 @@ class CalibrateModule(GUIBase):
         
         # Current Ring Number (Dioptas style)
         ring_num_row = QHBoxLayout()
-        ring_num_row.addWidget(QLabel("Current Ring #:"))
+        ring_num_row.setSpacing(8)
+
+        ring_label = QLabel("Current Ring #:")
+        ring_label.setMinimumWidth(100)
+        ring_num_row.addWidget(ring_label)
         self.ring_number_spinbox = QSpinBox()
         self.ring_number_spinbox.setMinimum(0)
         self.ring_number_spinbox.setMaximum(50)
         self.ring_number_spinbox.setValue(1)  # Default to ring 1
-        self.ring_number_spinbox.setFixedWidth(60)
+        self.ring_number_spinbox.setFixedWidth(70)
         self.ring_number_spinbox.setStyleSheet("""
             QSpinBox {
                 background-color: #FFF8DC;
                 font-weight: bold;
-                padding: 3px;
+                padding: 5px;
+                border-radius: 3px;
             }
         """)
         ring_num_row.addWidget(self.ring_number_spinbox)
         ring_num_row.addStretch()
         peak_layout.addLayout(ring_num_row)
-        
+
         # Auto increment checkbox (Dioptas style)
         self.automatic_peak_num_inc_cb = QCheckBox("Automatic increase ring number")
         self.automatic_peak_num_inc_cb.setChecked(True)
-        self.automatic_peak_num_inc_cb.setStyleSheet(f"color: {self.colors['text_dark']};")
+        self.automatic_peak_num_inc_cb.setStyleSheet(f"""
+            QCheckBox {{
+                color: {self.colors['text_dark']};
+                padding: 4px 0px;
+            }}
+        """)
         peak_layout.addWidget(self.automatic_peak_num_inc_cb)
-        
+
         # Peak search size
         search_size_row = QHBoxLayout()
-        search_size_row.addWidget(QLabel("Search Size:"))
+        search_size_row.setSpacing(8)
+
+        search_label = QLabel("Search Size:")
+        search_label.setMinimumWidth(100)
+        search_size_row.addWidget(search_label)
         self.search_size_sb = QSpinBox()
         self.search_size_sb.setMinimum(5)
         self.search_size_sb.setMaximum(100)
         self.search_size_sb.setValue(10)
-        self.search_size_sb.setFixedWidth(60)
+        self.search_size_sb.setFixedWidth(70)
+        self.search_size_sb.setStyleSheet("""
+            QSpinBox {
+                padding: 5px;
+                border-radius: 3px;
+            }
+        """)
         search_size_row.addWidget(self.search_size_sb)
         search_size_row.addWidget(QLabel("pixels"))
         search_size_row.addStretch()
@@ -1755,23 +1921,44 @@ class CalibrateModule(GUIBase):
         
         # Clear and Undo buttons
         btn_layout = QHBoxLayout()
-        
+        btn_layout.setSpacing(8)
+
         self.clear_peaks_btn = QPushButton("Clear Peaks")
-        self.clear_peaks_btn.setStyleSheet("padding: 5px;")
+        self.clear_peaks_btn.setStyleSheet("""
+            QPushButton {
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-size: 9pt;
+            }
+        """)
         self.clear_peaks_btn.clicked.connect(self.clear_manual_peaks)
         btn_layout.addWidget(self.clear_peaks_btn)
-        
+
         self.undo_peaks_btn = QPushButton("Undo Last")
-        self.undo_peaks_btn.setStyleSheet("padding: 5px;")
+        self.undo_peaks_btn.setStyleSheet("""
+            QPushButton {
+                padding: 6px 12px;
+                border-radius: 4px;
+                font-size: 9pt;
+            }
+        """)
         self.undo_peaks_btn.clicked.connect(self.undo_last_peak)
         btn_layout.addWidget(self.undo_peaks_btn)
-        
+
         peak_layout.addLayout(btn_layout)
-        
+
         # Peak count label
         self.peak_count_label = QLabel("Peaks: 0")
-        self.peak_count_label.setFont(QFont('Arial', 8))
-        self.peak_count_label.setStyleSheet("color: blue; padding: 3px;")
+        self.peak_count_label.setFont(QFont('Arial', 9))
+        self.peak_count_label.setStyleSheet(f"""
+            QLabel {{
+                color: {self.colors['primary']};
+                padding: 6px 10px;
+                background-color: rgba(33, 150, 243, 0.1);
+                border-radius: 4px;
+                font-weight: bold;
+            }}
+        """)
         peak_layout.addWidget(self.peak_count_label)
         
         parent_layout.addWidget(peak_gb)
@@ -1784,22 +1971,27 @@ class CalibrateModule(GUIBase):
                 font-weight: bold;
                 font-size: 10pt;
                 border: 2px solid {self.colors['border']};
-                border-radius: 5px;
-                margin-top: 15px;
-                margin-bottom: 10px;
-                padding: 15px 10px 10px 10px;
+                border-radius: 6px;
+                margin-top: 10px;
+                margin-bottom: 5px;
+                padding-top: 18px;
+                padding-bottom: 12px;
+                padding-left: 12px;
+                padding-right: 12px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
+                left: 12px;
+                padding: 0 8px 0 8px;
                 color: {self.colors['text_dark']};
+                background-color: {self.colors['card_bg']};
                 text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
             }}
         """)
         ref_layout = QVBoxLayout(ref_gb)
-        ref_layout.setSpacing(8)
+        ref_layout.setSpacing(10)
+        ref_layout.setContentsMargins(8, 8, 8, 8)
         
         # Checkbox style
         checkbox_style = f"""
@@ -1836,14 +2028,23 @@ class CalibrateModule(GUIBase):
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
         separator.setFrameShadow(QFrame.Shadow.Sunken)
-        separator.setStyleSheet(f"background-color: {self.colors['border']}; max-height: 2px; margin: 10px 0px;")
+        separator.setStyleSheet(f"background-color: {self.colors['border']}; max-height: 2px; margin: 12px 0px;")
         ref_layout.addWidget(separator)
-        
+
         # Mask from Mask Module
         mask_frame = QFrame()
-        mask_frame.setStyleSheet(f"QFrame {{ background-color: {self.colors['card_bg']}; border-radius: 5px; padding: 10px; margin: 5px 0px; }}")
+        mask_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: rgba(240, 240, 240, 0.3);
+                border: 1px solid {self.colors['border']};
+                border-radius: 5px;
+                padding: 12px;
+                margin: 5px 0px;
+            }}
+        """)
         mask_inner_layout = QVBoxLayout(mask_frame)
         mask_inner_layout.setSpacing(10)
+        mask_inner_layout.setContentsMargins(8, 8, 8, 8)
         
         mask_title = QLabel("Mask from Mask Module")
         mask_title.setFont(QFont('Arial', 9, QFont.Weight.Bold))
@@ -1870,19 +2071,30 @@ class CalibrateModule(GUIBase):
         separator2 = QFrame()
         separator2.setFrameShape(QFrame.Shape.HLine)
         separator2.setFrameShadow(QFrame.Shadow.Sunken)
-        separator2.setStyleSheet(f"background-color: {self.colors['border']}; max-height: 2px; margin: 10px 0px;")
+        separator2.setStyleSheet(f"background-color: {self.colors['border']}; max-height: 2px; margin: 12px 0px;")
         ref_layout.addWidget(separator2)
-        
+
         # Peak search settings frame
         peak_frame = QFrame()
-        peak_frame.setStyleSheet(f"QFrame {{ background-color: rgba(255,255,255,0.02); border-radius: 5px; padding: 8px; margin: 5px 0px; }}")
+        peak_frame.setStyleSheet(f"""
+            QFrame {{
+                background-color: rgba(240, 240, 240, 0.3);
+                border: 1px solid {self.colors['border']};
+                border-radius: 5px;
+                padding: 12px;
+                margin: 5px 0px;
+            }}
+        """)
         peak_layout_inner = QVBoxLayout(peak_frame)
-        peak_layout_inner.setSpacing(8)
-        
+        peak_layout_inner.setSpacing(10)
+        peak_layout_inner.setContentsMargins(8, 8, 8, 8)
+
         # Peak search algorithm
         algo_layout = QHBoxLayout()
+        algo_layout.setSpacing(8)
+
         algo_label = QLabel("Peak Search:")
-        algo_label.setFixedWidth(100)
+        algo_label.setMinimumWidth(100)
         algo_layout.addWidget(algo_label)
         self.peak_search_algorithm_cb = QComboBox()
         self.peak_search_algorithm_cb.addItems(["Massif", "Blob"])
