@@ -343,8 +343,8 @@ class CalibrationCanvas(FigureCanvas):
     
     def __init__(self, parent=None, width=6, height=6, dpi=100):
         try:
-            # Use smaller DPI to reduce memory usage
-            actual_dpi = min(dpi, 80)
+            # Use full DPI for better visibility (removed 80 DPI limit per user request)
+            actual_dpi = dpi
             
             self.fig = Figure(figsize=(width, height), dpi=actual_dpi)
             self.axes = self.fig.add_subplot(111)
@@ -794,6 +794,23 @@ class CalibrationCanvas(FigureCanvas):
     def get_mask(self):
         """Get current mask data"""
         return self.mask_data
+    
+    def get_manual_control_points(self):
+        """Get manually selected control points in format for calibration
+        
+        Returns:
+            list: Control points in format [[row, col, ring_num], ...]
+        """
+        if not self.manual_peaks:
+            return None
+        
+        # Convert from (x, y, ring_num) to [[row, col, ring_num], ...]
+        control_points = []
+        for x, y, ring_num in self.manual_peaks:
+            # x corresponds to col, y corresponds to row
+            control_points.append([y, x, ring_num])
+        
+        return control_points
     
     def clear_manual_peaks(self):
         """Clear all manually selected peaks"""
