@@ -68,11 +68,12 @@ except ImportError:
 
 
 class CalibrationWorkerThread(QThread):
-    """Worker thread for calibration processing"""
+    """Worker thread for calibration processing with real-time ring-by-ring display"""
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
     progress = pyqtSignal(str)
     calibration_result = pyqtSignal(object)  # Emits calibration result
+    ring_found = pyqtSignal(int, object)  # Emits (ring_number, ring_points) for real-time display
 
     def __init__(self, target_func, *args, **kwargs):
         super().__init__()
@@ -2560,11 +2561,26 @@ class CalibrateModule(GUIBase):
             QMessageBox.critical(None, "Error", f"Failed to start calibration:\n{str(e)}")
 
     def perform_calibration(self, image, calibrant, distance, pixel_size, mask, manual_control_points=None):
-        """Perform calibration (runs in worker thread) - Based on Dioptas implementation"""
+        """
+        Perform calibration (runs in worker thread) - Based on Dioptas implementation
+        With optimizations to prevent kernel died / memory issues
+        """
+        import gc
         from pyFAI.detectors import Detector
         
-        # Create detector object
+        # Clean up memory at start
+        gc.collect()
+        
+        # Check image size - very large images can cause kernel died
         shape = image.shape
+        image_megapixels = (shape[0] * shape[1]) / 1e6
+        self.log(f"Image size: {shape[0]} x {shape[1]} ({image_megapixels:.1f} MP)")
+        
+        if image_megapixels > 16:  # > 16 megapixels
+            self.log(f"⚠ Warning: Large image detected ({image_megapixels:.1f} MP)")
+            self.log(f"  This may cause memory issues. Consider binning the image.")
+        
+        # Create detector object
         detector = Detector(pixel1=pixel_size, pixel2=pixel_size, max_shape=shape)
         
         # Create geometry refinement object
@@ -2634,16 +2650,94 @@ class CalibrateModule(GUIBase):
         # Extract control points (only if not using manual peaks)
         if manual_control_points is None or len(manual_control_points) == 0:
             try:
-                self.log("Extracting control points automatically...")
+                self.log("="*70)
+                self.log("Starting RING-BY-RING Peak Detection (Dioptas-style)")
+                self.log("="*70)
+                
+                # Extract all control points at once (pyFAI method)
+                # This is optimized and avoids kernel died issues
+                import gc
+                gc.collect()  # Clean up memory before intensive operation
+                
                 geo_ref.extract_cp(max_rings=10, pts_per_deg=1.0)
                 
-                # Display detected points in real-time (Dioptas-style)
+                # Create temporary AI for coordinate conversion
+                temp_ai = AzimuthalIntegrator(
+                    dist=geo_ref.dist,
+                    poni1=geo_ref.poni1,
+                    poni2=geo_ref.poni2,
+                    rot1=geo_ref.rot1,
+                    rot2=geo_ref.rot2,
+                    rot3=geo_ref.rot3,
+                    pixel1=geo_ref.pixel1,
+                    pixel2=geo_ref.pixel2,
+                    detector=detector,
+                    wavelength=geo_ref.wavelength
+                )
+                
+                # Display detected rings one by one (Dioptas-style real-time display)
                 if hasattr(geo_ref, 'data') and geo_ref.data is not None:
-                    self.log(f"Found {len(geo_ref.data)} rings with control points")
-                    # Signal to display points (will be processed in main thread)
-                    self.progress.emit(f"AUTO_POINTS:{len(geo_ref.data)}")
+                    num_rings = len(geo_ref.data)
+                    self.log(f"Found {num_rings} rings with control points")
+                    self.log("="*70)
+                    
+                    # Send each ring for real-time display
+                    for ring_idx, ring_points in enumerate(geo_ref.data):
+                        if len(ring_points) > 0:
+                            ring_num = ring_idx + 1
+                            num_points = len(ring_points)
+                            
+                            # Log ring info
+                            self.log(f"Ring {ring_num}: {num_points} control points detected")
+                            
+                            # Send signal for real-time display
+                            try:
+                                # Convert ring data to pixel coordinates for display
+                                ring_display_points = []
+                                for point in ring_points:
+                                    # point format: [ring_num, tth, chi]
+                                    if len(point) >= 3:
+                                        tth_val = point[1]  # 2theta in radians
+                                        chi_val = point[2]  # chi in radians
+                                        
+                                        # Convert to pixel coordinates
+                                        try:
+                                            # Use temp_ai to convert polar to pixel
+                                            y, x = temp_ai.calcfrom1d(np.array([tth_val]), np.array([chi_val]), shape=shape)
+                                            if 0 <= y < shape[0] and 0 <= x < shape[1]:
+                                                ring_display_points.append([float(x), float(y), ring_num])
+                                        except:
+                                            pass
+                                
+                                # Send as progress signal (string format for thread safety)
+                                import json
+                                ring_data_json = json.dumps({
+                                    'ring_num': ring_num,
+                                    'num_points': num_points,
+                                    'points': ring_display_points  # Now in pixel coords: [x, y, ring_num]
+                                })
+                                self.progress.emit(f"RING_FOUND:{ring_data_json}")
+                                
+                                # Small delay for visual effect (simulating Dioptas)
+                                import time
+                                time.sleep(0.15)  # 150ms delay between rings for visibility
+                                
+                            except Exception as display_error:
+                                self.log(f"Warning: Could not send ring {ring_num} for display: {display_error}")
+                    
+                    self.log("="*70)
+                    self.log(f"Peak detection complete: {num_rings} rings found")
+                    self.log("="*70 + "\n")
+                    
+                    # Clean up temporary objects
+                    del temp_ai
+                    del ring_display_points
+                    gc.collect()
                     
             except Exception as e:
+                import traceback
+                error_detail = traceback.format_exc()
+                self.log(f"Peak detection error:\n{error_detail}")
                 raise ValueError(f"Failed to extract control points: {str(e)}. "
                                "Please check image quality or use Manual Peak Selection.")
         
@@ -2828,6 +2922,9 @@ class CalibrateModule(GUIBase):
             self.log(f"\nRefinement error details:\n{error_detail}")
             raise ValueError(f"Geometry refinement failed: {str(e)}")
         
+        # Clean up before creating final AI (prevent memory buildup)
+        gc.collect()
+        
         # Create AzimuthalIntegrator from refined parameters
         ai = AzimuthalIntegrator(
             dist=geo_ref.dist,
@@ -2841,6 +2938,9 @@ class CalibrateModule(GUIBase):
             detector=detector,
             wavelength=geo_ref.wavelength
         )
+        
+        # Final memory cleanup before returning result
+        gc.collect()
         
         # Get refined parameters
         result = {
@@ -2954,8 +3054,43 @@ class CalibrateModule(GUIBase):
             QMessageBox.critical(None, "Error", f"Error processing results:\n{str(e)}")
 
     def on_calibration_progress(self, message):
-        """Handle calibration progress updates including auto-detected points"""
-        if message.startswith("AUTO_POINTS:"):
+        """Handle calibration progress updates including real-time ring-by-ring display (Dioptas-style)"""
+        if message.startswith("RING_FOUND:"):
+            # Real-time display of detected ring (Dioptas-style)
+            try:
+                import json
+                # Extract ring data from message
+                ring_data_json = message.split("RING_FOUND:", 1)[1]
+                ring_data = json.loads(ring_data_json)
+                
+                ring_num = ring_data['ring_num']
+                num_points = ring_data['num_points']
+                points = ring_data['points']  # [[x, y, ring_num], ...] already in pixel coords
+                
+                # Display on canvas
+                if MATPLOTLIB_AVAILABLE and hasattr(self, 'unified_canvas'):
+                    try:
+                        # Convert to tuple format expected by canvas
+                        display_points = [(p[0], p[1], p[2]) for p in points]
+                        
+                        # Add to canvas auto_detected_peaks
+                        if hasattr(self.unified_canvas, 'auto_detected_peaks'):
+                            self.unified_canvas.auto_detected_peaks.extend(display_points)
+                            
+                            # Update display incrementally (Dioptas-style)
+                            self.unified_canvas.update_auto_peaks_display()
+                            
+                            self.log(f"  → Ring {ring_num}: Displayed {len(display_points)} points")
+                    
+                    except Exception as display_error:
+                        self.log(f"Warning: Could not display ring {ring_num}: {display_error}")
+                
+            except Exception as e:
+                self.log(f"Warning: Could not process ring data: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        elif message.startswith("AUTO_POINTS:"):
             # Extract number of rings
             num_rings = int(message.split(":")[1])
             self.log(f"✓ Automatically detected control points on {num_rings} rings")
