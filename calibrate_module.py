@@ -272,7 +272,7 @@ class CalibrateModule(GUIBase):
             
             try:
                 # Create canvas with larger size for better visibility
-                self.unified_canvas = CalibrationCanvas(canvas_container, width=20, height=20, dpi=100)
+                self.unified_canvas = CalibrationCanvas(canvas_container, width=22, height=22, dpi=100)
                 canvas_layout.addWidget(self.unified_canvas)
             except Exception as e:
                 # Simplified error message
