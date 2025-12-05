@@ -507,6 +507,10 @@ class CalibrationCanvas(FigureCanvas):
             self.ring_color = 'red'  # Red color (Dioptas default)
             self.calibration_points = None  # Store calibration points
             
+            # Store AzimuthalIntegrator for theoretical ring overlay (Dioptas-style)
+            self.ai = None  # AzimuthalIntegrator from calibration result
+            self.show_theoretical_rings = True  # Show theoretical calibration rings
+            
             # Connect events with error handling
             try:
                 self.mpl_connect('scroll_event', self.on_scroll)
@@ -605,8 +609,85 @@ class CalibrationCanvas(FigureCanvas):
             self.base_xlim = self.axes.get_xlim()
             self.base_ylim = self.axes.get_ylim()
         
+        # Draw theoretical calibration rings if AI is available (Dioptas-style)
+        if self.ai is not None and self.show_theoretical_rings:
+            self.draw_theoretical_rings()
+        
         # Use draw_idle() for better performance
         self.draw_idle()
+    
+    def draw_theoretical_rings(self):
+        """
+        Draw theoretical calibration rings based on refined geometry (Dioptas-style)
+        Uses AzimuthalIntegrator to calculate ring positions from calibrant d-spacings
+        """
+        if self.ai is None or self.image_data is None:
+            return
+        
+        try:
+            # Get image shape
+            shape = self.image_data.shape
+            
+            # Get calibrant and number of rings
+            if not hasattr(self.ai, 'calibrant') or self.ai.calibrant is None:
+                return
+            
+            calibrant = self.ai.calibrant
+            num_rings = min(len(calibrant.dSpacing), self.num_rings_display)
+            
+            # Generate 2theta array for entire image (Dioptas method)
+            # This is computationally efficient as it's done once for all pixels
+            tth_array = self.ai.twoThetaArray(shape)
+            
+            # Draw each theoretical ring
+            for ring_idx in range(num_rings):
+                try:
+                    # Get 2theta value for this ring from calibrant
+                    ring_2theta = calibrant.get_2th()[ring_idx]
+                    
+                    # Find pixels close to this 2theta value (within tolerance)
+                    tolerance = 0.01  # radians (~0.5 degrees)
+                    ring_mask = np.abs(tth_array - ring_2theta) < tolerance
+                    
+                    # Get coordinates of pixels in this ring
+                    ring_coords = np.where(ring_mask)
+                    
+                    if len(ring_coords[0]) > 0:
+                        # Sample points for smoother display (every Nth point)
+                        sample_rate = max(1, len(ring_coords[0]) // 500)  # Max 500 points per ring
+                        y_coords = ring_coords[0][::sample_rate]
+                        x_coords = ring_coords[1][::sample_rate]
+                        
+                        # Plot the ring points
+                        self.axes.plot(x_coords, y_coords, 'o',
+                                     color=self.ring_color, 
+                                     markersize=1,
+                                     alpha=self.ring_alpha, 
+                                     markeredgewidth=0,
+                                     zorder=10)
+                        
+                except Exception as ring_error:
+                    # Skip this ring if calculation fails
+                    continue
+                    
+        except Exception as e:
+            # If theoretical ring drawing fails, silently continue
+            print(f"Warning: Could not draw theoretical rings: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def update_calibration_overlay(self, ai):
+        """
+        Update theoretical ring overlay with new calibration (Dioptas-style real-time update)
+        
+        Args:
+            ai: AzimuthalIntegrator with calibration results
+        """
+        self.ai = ai
+        
+        # Redraw image with new theoretical rings
+        if self.image_data is not None:
+            self.display_calibration_image(self.image_data, self.calibration_points)
     
     def on_scroll(self, event):
         """Handle mouse scroll for zoom"""
@@ -3418,10 +3499,12 @@ class CalibrateModule(GUIBase):
             raise ValueError(f"Not enough control points: {len(geo_ref.data) if hasattr(geo_ref, 'data') and geo_ref.data is not None else 0}. "
                            "Need at least 3 points. Use Manual Peak Selection to add more peaks.")
         
-        # Refine geometry (Conservative approach: NO rotation refinement by default)
-        # This avoids unrealistic tilt angles that can occur with limited data
+        # Refine geometry (Dioptas-style: Full refinement with all parameters)
+        # This matches the Dioptas implementation which optimizes all 6 parameters
         try:
-            self.log("\nStarting geometry refinement...")
+            self.log("\n" + "="*60)
+            self.log("Starting Geometry Refinement (Dioptas-style)")
+            self.log("="*60)
             self.log(f"Number of control points: {len(geo_ref.data)}")
             
             # Count rings
@@ -3431,73 +3514,67 @@ class CalibrateModule(GUIBase):
                     ring_nums.add(point[0])
             self.log(f"Number of rings: {len(ring_nums)}")
             
-            # Stage 1: Refine distance only (most sensitive parameter)
-            # Fix everything else for initial convergence
-            self.log("\n  Stage 1: Refining distance only...")
-            geo_ref.refine2(fix=["wavelength", "poni1", "poni2", "rot1", "rot2", "rot3"])
-            stage1_distance = geo_ref.dist
-            self.log(f"    Distance: {stage1_distance*1000:.2f} mm")
+            # Dioptas-style multi-stage refinement
+            # Stage 1: Refine distance and beam center only (most critical parameters)
+            self.log("\nStage 1: Refining distance and beam center...")
+            geo_ref.refine2(fix=["wavelength", "rot1", "rot2", "rot3"])
+            self.log(f"  Distance: {geo_ref.dist*1000:.3f} mm")
+            self.log(f"  PONI1 (Y): {geo_ref.poni1*1000:.3f} mm")
+            self.log(f"  PONI2 (X): {geo_ref.poni2*1000:.3f} mm")
             
-            # Stage 2: Refine beam center ONLY (keep distance from Stage 1)
-            # Distance is already correct from Stage 1, only optimize beam center
-            self.log("\n  Stage 2: Refining beam center only (keeping Stage 1 distance)...")
-            geo_ref.refine2(fix=["wavelength", "dist", "rot1", "rot2", "rot3"])
-            self.log(f"    Distance: {geo_ref.dist*1000:.2f} mm (unchanged)")
-            self.log(f"    Beam center: ({geo_ref.poni2*1000:.2f}, {geo_ref.poni1*1000:.2f}) mm")
+            # Calculate initial RMS error
+            if hasattr(geo_ref, 'chi2') and geo_ref.chi2 is not None:
+                rms = np.sqrt(geo_ref.chi2())
+                self.log(f"  RMS error: {rms:.3f} pixels")
             
-            # Stage 3: SKIP rotation refinement by default
-            # Rotation refinement is DISABLED to avoid unrealistic angles
-            # In most cases, detector is nearly perpendicular to beam (rot1≈0, rot2≈0, rot3≈0)
-            self.log("\n  Stage 3: Rotation refinement DISABLED")
-            self.log(f"    Detector assumed perpendicular to beam (rot1=0°, rot2=0°, rot3=0°)")
-            self.log(f"    This is the safest and most common configuration.")
+            # Stage 2: Full refinement including rotation parameters (Dioptas default)
+            # This is the KEY difference - Dioptas ALWAYS refines rotations
+            self.log("\nStage 2: Full geometry refinement (including rotations)...")
+            self.log("  Optimizing all 6 parameters: dist, poni1, poni2, rot1, rot2, rot3")
             
-            # Optional: Only refine rotations if EXCELLENT data (strict criteria)
-            # Uncomment the block below if you want to enable rotation refinement for very high quality data
-            """
-            if len(ring_nums) >= 8 and len(geo_ref.data) >= 100:
-                self.log("\n  [OPTIONAL] Stage 3b: High-quality data detected, attempting rotation refinement...")
+            # Save current state for comparison
+            dist_before = geo_ref.dist
+            poni1_before = geo_ref.poni1
+            poni2_before = geo_ref.poni2
+            
+            # FULL REFINEMENT - This is what Dioptas does!
+            geo_ref.refine2(fix=["wavelength"])  # Only fix wavelength
+            
+            # Log refined parameters
+            self.log(f"\n  Refined Parameters:")
+            self.log(f"    Distance: {geo_ref.dist*1000:.3f} mm (Δ={( geo_ref.dist-dist_before)*1000:.3f} mm)")
+            self.log(f"    PONI1: {geo_ref.poni1*1000:.3f} mm (Δ={(geo_ref.poni1-poni1_before)*1000:.3f} mm)")
+            self.log(f"    PONI2: {geo_ref.poni2*1000:.3f} mm (Δ={(geo_ref.poni2-poni2_before)*1000:.3f} mm)")
+            self.log(f"    Rot1: {np.degrees(geo_ref.rot1):.4f}° (tilt around axis 1)")
+            self.log(f"    Rot2: {np.degrees(geo_ref.rot2):.4f}° (tilt around axis 2)")
+            self.log(f"    Rot3: {np.degrees(geo_ref.rot3):.4f}° (rotation in plane)")
+            
+            # Calculate final RMS error
+            if hasattr(geo_ref, 'chi2') and geo_ref.chi2 is not None:
                 try:
-                    # Save current state
-                    dist_backup = geo_ref.dist
-                    poni1_backup = geo_ref.poni1
-                    poni2_backup = geo_ref.poni2
+                    rms = np.sqrt(geo_ref.chi2())
+                    self.log(f"\n  Final RMS error: {rms:.3f} pixels")
                     
-                    # Try rotation refinement
-                    geo_ref.refine2(fix=["wavelength"])
-                    
-                    rot1_deg = np.degrees(geo_ref.rot1)
-                    rot2_deg = np.degrees(geo_ref.rot2)
-                    rot3_deg = np.degrees(geo_ref.rot3)
-                    
-                    # Check if result is reasonable
-                    if abs(rot1_deg) > 5 or abs(rot2_deg) > 5 or abs(rot3_deg) > 5:
-                        self.log(f"    Warning: Unrealistic rotations detected!")
-                        self.log(f"    rot1={rot1_deg:.3f}°, rot2={rot2_deg:.3f}°, rot3={rot3_deg:.3f}°")
-                        self.log(f"    Reverting to zero rotations (perpendicular detector)")
-                        # Revert
-                        geo_ref.rot1 = 0.0
-                        geo_ref.rot2 = 0.0
-                        geo_ref.rot3 = 0.0
-                        geo_ref.dist = dist_backup
-                        geo_ref.poni1 = poni1_backup
-                        geo_ref.poni2 = poni2_backup
+                    # Quality assessment (Dioptas-style)
+                    if rms < 1.0:
+                        self.log(f"  Quality: Excellent ✓✓✓")
+                    elif rms < 2.0:
+                        self.log(f"  Quality: Good ✓✓")
+                    elif rms < 3.0:
+                        self.log(f"  Quality: Acceptable ✓")
                     else:
-                        self.log(f"    Rotations accepted: rot1={rot1_deg:.4f}°, rot2={rot2_deg:.4f}°, rot3={rot3_deg:.4f}°")
-                except Exception as rot_error:
-                    self.log(f"    Rotation refinement failed: {rot_error}")
-                    self.log(f"    Keeping rotations at zero")
-                    geo_ref.rot1 = 0.0
-                    geo_ref.rot2 = 0.0
-                    geo_ref.rot3 = 0.0
-            """
+                        self.log(f"  Quality: Poor - consider re-calibration")
+                except:
+                    pass
             
-            self.log("\n  Refinement completed successfully!")
+            self.log("\n" + "="*60)
+            self.log("Geometry Refinement Completed!")
+            self.log("="*60 + "\n")
             
         except Exception as e:
             import traceback
             error_detail = traceback.format_exc()
-            self.log(f"Refinement error details:\n{error_detail}")
+            self.log(f"\nRefinement error details:\n{error_detail}")
             raise ValueError(f"Geometry refinement failed: {str(e)}")
         
         # Create AzimuthalIntegrator from refined parameters
@@ -3530,40 +3607,52 @@ class CalibrateModule(GUIBase):
         return result
 
     def on_calibration_result(self, result):
-        """Handle calibration result"""
+        """Handle calibration result with real-time ring overlay (Dioptas-style)"""
         try:
             # Store results first
             self.ai = result['ai']
             self.geo_ref = result['geo_ref']
             
             # Log results
-            self.log("\n=== Calibration Results ===")
-            self.log(f"Distance: {result['dist']*1000:.2f} mm")
-            self.log(f"PONI1: {result['poni1']*1000:.2f} mm")
-            self.log(f"PONI2: {result['poni2']*1000:.2f} mm")
-            self.log(f"Rot1: {np.degrees(result['rot1']):.3f}°")
-            self.log(f"Rot2: {np.degrees(result['rot2']):.3f}°")
-            self.log(f"Rot3: {np.degrees(result['rot3']):.3f}°")
+            self.log("\n" + "="*60)
+            self.log("CALIBRATION RESULTS (Dioptas-style)")
+            self.log("="*60)
+            self.log(f"Distance: {result['dist']*1000:.3f} mm")
+            self.log(f"PONI1 (Y): {result['poni1']*1000:.3f} mm")
+            self.log(f"PONI2 (X): {result['poni2']*1000:.3f} mm")
+            self.log(f"Rot1: {np.degrees(result['rot1']):.4f}°")
+            self.log(f"Rot2: {np.degrees(result['rot2']):.4f}°")
+            self.log(f"Rot3: {np.degrees(result['rot3']):.4f}°")
             self.log(f"Wavelength: {result['wavelength']*1e10:.4f} Å")
-            self.log("=" * 30)
+            self.log("="*60 + "\n")
             
             # Update UI with calibration results
             self.update_ui_from_calibration()
             
-            # Display calibration result
+            # Display calibration result with theoretical ring overlay (Dioptas-style)
             if MATPLOTLIB_AVAILABLE:
-                # Get control points for visualization from geo_ref.data
                 try:
-                    # geo_ref.data contains the control points in pyFAI format
-                    # Convert to format expected by display_calibration_image
+                    # Update canvas with calibration AI for theoretical rings
+                    self.calibration_canvas.ai = self.ai
+                    self.calibration_canvas.show_theoretical_rings = True
+                    
+                    # Get control points for visualization from geo_ref.data
                     if hasattr(self.geo_ref, 'data') and self.geo_ref.data is not None:
                         rings = self.geo_ref.data
                         self.calibration_canvas.display_calibration_image(self.current_image, rings)
                     else:
                         self.calibration_canvas.display_calibration_image(self.current_image)
+                    
+                    # Log overlay status
+                    self.log("✓ Theoretical calibration rings overlaid on image")
+                    self.log("  (Red circles show expected ring positions)")
+                    
                     self.switch_display_tab("result")
+                    
                 except Exception as viz_error:
+                    import traceback
                     self.log(f"Warning: Could not display rings: {viz_error}")
+                    self.log(traceback.format_exc())
                     self.calibration_canvas.display_calibration_image(self.current_image)
                     self.switch_display_tab("result")
                 
@@ -3571,6 +3660,7 @@ class CalibrateModule(GUIBase):
                 try:
                     self.update_cake_view()
                     self.update_pattern_view()
+                    self.log("✓ Cake and pattern views updated")
                 except Exception as view_error:
                     self.log(f"Warning: Could not update Cake/Pattern views: {view_error}")
                     
