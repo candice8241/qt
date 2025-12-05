@@ -202,7 +202,7 @@ class CalibrateModule(GUIBase):
         
         # Mark as initializing to prevent re-entry
         if hasattr(self, '_ui_initializing') and self._ui_initializing:
-            print("WARNING: setup_ui already initializing, skipping...")
+            # Silently skip re-initialization
             return
         
         self._ui_initializing = True
@@ -249,9 +249,9 @@ class CalibrateModule(GUIBase):
                 # Using larger dimensions for better user experience (increased per user request)
                 self.unified_canvas = CalibrationCanvas(canvas_container, width=14, height=14, dpi=100)
                 canvas_layout.addWidget(self.unified_canvas)
-                print("✅ CalibrationCanvas created successfully")
             except Exception as e:
-                print(f"❌ Error creating CalibrationCanvas: {e}")
+                # Only print errors to console
+                print(f"ERROR creating CalibrationCanvas: {e}")
                 import traceback
                 traceback.print_exc()
                 # Create placeholder
@@ -584,8 +584,6 @@ class CalibrateModule(GUIBase):
         # Mark UI as initialized
         self._ui_initialized = True
         self._ui_initializing = False
-        
-        print("✅ Calibrate UI initialized successfully")
 
     def setup_detector_groupbox(self, parent_layout):
         """Setup Detector GroupBox (Dioptas style)"""
@@ -875,7 +873,7 @@ class CalibrateModule(GUIBase):
         self.search_size_sb = QSpinBox()
         self.search_size_sb.setMinimum(1)  # Allow smaller values
         self.search_size_sb.setMaximum(100)
-        self.search_size_sb.setValue(4)  # Set default to 4 per user request
+        self.search_size_sb.setValue(1)  # Set default to 1 per user request
         self.search_size_sb.setFixedWidth(60)
         search_size_row.addWidget(self.search_size_sb)
         search_size_row.addWidget(QLabel("pixels"))
@@ -3329,13 +3327,15 @@ class CalibrateModule(GUIBase):
 
 
     def update_cake_view(self):
-        """Update Cake view after calibration - Dioptas style with correct polar transformation"""
+        """Update Cake view after calibration - Dioptas style
+        
+        NOTE: If calibration is correct, calibrant peaks should appear as STRAIGHT VERTICAL LINES.
+        Curved lines indicate calibration errors (incorrect geometry parameters).
+        """
         if not hasattr(self, 'cake_axes') or self.ai is None or self.current_image is None:
             return
         
         try:
-            self.log("Generating Cake view (polar transformation)...")
-            
             # Apply mask if available
             mask = None
             if hasattr(self, 'imported_mask') and self.imported_mask is not None:
@@ -3344,18 +3344,18 @@ class CalibrateModule(GUIBase):
                 mask = self.unified_canvas.mask_data
             
             # Dioptas-style cake/polar transformation
-            # Use integrate2d with proper parameters
+            # This creates a 2D map: X=2theta, Y=azimuthal_angle
             result = self.ai.integrate2d(
                 self.current_image,
-                npt_rad=1024,     # Number of radial bins (2theta direction) - higher for better resolution
-                npt_azim=360,     # Number of azimuthal bins (chi/azimuth) - 1° per bin
-                unit="2th_deg",   # Use 2theta in degrees (Dioptas default)
+                npt_rad=1024,      # Radial bins (2theta direction)
+                npt_azim=360,      # Azimuthal bins (chi direction) - 360° = 1°/bin
+                unit="2th_deg",    # Use 2theta in degrees
                 mask=mask,
-                method="bbox",    # Fast method (Dioptas uses this for speed)
-                correctSolidAngle=False  # Dioptas doesn't apply this by default for cake
+                method="bbox",     # Fast method
+                correctSolidAngle=False  # Don't apply solid angle correction for cake
             )
             
-            # Result: intensity, 2theta_edges, chi_edges
+            # Extract result data
             cake_intensity = result.intensity if hasattr(result, 'intensity') else result[0]
             tth_edges = result.radial if hasattr(result, 'radial') else result[1]
             chi_edges = result.azimuthal if hasattr(result, 'azimuthal') else result[2]
@@ -3363,47 +3363,55 @@ class CalibrateModule(GUIBase):
             # Clear axes
             self.cake_axes.clear()
             
-            # Log scale for better visualization (Dioptas style)
-            cake_display = np.log10(np.clip(cake_intensity, 1, None))  # Clip to avoid log(0)
+            # Log scale for better visualization
+            cake_display = np.log10(np.clip(cake_intensity, 1, None))
             
-            # Transpose for correct orientation (Dioptas has azimuth on Y, 2theta on X)
-            # cake_display should be (n_azim, n_rad) shape
+            # Ensure correct orientation: (n_azim, n_rad)
+            # Y-axis = azimuthal angle (0-360°), X-axis = 2theta
             if cake_display.shape[0] != len(chi_edges) - 1:
                 cake_display = cake_display.T
             
-            # Create extent for imshow [left, right, bottom, top]
+            # Display cake image
+            # extent = [left, right, bottom, top] = [2th_min, 2th_max, chi_min, chi_max]
             extent = [tth_edges[0], tth_edges[-1], chi_edges[0], chi_edges[-1]]
             
-            # Display cake with correct extent and orientation
             im = self.cake_axes.imshow(
                 cake_display,
                 aspect='auto',
-                origin='lower',       # Origin at bottom-left (Dioptas style)
+                origin='lower',
                 extent=extent,
-                cmap='jet',          # Dioptas uses jet colormap
+                cmap='jet',        # Dioptas default colormap
                 interpolation='nearest',
                 vmin=cake_display.min(),
-                vmax=np.percentile(cake_display, 99.5)  # Auto-scale to 99.5 percentile
+                vmax=np.percentile(cake_display, 99.5)
             )
             
-            # Set labels (Dioptas style)
+            # Set labels
             self.cake_axes.set_xlabel('2θ (°)', fontsize=11)
-            self.cake_axes.set_ylabel('Azimuth (°)', fontsize=11)
-            self.cake_axes.set_title('Cake/Polar View', fontsize=12, fontweight='bold')
+            self.cake_axes.set_ylabel('Azimuthal Angle (°)', fontsize=11)
+            self.cake_axes.set_title('Cake View - Vertical lines = Good calibration', fontsize=11, fontweight='bold')
             
-            # Add calibrant lines if available (vertical lines at expected 2theta positions)
+            # Add calibrant peak lines as VERTICAL LINES
+            # If calibration is correct, these should appear as straight vertical lines
+            # If calibration is wrong, they will appear curved/bent
             if hasattr(self.ai, 'calibrant') and self.ai.calibrant is not None:
                 try:
                     tth_calibrant = self.ai.calibrant.get_2th()
                     tth_calibrant_deg = np.degrees(tth_calibrant)
                     
-                    # Draw vertical lines for visible calibrant peaks
+                    # Draw vertical lines at expected 2theta positions
+                    # These span the full azimuthal range (0-360°)
                     for peak_2th in tth_calibrant_deg:
                         if extent[0] <= peak_2th <= extent[1]:
-                            self.cake_axes.axvline(peak_2th, color='white', linestyle='-', 
-                                                 alpha=0.3, linewidth=0.8)
-                except:
-                    pass
+                            # Draw vertical line from bottom to top (full azimuthal range)
+                            self.cake_axes.axvline(peak_2th, 
+                                                  color='white', 
+                                                  linestyle='-', 
+                                                  alpha=0.5, 
+                                                  linewidth=1.0,
+                                                  zorder=10)  # Draw on top
+                except Exception as calib_error:
+                    pass  # Silently ignore calibrant line errors
             
             # Add colorbar
             if hasattr(self, 'cake_colorbar') and self.cake_colorbar is not None:
@@ -3414,18 +3422,20 @@ class CalibrateModule(GUIBase):
             
             try:
                 self.cake_colorbar = self.cake_figure.colorbar(im, ax=self.cake_axes)
-                self.cake_colorbar.set_label('log10(Intensity)', fontsize=10)
+                self.cake_colorbar.set_label('log₁₀(Intensity)', fontsize=10)
             except:
                 pass
             
             self.cake_canvas.draw_idle()
-            self.log(f"✓ Cake view updated: {cake_intensity.shape[1]} × {cake_intensity.shape[0]} (2θ × azimuth)")
                 
         except Exception as e:
             import traceback
             error_detail = traceback.format_exc()
+            # Only print to console on error
+            print(f"ERROR in Cake view: {str(e)}")
+            print(error_detail)
+            # Also log to GUI
             self.log(f"Error updating Cake view: {str(e)}")
-            self.log(error_detail)
     
     def update_pattern_view(self):
         """Update Pattern view after calibration - Dioptas style with correct 1D integration"""

@@ -18,7 +18,7 @@ try:
     SCIPY_AVAILABLE = True
 except ImportError:
     SCIPY_AVAILABLE = False
-    print("Warning: scipy not available. Auto peak finding will be disabled.")
+    # Silently disable - no console output unless error
 
 # Matplotlib imports
 try:
@@ -105,7 +105,7 @@ class MaskCanvas(FigureCanvas):
             self.display_image()
             return True
         except Exception as e:
-            print(f"Error loading image: {e}")
+            print(f"ERROR loading image: {e}")  # Console output for errors
             return False
     
     def display_image(self):
@@ -411,7 +411,7 @@ class CalibrationCanvas(FigureCanvas):
                 self.mpl_connect('button_release_event', self.on_mouse_release)
                 self.mpl_connect('motion_notify_event', self.on_mouse_move)
             except Exception as e:
-                print(f"Warning: Could not connect canvas events: {e}")
+                print(f"ERROR: Could not connect canvas events: {e}")
                 
         except Exception as e:
             print(f"ERROR creating CalibrationCanvas: {e}")
@@ -580,8 +580,8 @@ class CalibrationCanvas(FigureCanvas):
                     continue
                     
         except Exception as e:
-            # If theoretical ring drawing fails, silently continue
-            print(f"Warning: Could not draw theoretical rings: {e}")
+            # If theoretical ring drawing fails, print error to console
+            print(f"ERROR drawing theoretical rings: {e}")
             import traceback
             traceback.print_exc()
     
@@ -888,8 +888,7 @@ class CalibrationCanvas(FigureCanvas):
         
         # Check if scipy is available
         if not SCIPY_AVAILABLE:
-            print("[Auto Peak] Warning: scipy not available, skipping auto peak finding")
-            return []
+            return []  # Silently skip if scipy not available
         
         try:
             # Import necessary modules
@@ -955,7 +954,8 @@ class CalibrationCanvas(FigureCanvas):
             return [(x, y, ring_num) for x, y in peaks]
             
         except Exception as e:
-            print(f"Auto peak finding error: {e}")
+            # Only print errors to console
+            print(f"ERROR in auto peak finding: {e}")
             import traceback
             traceback.print_exc()
             return []
@@ -988,8 +988,6 @@ class CalibrationCanvas(FigureCanvas):
         if not self.show_auto_peaks or not self.manual_peaks or self.image_data is None:
             return
         
-        print(f"[Auto Peak] Refreshing auto peaks for {len(self.manual_peaks)} manual peaks...")
-        
         # Clear existing auto peaks
         self.clear_auto_peaks()
         
@@ -998,9 +996,6 @@ class CalibrationCanvas(FigureCanvas):
             auto_peaks = self.auto_find_peaks_on_ring(x, y, ring_num)
             if auto_peaks:
                 self.auto_detected_peaks.extend(auto_peaks)
-                print(f"[Auto Peak] Ring {ring_num}: Found {len(auto_peaks)} peaks")
-        
-        print(f"[Auto Peak] Total auto-detected peaks: {len(self.auto_detected_peaks)}")
         
         # Update display
         if self.image_data is not None:
