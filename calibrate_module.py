@@ -245,8 +245,8 @@ class CalibrateModule(GUIBase):
             
             try:
                 # Create canvas with enlarged size for better visibility
-                # Using larger dimensions for better user experience
-                self.unified_canvas = CalibrationCanvas(canvas_container, width=10, height=10, dpi=100)
+                # Using larger dimensions for better user experience (increased per user request)
+                self.unified_canvas = CalibrationCanvas(canvas_container, width=14, height=14, dpi=100)
                 canvas_layout.addWidget(self.unified_canvas)
                 print("✅ CalibrationCanvas created successfully")
             except Exception as e:
@@ -281,7 +281,7 @@ class CalibrateModule(GUIBase):
             self.contrast_slider.setMaximum(65535)
             self.contrast_slider.setValue(65535)
             self.contrast_slider.setInvertedAppearance(True)  # Max at top
-            self.contrast_slider.setFixedHeight(400)  # Increase height to match larger canvas
+            self.contrast_slider.setFixedHeight(550)  # Increase height to match larger canvas (14x14)
             self.contrast_slider.setStyleSheet("""
                 QSlider::groove:vertical {
                     width: 25px;

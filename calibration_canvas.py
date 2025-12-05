@@ -791,6 +791,10 @@ class CalibrationCanvas(FigureCanvas):
         # Apply mask
         self.mask_data[distance <= radius] = self.mask_value
     
+    def get_mask(self):
+        """Get current mask data"""
+        return self.mask_data
+    
     def clear_manual_peaks(self):
         """Clear all manually selected peaks"""
         self.manual_peaks = []
