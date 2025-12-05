@@ -245,9 +245,9 @@ class CalibrateModule(GUIBase):
             canvas_layout.setSpacing(5)
             
             try:
-                # Create canvas with enlarged size for better visibility
-                # Using larger dimensions for better user experience (increased per user request)
-                self.unified_canvas = CalibrationCanvas(canvas_container, width=14, height=14, dpi=100)
+                # Create canvas with large size for better visibility
+                # Increased per user request - maximize display area
+                self.unified_canvas = CalibrationCanvas(canvas_container, width=18, height=18, dpi=100)
                 canvas_layout.addWidget(self.unified_canvas)
             except Exception as e:
                 # Only print errors to console
@@ -282,7 +282,7 @@ class CalibrateModule(GUIBase):
             self.contrast_slider.setMaximum(65535)
             self.contrast_slider.setValue(65535)
             self.contrast_slider.setInvertedAppearance(True)  # Max at top
-            self.contrast_slider.setFixedHeight(550)  # Increase height to match larger canvas (14x14)
+            self.contrast_slider.setFixedHeight(700)  # Increase height to match larger canvas (18x18)
             self.contrast_slider.setStyleSheet("""
                 QSlider::groove:vertical {
                     width: 25px;
@@ -438,38 +438,39 @@ class CalibrateModule(GUIBase):
         
         # ============== RIGHT PANEL: CONTROL WIDGET ==============
         # Use scroll area to ensure all controls are accessible
+        # Reduce width to give more space to image display
         right_scroll = QScrollArea()
         right_scroll.setWidgetResizable(True)
         right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        right_scroll.setMinimumWidth(310)
-        right_scroll.setMaximumWidth(310)
+        right_scroll.setMinimumWidth(280)
+        right_scroll.setMaximumWidth(290)
         
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(5, 5, 5, 5)
-        right_layout.setSpacing(5)
+        right_layout.setContentsMargins(3, 3, 3, 3)
+        right_layout.setSpacing(3)
         
         # File loading section
         file_frame = QFrame()
         file_layout = QHBoxLayout(file_frame)
         file_layout.setContentsMargins(5, 5, 5, 5)
         
-        self.load_img_btn = ModernButton("Load Image File",
+        self.load_img_btn = ModernButton("Load Image",
                                          self.browse_and_load_image,
                                          "",
                                          bg_color=self.colors['secondary'],
                                          hover_color=self.colors['primary'],
-                                         width=180, height=30,
-                                         font_size=9,
+                                         width=160, height=28,
+                                         font_size=8,
                                          parent=file_frame)
         
         self.load_previous_img_btn = QPushButton("<")
-        self.load_previous_img_btn.setMaximumWidth(50)
-        self.load_previous_img_btn.setStyleSheet("padding: 5px;")
+        self.load_previous_img_btn.setMaximumWidth(45)
+        self.load_previous_img_btn.setStyleSheet("padding: 4px; font-size: 9pt;")
         
         self.load_next_img_btn = QPushButton(">")
-        self.load_next_img_btn.setMaximumWidth(50)
-        self.load_next_img_btn.setStyleSheet("padding: 5px;")
+        self.load_next_img_btn.setMaximumWidth(45)
+        self.load_next_img_btn.setStyleSheet("padding: 4px; font-size: 9pt;")
         
         file_layout.addWidget(self.load_img_btn)
         file_layout.addWidget(self.load_previous_img_btn)
@@ -483,14 +484,20 @@ class CalibrateModule(GUIBase):
         self.filename_txt.setPlaceholderText("No file loaded")
         right_layout.addWidget(self.filename_txt)
         
-        # Toolbox for parameters (Dioptas style)
+        # Toolbox for parameters (Dioptas style) - compact
         self.toolbox = QToolBox()
-        self.toolbox.setStyleSheet("QToolBox::tab { font-weight: bold; }")
+        self.toolbox.setStyleSheet("""
+            QToolBox::tab { 
+                font-weight: bold; 
+                font-size: 9pt;
+            }
+        """)
         
         # Calibration Parameters page
         calib_params_widget = QWidget()
         calib_params_layout = QVBoxLayout(calib_params_widget)
-        calib_params_layout.setSpacing(5)
+        calib_params_layout.setSpacing(3)
+        calib_params_layout.setContentsMargins(2, 2, 2, 2)
         
         self.setup_detector_groupbox(calib_params_layout)
         self.setup_start_values_groupbox(calib_params_layout)
@@ -523,28 +530,50 @@ class CalibrateModule(GUIBase):
         bottom_layout = QHBoxLayout(bottom_frame)
         bottom_layout.setContentsMargins(5, 5, 5, 5)
         
-        self.load_calibration_btn = ModernButton("Load Calibration",
+        self.load_calibration_btn = ModernButton("Load PONI",
                                                 self.load_calibration,
                                                 "",
                                                 bg_color=self.colors['secondary'],
                                                 hover_color=self.colors['primary'],
-                                                width=145, height=30,
-                                                font_size=9,
+                                                width=130, height=26,
+                                                font_size=8,
                                                 parent=bottom_frame)
         
-        self.save_calibration_btn = ModernButton("Save Calibration",
+        self.save_calibration_btn = ModernButton("Save PONI",
                                                 self.save_poni_file,
                                                 "",
                                                 bg_color=self.colors['secondary'],
                                                 hover_color=self.colors['primary'],
-                                                width=145, height=30,
-                                                font_size=9,
+                                                width=130, height=26,
+                                                font_size=8,
                                                 parent=bottom_frame)
         
         bottom_layout.addWidget(self.load_calibration_btn)
         bottom_layout.addWidget(self.save_calibration_btn)
         
         right_layout.addWidget(bottom_frame)
+        
+        # Add log output to right panel (compact version)
+        log_label = QLabel("📋 Log:")
+        log_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        log_label.setStyleSheet(f"color: {self.colors['text_dark']}; padding: 2px 5px;")
+        right_layout.addWidget(log_label)
+        
+        self.log_output = QTextEdit()
+        self.log_output.setMaximumHeight(200)
+        self.log_output.setMinimumHeight(150)
+        self.log_output.setReadOnly(True)
+        self.log_output.setFont(QFont('Consolas', 8))
+        self.log_output.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: #f8f9fa;
+                border: 1px solid {self.colors['border']};
+                border-radius: 3px;
+                padding: 3px;
+                color: #2c3e50;
+            }}
+        """)
+        right_layout.addWidget(self.log_output)
         
         # Set scroll area content
         right_scroll.setWidget(right_widget)
@@ -557,58 +586,40 @@ class CalibrateModule(GUIBase):
         main_splitter.setStretchFactor(0, 1)
         main_splitter.setStretchFactor(1, 0)
         
+        # Set initial splitter sizes to favor left panel
+        # Total width e.g. 1400: left gets 1110, right gets 290
+        main_splitter.setSizes([1200, 290])
+        
         layout.addWidget(main_splitter)
-        
-        # Log output at bottom of entire interface (larger font)
-        log_label = QLabel("📋 Log Output:")
-        log_label.setFont(QFont('Arial', 11, QFont.Weight.Bold))
-        log_label.setStyleSheet(f"color: {self.colors['text_dark']}; padding: 5px;")
-        layout.addWidget(log_label)
-        
-        self.log_output = QTextEdit()
-        self.log_output.setMaximumHeight(150)  # Increased from 80
-        self.log_output.setMinimumHeight(100)
-        self.log_output.setReadOnly(True)
-        self.log_output.setFont(QFont('Consolas', 10))  # Increased from Courier 7
-        self.log_output.setStyleSheet(f"""
-            QTextEdit {{
-                background-color: #f8f9fa;
-                border: 2px solid {self.colors['border']};
-                border-radius: 5px;
-                padding: 5px;
-                color: #2c3e50;
-            }}
-        """)
-        layout.addWidget(self.log_output)
         
         # Mark UI as initialized
         self._ui_initialized = True
         self._ui_initializing = False
 
     def setup_detector_groupbox(self, parent_layout):
-        """Setup Detector GroupBox (Dioptas style)"""
+        """Setup Detector GroupBox (Dioptas style) - Compact"""
         detector_gb = QGroupBox("Detector")
         detector_gb.setStyleSheet(f"""
             QGroupBox {{
                 font-weight: bold;
-                font-size: 10pt;
-                border: 2px solid {self.colors['border']};
-                border-radius: 5px;
-                margin-top: 15px;
-                margin-bottom: 10px;
-                padding: 15px 10px 10px 10px;
+                font-size: 9pt;
+                border: 1px solid {self.colors['border']};
+                border-radius: 3px;
+                margin-top: 10px;
+                margin-bottom: 5px;
+                padding: 10px 5px 5px 5px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
+                left: 8px;
+                padding: 0 3px 0 3px;
                 color: {self.colors['text_dark']};
-                text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
             }}
         """)
         detector_layout = QVBoxLayout(detector_gb)
-        detector_layout.setSpacing(8)
+        detector_layout.setSpacing(4)
+        detector_layout.setContentsMargins(3, 3, 3, 3)
         
         # Detector selection combo box
         self.detector_combo = QComboBox()
@@ -663,29 +674,29 @@ class CalibrateModule(GUIBase):
         parent_layout.addWidget(detector_gb)
     
     def setup_start_values_groupbox(self, parent_layout):
-        """Setup Start Values GroupBox (Dioptas style)"""
+        """Setup Start Values GroupBox (Dioptas style) - Compact"""
         sv_gb = QGroupBox("Start values")
         sv_gb.setStyleSheet(f"""
             QGroupBox {{
                 font-weight: bold;
-                font-size: 10pt;
-                border: 2px solid {self.colors['border']};
-                border-radius: 5px;
-                margin-top: 15px;
-                margin-bottom: 10px;
-                padding: 15px 10px 10px 10px;
+                font-size: 9pt;
+                border: 1px solid {self.colors['border']};
+                border-radius: 3px;
+                margin-top: 10px;
+                margin-bottom: 5px;
+                padding: 10px 5px 5px 5px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
+                left: 8px;
+                padding: 0 3px 0 3px;
                 color: {self.colors['text_dark']};
-                text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
             }}
         """)
         sv_layout = QVBoxLayout(sv_gb)
-        sv_layout.setSpacing(8)
+        sv_layout.setSpacing(4)
+        sv_layout.setContentsMargins(3, 3, 3, 3)
         
         # Calibrant selection
         calib_layout = QHBoxLayout()
@@ -775,29 +786,29 @@ class CalibrateModule(GUIBase):
         parent_layout.addWidget(sv_gb)
     
     def setup_peak_selection_groupbox(self, parent_layout):
-        """Setup Peak Selection GroupBox (Dioptas style)"""
+        """Setup Peak Selection GroupBox (Dioptas style) - Compact"""
         peak_gb = QGroupBox("Peak Selection")
         peak_gb.setStyleSheet(f"""
             QGroupBox {{
                 font-weight: bold;
-                font-size: 10pt;
-                border: 2px solid {self.colors['border']};
-                border-radius: 5px;
-                margin-top: 15px;
-                margin-bottom: 10px;
-                padding: 15px 10px 10px 10px;
+                font-size: 9pt;
+                border: 1px solid {self.colors['border']};
+                border-radius: 3px;
+                margin-top: 10px;
+                margin-bottom: 5px;
+                padding: 10px 5px 5px 5px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
+                left: 8px;
+                padding: 0 3px 0 3px;
                 color: {self.colors['text_dark']};
-                text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
             }}
         """)
         peak_layout = QVBoxLayout(peak_gb)
-        peak_layout.setSpacing(8)
+        peak_layout.setSpacing(4)
+        peak_layout.setContentsMargins(3, 3, 3, 3)
         
         # Radio buttons for peak selection mode
         self.peak_mode_group = QButtonGroup()
@@ -904,29 +915,29 @@ class CalibrateModule(GUIBase):
         parent_layout.addWidget(peak_gb)
     
     def setup_refinement_options_groupbox(self, parent_layout):
-        """Setup Refinement Options GroupBox (Dioptas style) - Parameter Selection"""
+        """Setup Refinement Options GroupBox (Dioptas style) - Parameter Selection - Compact"""
         ref_gb = QGroupBox("Refinement Parameters")
         ref_gb.setStyleSheet(f"""
             QGroupBox {{
                 font-weight: bold;
-                font-size: 10pt;
-                border: 2px solid {self.colors['border']};
-                border-radius: 5px;
-                margin-top: 15px;
-                margin-bottom: 10px;
-                padding: 15px 10px 10px 10px;
+                font-size: 9pt;
+                border: 1px solid {self.colors['border']};
+                border-radius: 3px;
+                margin-top: 10px;
+                margin-bottom: 5px;
+                padding: 10px 5px 5px 5px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
+                left: 8px;
+                padding: 0 3px 0 3px;
                 color: {self.colors['text_dark']};
-                text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
             }}
         """)
         ref_layout = QVBoxLayout(ref_gb)
-        ref_layout.setSpacing(10)
+        ref_layout.setSpacing(5)
+        ref_layout.setContentsMargins(3, 3, 3, 3)
         
         # Checkbox style
         checkbox_style = f"""
@@ -954,21 +965,21 @@ class CalibrateModule(GUIBase):
             }}
         """
         
-        # Info label
-        info_label = QLabel("Select parameters to refine during calibration:")
-        info_label.setStyleSheet(f"color: {self.colors['text_dark']}; font-size: 9pt; font-weight: normal; padding: 5px 0px;")
+        # Info label - compact
+        info_label = QLabel("Select parameters to refine:")
+        info_label.setStyleSheet(f"color: {self.colors['text_dark']}; font-size: 8pt; font-weight: normal; padding: 2px 0px;")
         info_label.setWordWrap(True)
         ref_layout.addWidget(info_label)
         
-        # Geometry parameters frame
+        # Geometry parameters frame - compact
         geom_frame = QFrame()
-        geom_frame.setStyleSheet(f"QFrame {{ background-color: rgba(255,255,255,0.03); border-radius: 5px; padding: 10px; }}")
+        geom_frame.setStyleSheet(f"QFrame {{ background-color: rgba(255,255,255,0.03); border-radius: 3px; padding: 5px; }}")
         geom_layout = QVBoxLayout(geom_frame)
-        geom_layout.setSpacing(5)
+        geom_layout.setSpacing(3)
         
-        # Title for geometry section
-        geom_title = QLabel("Geometry (always refined first):")
-        geom_title.setStyleSheet(f"color: {self.colors['text_dark']}; font-weight: bold; font-size: 9pt;")
+        # Title for geometry section - compact
+        geom_title = QLabel("Geometry (always refined):")
+        geom_title.setStyleSheet(f"color: {self.colors['text_dark']}; font-weight: bold; font-size: 8pt;")
         geom_layout.addWidget(geom_title)
         
         # Distance checkbox (always enabled)
@@ -996,20 +1007,20 @@ class CalibrateModule(GUIBase):
         
         ref_layout.addWidget(geom_frame)
         
-        # Rotation parameters frame
+        # Rotation parameters frame - compact
         rot_frame = QFrame()
-        rot_frame.setStyleSheet(f"QFrame {{ background-color: rgba(255,255,255,0.03); border-radius: 5px; padding: 10px; }}")
+        rot_frame.setStyleSheet(f"QFrame {{ background-color: rgba(255,255,255,0.03); border-radius: 3px; padding: 5px; }}")
         rot_layout = QVBoxLayout(rot_frame)
-        rot_layout.setSpacing(5)
+        rot_layout.setSpacing(3)
         
-        # Title for rotation section
+        # Title for rotation section - compact
         rot_title = QLabel("Detector Tilt (optional):")
-        rot_title.setStyleSheet(f"color: {self.colors['text_dark']}; font-weight: bold; font-size: 9pt;")
+        rot_title.setStyleSheet(f"color: {self.colors['text_dark']}; font-weight: bold; font-size: 8pt;")
         rot_layout.addWidget(rot_title)
         
-        # Info about rotations
-        rot_info = QLabel("⚠ Only enable if detector is tilted (usually not needed)")
-        rot_info.setStyleSheet("color: #FF9800; font-size: 8pt; font-weight: normal; padding: 2px 0px;")
+        # Info about rotations - compact
+        rot_info = QLabel("⚠ Only if detector tilted")
+        rot_info.setStyleSheet("color: #FF9800; font-size: 7pt; font-weight: normal; padding: 1px 0px;")
         rot_info.setWordWrap(True)
         rot_layout.addWidget(rot_info)
         
@@ -1034,11 +1045,11 @@ class CalibrateModule(GUIBase):
         
         ref_layout.addWidget(rot_frame)
         
-        # Wavelength parameter frame
+        # Wavelength parameter frame - compact
         wl_frame = QFrame()
-        wl_frame.setStyleSheet(f"QFrame {{ background-color: rgba(255,255,255,0.03); border-radius: 5px; padding: 10px; }}")
+        wl_frame.setStyleSheet(f"QFrame {{ background-color: rgba(255,255,255,0.03); border-radius: 3px; padding: 5px; }}")
         wl_layout = QVBoxLayout(wl_frame)
-        wl_layout.setSpacing(5)
+        wl_layout.setSpacing(3)
         
         # Wavelength checkbox
         self.refine_wavelength_cb = QCheckBox("Wavelength (usually fixed)")
@@ -1047,36 +1058,36 @@ class CalibrateModule(GUIBase):
         self.refine_wavelength_cb.setStyleSheet(checkbox_style)
         wl_layout.addWidget(self.refine_wavelength_cb)
         
-        wl_info = QLabel("⚠ Only enable if wavelength is uncertain")
-        wl_info.setStyleSheet("color: #FF9800; font-size: 8pt; font-weight: normal; padding: 2px 0px;")
+        wl_info = QLabel("⚠ Only if wavelength uncertain")
+        wl_info.setStyleSheet("color: #FF9800; font-size: 7pt; font-weight: normal; padding: 1px 0px;")
         wl_layout.addWidget(wl_info)
         
         ref_layout.addWidget(wl_frame)
         
-        # Quick presets
+        # Quick presets - compact
         preset_frame = QFrame()
-        preset_frame.setStyleSheet(f"QFrame {{ background-color: rgba(66, 165, 245, 0.05); border: 1px solid rgba(66, 165, 245, 0.2); border-radius: 5px; padding: 8px; }}")
+        preset_frame.setStyleSheet(f"QFrame {{ background-color: rgba(66, 165, 245, 0.05); border: 1px solid rgba(66, 165, 245, 0.2); border-radius: 3px; padding: 5px; }}")
         preset_layout = QVBoxLayout(preset_frame)
-        preset_layout.setSpacing(5)
+        preset_layout.setSpacing(3)
         
         preset_title = QLabel("Quick Presets:")
-        preset_title.setStyleSheet(f"color: {self.colors['text_dark']}; font-weight: bold; font-size: 9pt;")
+        preset_title.setStyleSheet(f"color: {self.colors['text_dark']}; font-weight: bold; font-size: 8pt;")
         preset_layout.addWidget(preset_title)
         
         preset_btn_layout = QHBoxLayout()
-        preset_btn_layout.setSpacing(5)
+        preset_btn_layout.setSpacing(3)
         
-        # Basic preset button
-        basic_preset_btn = QPushButton("Basic (Dist + Center)")
+        # Basic preset button - compact
+        basic_preset_btn = QPushButton("Basic")
         basic_preset_btn.setToolTip("Refine distance and beam center only (recommended)")
         basic_preset_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['primary']};
                 color: white;
                 border: none;
-                border-radius: 3px;
-                padding: 5px 10px;
-                font-size: 8pt;
+                border-radius: 2px;
+                padding: 3px 6px;
+                font-size: 7pt;
             }}
             QPushButton:hover {{
                 background-color: {self.colors['primary_hover']};
@@ -1085,17 +1096,17 @@ class CalibrateModule(GUIBase):
         basic_preset_btn.clicked.connect(self.apply_basic_refinement_preset)
         preset_btn_layout.addWidget(basic_preset_btn)
         
-        # Full preset button
-        full_preset_btn = QPushButton("Full (+ Tilt)")
+        # Full preset button - compact
+        full_preset_btn = QPushButton("Full")
         full_preset_btn.setToolTip("Refine all geometry including detector tilt")
         full_preset_btn.setStyleSheet(f"""
             QPushButton {{
                 background-color: {self.colors['secondary']};
                 color: white;
                 border: none;
-                border-radius: 3px;
-                padding: 5px 10px;
-                font-size: 8pt;
+                border-radius: 2px;
+                padding: 3px 6px;
+                font-size: 7pt;
             }}
             QPushButton:hover {{
                 background-color: #FF8A65;
