@@ -21,7 +21,7 @@ from PyQt6.QtWidgets import (QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushBut
                               QFileDialog, QMessageBox, QFrame, QScrollArea, QSplitter,
                               QListWidget, QListWidgetItem, QSlider, QRadioButton, QButtonGroup,
                               QSpinBox, QDoubleSpinBox, QToolBox, QTabWidget, QTableWidget,
-                              QTableWidgetItem, QHeaderView, QDialog)
+                              QTableWidgetItem, QHeaderView, QDialog, QGridLayout)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
 import os
