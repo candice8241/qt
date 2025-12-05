@@ -283,7 +283,57 @@ class CalibrateModule(GUIBase):
                 canvas_layout.addWidget(placeholder)
                 self.unified_canvas = None
             
-            # Right side panel with controls
+            # Middle panel with control buttons (vertical arrangement)
+            button_widget = QWidget()
+            button_widget.setMinimumWidth(120)
+            button_widget.setMaximumWidth(140)
+            button_layout = QVBoxLayout(button_widget)
+            button_layout.setContentsMargins(5, 5, 5, 5)
+            button_layout.setSpacing(8)
+            
+            # Add top stretch to push buttons towards middle
+            button_layout.addStretch(2)
+            
+            # Control buttons (vertical arrangement)
+            button_width = 115
+            button_height = 38
+            
+            reset_zoom_btn = ModernButton("Reset Zoom",
+                                         self.reset_zoom,
+                                         "",
+                                         bg_color=self.colors['secondary'],
+                                         hover_color=self.colors['primary'],
+                                         width=button_width, height=button_height,
+                                         font_size=9,
+                                         parent=button_widget)
+            button_layout.addWidget(reset_zoom_btn)
+
+            self.calibrate_btn = ModernButton("Calibrate",
+                                             self.run_calibration,
+                                             "",
+                                             bg_color=self.colors['primary'],
+                                             hover_color=self.colors['primary_hover'],
+                                             width=button_width, height=button_height,
+                                             font_size=9,
+                                             parent=button_widget)
+            button_layout.addWidget(self.calibrate_btn)
+
+            self.refine_btn = ModernButton("Refine",
+                                           self.refine_calibration,
+                                           "",
+                                           bg_color=self.colors['secondary'],
+                                           hover_color=self.colors['primary'],
+                                           width=button_width, height=button_height,
+                                           font_size=9,
+                                           parent=button_widget)
+            button_layout.addWidget(self.refine_btn)
+            
+            # Add bottom stretch
+            button_layout.addStretch(2)
+            
+            canvas_layout.addWidget(button_widget)
+            
+            # Right side panel with position label and contrast slider
             contrast_widget = QWidget()
             contrast_widget.setMinimumWidth(180)
             contrast_widget.setMaximumWidth(200)
@@ -302,43 +352,6 @@ class CalibrateModule(GUIBase):
             """)
             self.position_lbl.setMinimumHeight(25)
             contrast_layout.addWidget(self.position_lbl)
-
-            # Add small spacer
-            contrast_layout.addSpacing(10)
-
-            # Control buttons (vertical arrangement)
-            button_width = 160
-            button_height = 35
-            
-            reset_zoom_btn = ModernButton("Reset Zoom",
-                                         self.reset_zoom,
-                                         "",
-                                         bg_color=self.colors['secondary'],
-                                         hover_color=self.colors['primary'],
-                                         width=button_width, height=button_height,
-                                         font_size=9,
-                                         parent=contrast_widget)
-            contrast_layout.addWidget(reset_zoom_btn)
-
-            self.calibrate_btn = ModernButton("Calibrate",
-                                             self.run_calibration,
-                                             "",
-                                             bg_color=self.colors['primary'],
-                                             hover_color=self.colors['primary_hover'],
-                                             width=button_width, height=button_height,
-                                             font_size=9,
-                                             parent=contrast_widget)
-            contrast_layout.addWidget(self.calibrate_btn)
-
-            self.refine_btn = ModernButton("Refine",
-                                           self.refine_calibration,
-                                           "",
-                                           bg_color=self.colors['secondary'],
-                                           hover_color=self.colors['primary'],
-                                           width=button_width, height=button_height,
-                                           font_size=9,
-                                           parent=contrast_widget)
-            contrast_layout.addWidget(self.refine_btn)
 
             # Add stretch
             contrast_layout.addStretch(1)
