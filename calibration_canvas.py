@@ -669,28 +669,17 @@ class CalibrationCanvas(FigureCanvas):
         self.contrast_min = vmin
         self.contrast_max = vmax
 
-        # Debug output
-        print(f"DEBUG CalibrationCanvas.set_contrast: vmin={vmin}, vmax={vmax}")
-        print(f"DEBUG: Has image_data: {hasattr(self, 'image_data')}, is not None: {self.image_data is not None if hasattr(self, 'image_data') else 'N/A'}")
-
         # Update contrast if image is loaded
         if hasattr(self, 'image_data') and self.image_data is not None:
-            print(f"DEBUG: Calling update_image_contrast()")
             self.update_image_contrast()
-        else:
-            print(f"DEBUG: NOT calling update_image_contrast - no image data")
-    
+
     def update_image_contrast(self):
         """Update image contrast without full redraw"""
         # For now, just redraw the whole image
         # Could be optimized with blitting if needed
-        print(f"DEBUG update_image_contrast: image_data is not None: {self.image_data is not None}")
-        print(f"DEBUG: contrast_min={self.contrast_min}, contrast_max={self.contrast_max}")
         if self.image_data is not None:
-            print(f"DEBUG: Redrawing image with new contrast")
             self.display_calibration_image(self.image_data, self.calibration_points)
             self.draw()  # Force canvas refresh
-            print(f"DEBUG: Canvas refresh complete")
     
     def on_unified_click(self, event):
         """Unified click handler for both peak picking and mask editing"""

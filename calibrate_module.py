@@ -307,11 +307,11 @@ class CalibrateModule(GUIBase):
             max_lbl.setFont(QFont('Arial', 7))
             contrast_layout.addWidget(max_lbl)
             
-            # Vertical slider with fixed height
+            # Vertical slider with reasonable range (0-100 for percentage)
             self.contrast_slider = QSlider(Qt.Orientation.Vertical)
             self.contrast_slider.setMinimum(0)
-            self.contrast_slider.setMaximum(65535)
-            self.contrast_slider.setValue(65535)
+            self.contrast_slider.setMaximum(100)  # Use percentage scale
+            self.contrast_slider.setValue(100)  # Default to max
             self.contrast_slider.setInvertedAppearance(True)  # Max at top
             self.contrast_slider.setFixedHeight(550)  # Match canvas height (14x14)
             self.contrast_slider.setStyleSheet("""
@@ -338,6 +338,10 @@ class CalibrateModule(GUIBase):
             """)
             self.contrast_slider.valueChanged.connect(self.on_contrast_slider_changed)
             contrast_layout.addWidget(self.contrast_slider)
+
+            # Store image statistics for contrast mapping
+            self.image_vmin = 0
+            self.image_vmax = 65535  # Will be updated when image is loaded
             
             # Min label (bottom)
             min_lbl = QLabel("Min")
@@ -418,17 +422,8 @@ class CalibrateModule(GUIBase):
         status_layout = QHBoxLayout(status_frame)
         status_layout.setContentsMargins(3, 1, 3, 1)
         status_layout.setSpacing(3)
-        
-        # Display control buttons
-        auto_contrast_btn = ModernButton("Auto Contrast",
-                                        self.auto_contrast,
-                                        "",
-                                        bg_color=self.colors['secondary'],
-                                        hover_color=self.colors['primary'],
-                                        width=110, height=32,
-                                        font_size=8,
-                                        parent=status_frame)
-        
+
+        # Display control buttons (Auto Contrast removed, contrast now via slider)
         reset_zoom_btn = ModernButton("Reset Zoom",
                                      self.reset_zoom,
                                      "",
@@ -437,7 +432,7 @@ class CalibrateModule(GUIBase):
                                      width=100, height=32,
                                      font_size=8,
                                      parent=status_frame)
-        
+
         self.calibrate_btn = ModernButton("Calibrate",
                                          self.run_calibration,
                                          "",
@@ -456,10 +451,8 @@ class CalibrateModule(GUIBase):
                                        font_size=9,
                                        parent=status_frame)
 
-        # Center buttons relative to image area with even distribution
+        # Distribute three buttons evenly relative to image area
         status_layout.addStretch(2)
-        status_layout.addWidget(auto_contrast_btn)
-        status_layout.addStretch(1)
         status_layout.addWidget(reset_zoom_btn)
         status_layout.addStretch(1)
         status_layout.addWidget(self.calibrate_btn)
@@ -2305,14 +2298,18 @@ class CalibrateModule(GUIBase):
                 # Initialize contrast settings (auto-contrast on load)
                 vmin = float(np.percentile(self.current_image, 1))
                 vmax = float(np.percentile(self.current_image, 99))
+
+                # Store image statistics for contrast mapping
+                self.image_vmin = vmin
+                self.image_vmax = vmax
+
+                # Apply initial contrast
                 self.unified_canvas.contrast_min = vmin
                 self.unified_canvas.contrast_max = vmax
-                
-                # Update slider to match (clamp to int32 range to prevent overflow)
+
+                # Set slider to 100% (full contrast)
                 if hasattr(self, 'contrast_slider'):
-                    img_max = min(int(np.max(self.current_image)), INT32_MAX)
-                    self.contrast_slider.setMaximum(img_max)
-                    self.contrast_slider.setValue(min(int(vmax), img_max))
+                    self.contrast_slider.setValue(100)
                 
                 # Display image immediately with forced update
                 self.unified_canvas.display_calibration_image(self.current_image)
@@ -3619,27 +3616,27 @@ class CalibrateModule(GUIBase):
         self._contrast_timer.timeout.connect(lambda: self.apply_contrast_from_slider(value))
         self._contrast_timer.start(50)  # 50ms delay
     
-    def apply_contrast_from_slider(self, vmax):
-        """Apply contrast from single slider"""
-        vmin = 0  # Always use 0 as minimum
+    def apply_contrast_from_slider(self, slider_value):
+        """Apply contrast from slider (0-100 percentage scale)"""
+        # Map slider percentage to actual image value range
+        if not hasattr(self, 'image_vmin') or not hasattr(self, 'image_vmax'):
+            return
 
-        # Debug output
-        print(f"DEBUG: Contrast slider changed - vmin: {vmin}, vmax: {vmax}")
+        # Calculate actual vmax based on slider percentage
+        percentage = slider_value / 100.0
+        vmin = self.image_vmin
+        vmax = self.image_vmin + (self.image_vmax - self.image_vmin) * percentage
 
         # Apply to canvases
         if MATPLOTLIB_AVAILABLE:
             # unified_canvas is the main display canvas
             if hasattr(self, 'unified_canvas') and self.unified_canvas is not None:
-                print(f"DEBUG: Applying contrast to unified_canvas")
                 self.unified_canvas.set_contrast(vmin, vmax)
             elif hasattr(self, 'calibration_canvas'):
-                print(f"DEBUG: Applying contrast to calibration_canvas")
                 self.calibration_canvas.set_contrast(vmin, vmax)
 
             if hasattr(self, 'mask_canvas'):
                 self.mask_canvas.set_contrast(vmin, vmax)
-        else:
-            print(f"DEBUG: MATPLOTLIB_AVAILABLE is False")
     
     def auto_contrast(self):
         """Auto-adjust contrast based on image statistics"""
