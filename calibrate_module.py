@@ -391,14 +391,14 @@ class CalibrateModule(GUIBase):
                                            font_size=9,
                                            parent=status_frame)
 
-            # Center buttons relative to canvas_container width
-            status_layout.addStretch(1)
+            # Center buttons with tighter grouping for better appearance
+            status_layout.addStretch(3)
             status_layout.addWidget(reset_zoom_btn)
-            status_layout.addStretch(1)
+            status_layout.addSpacing(10)
             status_layout.addWidget(self.calibrate_btn)
-            status_layout.addStretch(1)
+            status_layout.addSpacing(10)
             status_layout.addWidget(self.refine_btn)
-            status_layout.addStretch(1)
+            status_layout.addStretch(3)
 
             image_layout.addWidget(status_frame)
 
@@ -3620,6 +3620,7 @@ class CalibrateModule(GUIBase):
         """Apply contrast from slider (0-100 percentage scale)"""
         # Map slider percentage to actual image value range
         if not hasattr(self, 'image_vmin') or not hasattr(self, 'image_vmax'):
+            print(f"WARNING: image_vmin or image_vmax not set")
             return
 
         # Calculate actual vmax based on slider percentage
@@ -3627,12 +3628,16 @@ class CalibrateModule(GUIBase):
         vmin = self.image_vmin
         vmax = self.image_vmin + (self.image_vmax - self.image_vmin) * percentage
 
+        print(f"Slider: {slider_value}% -> vmin={vmin:.0f}, vmax={vmax:.0f}")
+
         # Apply to canvases
         if MATPLOTLIB_AVAILABLE:
             # unified_canvas is the main display canvas
             if hasattr(self, 'unified_canvas') and self.unified_canvas is not None:
+                print(f"Applying to unified_canvas")
                 self.unified_canvas.set_contrast(vmin, vmax)
             elif hasattr(self, 'calibration_canvas'):
+                print(f"Applying to calibration_canvas")
                 self.calibration_canvas.set_contrast(vmin, vmax)
 
             if hasattr(self, 'mask_canvas'):

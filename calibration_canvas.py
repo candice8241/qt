@@ -673,20 +673,27 @@ class CalibrationCanvas(FigureCanvas):
     
     def set_contrast(self, vmin, vmax):
         """Set contrast limits"""
+        print(f"CalibrationCanvas.set_contrast called: vmin={vmin:.0f}, vmax={vmax:.0f}")
         self.contrast_min = vmin
         self.contrast_max = vmax
 
         # Update contrast if image is loaded
         if hasattr(self, 'image_data') and self.image_data is not None:
+            print(f"Image data exists, calling update_image_contrast")
             self.update_image_contrast()
+        else:
+            print(f"No image data, skipping update")
 
     def update_image_contrast(self):
         """Update image contrast without full redraw"""
         # For now, just redraw the whole image
         # Could be optimized with blitting if needed
+        print(f"update_image_contrast: contrast_min={self.contrast_min:.0f}, contrast_max={self.contrast_max:.0f}")
         if self.image_data is not None:
+            print(f"Redrawing image with contrast")
             self.display_calibration_image(self.image_data, self.calibration_points)
             self.draw()  # Force canvas refresh
+            print(f"Canvas refresh done")
     
     def on_unified_click(self, event):
         """Unified click handler for both peak picking and mask editing"""
@@ -779,17 +786,24 @@ class CalibrationCanvas(FigureCanvas):
             self.display_calibration_image(self.image_data, self.calibration_points)
     
     def on_mouse_move(self, event):
-        """Handle mouse move for mask preview"""
+        """Handle mouse move for mask preview and position display"""
+        # Update position label if canvas has parent module
+        if event.inaxes == self.axes and hasattr(self, 'parent_module') and self.parent_module is not None:
+            if hasattr(self.parent_module, 'position_lbl'):
+                x, y = int(event.xdata), int(event.ydata)
+                self.parent_module.position_lbl.setText(f"Position: x={x}, y={y}")
+
+        # Handle mask drawing preview
         if not self.drawing or self.start_point is None:
             return
-        
+
         if event.inaxes != self.axes:
             return
-        
+
         # Remove old preview
         if self.preview_patch is not None:
             self.preview_patch.remove()
-        
+
         # Draw preview shape
         if self.mask_mode == 'rectangle':
             x0, y0 = self.start_point
@@ -802,10 +816,10 @@ class CalibrationCanvas(FigureCanvas):
             radius = np.sqrt((event.xdata - x0)**2 + (event.ydata - y0)**2)
             self.preview_patch = Circle((x0, y0), radius,
                                        fill=False, edgecolor='yellow', linewidth=2)
-        
+
         if self.preview_patch is not None:
             self.axes.add_patch(self.preview_patch)
-        
+
         self.draw_idle()
     
     def apply_rectangle_mask(self, start, end):
