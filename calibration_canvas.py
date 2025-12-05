@@ -668,9 +668,9 @@ class CalibrationCanvas(FigureCanvas):
         """Set contrast limits"""
         self.contrast_min = vmin
         self.contrast_max = vmax
-        
-        # Update contrast without full redraw
-        if hasattr(self, '_last_image_data') and self._last_image_data is not None:
+
+        # Update contrast if image is loaded
+        if hasattr(self, 'image_data') and self.image_data is not None:
             self.update_image_contrast()
     
     def update_image_contrast(self):

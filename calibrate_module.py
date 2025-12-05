@@ -452,16 +452,18 @@ class CalibrateModule(GUIBase):
         self.position_lbl = QLabel("Position: x=0, y=0")
         self.position_lbl.setFont(QFont('Arial', 9))
 
-        # Center the four main buttons horizontally
-        status_layout.addStretch()
+        # Distribute buttons evenly relative to image area
+        status_layout.addStretch(1)
         status_layout.addWidget(auto_contrast_btn)
+        status_layout.addStretch(1)
         status_layout.addWidget(reset_zoom_btn)
+        status_layout.addStretch(1)
         status_layout.addWidget(self.calibrate_btn)
+        status_layout.addStretch(1)
         status_layout.addWidget(self.refine_btn)
-        status_layout.addStretch()
-
-        # Position label on the right
+        status_layout.addStretch(1)
         status_layout.addWidget(self.position_lbl)
+        status_layout.addStretch(1)
         
         left_layout.addWidget(status_frame)
         
