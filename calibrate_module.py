@@ -286,22 +286,19 @@ class CalibrateModule(GUIBase):
             
             # Vertical contrast slider on right side (limited height)
             contrast_widget = QWidget()
-            contrast_widget.setMinimumWidth(120)
-            contrast_widget.setMaximumWidth(140)
+            contrast_widget.setMinimumWidth(150)
+            contrast_widget.setMaximumWidth(180)
             contrast_layout = QVBoxLayout(contrast_widget)
             contrast_layout.setContentsMargins(5, 5, 5, 5)
             contrast_layout.setSpacing(3)
 
-            # Position label at top (more visible)
+            # Position label at top (more visible, no background)
             self.position_lbl = QLabel("Position: x=0, y=0")
-            self.position_lbl.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+            self.position_lbl.setFont(QFont('Arial', 10, QFont.Weight.Bold))
             self.position_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.position_lbl.setStyleSheet("""
-                color: #ffffff;
-                background-color: #4A90E2;
+                color: #333333;
                 padding: 5px;
-                border-radius: 3px;
-                border: 1px solid #2E5C8A;
             """)
             self.position_lbl.setMinimumHeight(30)
             contrast_layout.addWidget(self.position_lbl)
@@ -309,11 +306,12 @@ class CalibrateModule(GUIBase):
             # Add stretch
             contrast_layout.addStretch(1)
 
-            # Max label (top)
-            max_lbl = QLabel("Max")
-            max_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            max_lbl.setFont(QFont('Arial', 7))
-            contrast_layout.addWidget(max_lbl)
+            # Contrast percentage label (top)
+            contrast_top_lbl = QLabel("100% Contrast")
+            contrast_top_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            contrast_top_lbl.setFont(QFont('Arial', 8))
+            contrast_top_lbl.setStyleSheet("color: #555;")
+            contrast_layout.addWidget(contrast_top_lbl)
             
             # Vertical slider with reasonable range (0-100 for percentage)
             self.contrast_slider = QSlider(Qt.Orientation.Vertical)
@@ -350,12 +348,13 @@ class CalibrateModule(GUIBase):
             # Store image statistics for contrast mapping
             self.image_vmin = 0
             self.image_vmax = 65535  # Will be updated when image is loaded
-            
-            # Min label (bottom)
-            min_lbl = QLabel("Min")
-            min_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            min_lbl.setFont(QFont('Arial', 7))
-            contrast_layout.addWidget(min_lbl)
+
+            # Contrast percentage label (bottom)
+            contrast_bottom_lbl = QLabel("0% Contrast")
+            contrast_bottom_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            contrast_bottom_lbl.setFont(QFont('Arial', 8))
+            contrast_bottom_lbl.setStyleSheet("color: #555;")
+            contrast_layout.addWidget(contrast_bottom_lbl)
             
             # Add stretch at bottom
             contrast_layout.addStretch(1)
@@ -400,14 +399,14 @@ class CalibrateModule(GUIBase):
                                            font_size=9,
                                            parent=status_frame)
 
-            # Center buttons with equal spacing - perfectly aligned
-            status_layout.addStretch()
+            # Distribute buttons evenly with space between them
+            status_layout.addStretch(2)
             status_layout.addWidget(reset_zoom_btn)
-            status_layout.addSpacing(15)
+            status_layout.addStretch(1)
             status_layout.addWidget(self.calibrate_btn)
-            status_layout.addSpacing(15)
+            status_layout.addStretch(1)
             status_layout.addWidget(self.refine_btn)
-            status_layout.addStretch()
+            status_layout.addStretch(2)
 
             image_layout.addWidget(status_frame)
 
