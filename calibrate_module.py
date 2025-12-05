@@ -286,16 +286,24 @@ class CalibrateModule(GUIBase):
             
             # Vertical contrast slider on right side (limited height)
             contrast_widget = QWidget()
-            contrast_widget.setMaximumWidth(100)
+            contrast_widget.setMinimumWidth(120)
+            contrast_widget.setMaximumWidth(140)
             contrast_layout = QVBoxLayout(contrast_widget)
-            contrast_layout.setContentsMargins(2, 2, 2, 2)
-            contrast_layout.setSpacing(2)
+            contrast_layout.setContentsMargins(5, 5, 5, 5)
+            contrast_layout.setSpacing(3)
 
-            # Position label at top right
+            # Position label at top (more visible)
             self.position_lbl = QLabel("Position: x=0, y=0")
-            self.position_lbl.setFont(QFont('Arial', 8))
+            self.position_lbl.setFont(QFont('Arial', 9, QFont.Weight.Bold))
             self.position_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.position_lbl.setStyleSheet("color: #333; padding: 2px;")
+            self.position_lbl.setStyleSheet("""
+                color: #ffffff;
+                background-color: #4A90E2;
+                padding: 5px;
+                border-radius: 3px;
+                border: 1px solid #2E5C8A;
+            """)
+            self.position_lbl.setMinimumHeight(30)
             contrast_layout.addWidget(self.position_lbl)
 
             # Add stretch
@@ -363,14 +371,15 @@ class CalibrateModule(GUIBase):
             status_layout.setContentsMargins(3, 1, 3, 1)
             status_layout.setSpacing(3)
 
-            # Display control buttons (Auto Contrast removed, contrast now via slider)
+            # Display control buttons with consistent width for symmetry
+            button_width = 110
             reset_zoom_btn = ModernButton("Reset Zoom",
                                          self.reset_zoom,
                                          "",
                                          bg_color=self.colors['secondary'],
                                          hover_color=self.colors['primary'],
-                                         width=100, height=32,
-                                         font_size=8,
+                                         width=button_width, height=32,
+                                         font_size=9,
                                          parent=status_frame)
 
             self.calibrate_btn = ModernButton("Calibrate",
@@ -378,7 +387,7 @@ class CalibrateModule(GUIBase):
                                              "",
                                              bg_color=self.colors['primary'],
                                              hover_color=self.colors['primary_hover'],
-                                             width=120, height=32,
+                                             width=button_width, height=32,
                                              font_size=9,
                                              parent=status_frame)
 
@@ -387,18 +396,18 @@ class CalibrateModule(GUIBase):
                                            "",
                                            bg_color=self.colors['secondary'],
                                            hover_color=self.colors['primary'],
-                                           width=100, height=32,
+                                           width=button_width, height=32,
                                            font_size=9,
                                            parent=status_frame)
 
-            # Center buttons with tighter grouping for better appearance
-            status_layout.addStretch(3)
+            # Center buttons with equal spacing - perfectly aligned
+            status_layout.addStretch()
             status_layout.addWidget(reset_zoom_btn)
-            status_layout.addSpacing(10)
+            status_layout.addSpacing(15)
             status_layout.addWidget(self.calibrate_btn)
-            status_layout.addSpacing(10)
+            status_layout.addSpacing(15)
             status_layout.addWidget(self.refine_btn)
-            status_layout.addStretch(3)
+            status_layout.addStretch()
 
             image_layout.addWidget(status_frame)
 
@@ -2296,8 +2305,12 @@ class CalibrateModule(GUIBase):
                 self.unified_canvas.parent_module = self
                 
                 # Initialize contrast settings (auto-contrast on load)
+                # Use conservative percentiles and limit to reasonable range
                 vmin = float(np.percentile(self.current_image, 1))
-                vmax = float(np.percentile(self.current_image, 99))
+                vmax = float(np.percentile(self.current_image, 95))  # Use 95% instead of 99% to avoid outliers
+
+                # Limit vmax to prevent overflow issues (max 1 million for reasonable contrast)
+                vmax = min(vmax, 1000000)
 
                 # Store image statistics for contrast mapping
                 self.image_vmin = vmin
@@ -3620,7 +3633,6 @@ class CalibrateModule(GUIBase):
         """Apply contrast from slider (0-100 percentage scale)"""
         # Map slider percentage to actual image value range
         if not hasattr(self, 'image_vmin') or not hasattr(self, 'image_vmax'):
-            print(f"WARNING: image_vmin or image_vmax not set")
             return
 
         # Calculate actual vmax based on slider percentage
@@ -3628,16 +3640,12 @@ class CalibrateModule(GUIBase):
         vmin = self.image_vmin
         vmax = self.image_vmin + (self.image_vmax - self.image_vmin) * percentage
 
-        print(f"Slider: {slider_value}% -> vmin={vmin:.0f}, vmax={vmax:.0f}")
-
         # Apply to canvases
         if MATPLOTLIB_AVAILABLE:
             # unified_canvas is the main display canvas
             if hasattr(self, 'unified_canvas') and self.unified_canvas is not None:
-                print(f"Applying to unified_canvas")
                 self.unified_canvas.set_contrast(vmin, vmax)
             elif hasattr(self, 'calibration_canvas'):
-                print(f"Applying to calibration_canvas")
                 self.calibration_canvas.set_contrast(vmin, vmax)
 
             if hasattr(self, 'mask_canvas'):
