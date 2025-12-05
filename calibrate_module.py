@@ -838,13 +838,13 @@ class CalibrateModule(GUIBase):
         self.peak_mode_group.addButton(self.select_peak_rb, 1)
         peak_layout.addWidget(self.select_peak_rb)
         
-        # Current Ring Number (Dioptas style)
+        # Current Ring Number (Dioptas style) - OLD UI, keep for compatibility
         ring_num_row = QHBoxLayout()
         ring_num_row.addWidget(QLabel("Current Ring #:"))
         self.ring_number_spinbox = QSpinBox()
         self.ring_number_spinbox.setMinimum(0)
         self.ring_number_spinbox.setMaximum(50)
-        self.ring_number_spinbox.setValue(1)  # Default to ring 1
+        self.ring_number_spinbox.setValue(0)  # Default to ring 0
         self.ring_number_spinbox.setFixedWidth(60)
         self.ring_number_spinbox.setStyleSheet("""
             QSpinBox {
@@ -853,6 +853,8 @@ class CalibrateModule(GUIBase):
                 padding: 3px;
             }
         """)
+        # Sync with main ring_num_input if it exists
+        self.ring_number_spinbox.valueChanged.connect(self.on_ring_number_changed)
         ring_num_row.addWidget(self.ring_number_spinbox)
         ring_num_row.addStretch()
         peak_layout.addLayout(ring_num_row)
@@ -1765,10 +1767,14 @@ class CalibrateModule(GUIBase):
         ring_label.setStyleSheet(f"color: {self.colors['text_dark']}; font-weight: bold;")
         ring_layout.addWidget(ring_label)
         
-        self.ring_number_entry = QLineEdit("1")
-        self.ring_number_entry.setFixedWidth(50)
-        self.ring_number_entry.setStyleSheet(f"""
-            QLineEdit {{
+        # Use SpinBox for ring number (unified name: ring_num_input)
+        self.ring_num_input = QSpinBox()
+        self.ring_num_input.setMinimum(0)
+        self.ring_num_input.setMaximum(50)
+        self.ring_num_input.setValue(0)  # Default to ring 0
+        self.ring_num_input.setFixedWidth(50)
+        self.ring_num_input.setStyleSheet(f"""
+            QSpinBox {{
                 background-color: #FFF8DC;
                 color: {self.colors['text_dark']};
                 border: 2px solid {self.colors['primary']};
@@ -1776,7 +1782,9 @@ class CalibrateModule(GUIBase):
                 font-weight: bold;
             }}
         """)
-        ring_layout.addWidget(self.ring_number_entry)
+        # Connect to update canvas when value changes
+        self.ring_num_input.valueChanged.connect(self.on_ring_number_changed)
+        ring_layout.addWidget(self.ring_num_input)
         
         ring_layout.addStretch()
         card_layout.addWidget(ring_frame)
@@ -2271,11 +2279,20 @@ class CalibrateModule(GUIBase):
         self.mask_module_reference = mask_module
         self.log("Mask module reference set")
 
+    def on_ring_number_changed(self, value):
+        """Handle ring number change from SpinBox"""
+        # Update canvas current_ring_num if in peak picking mode
+        if hasattr(self, 'unified_canvas'):
+            self.unified_canvas.current_ring_num = value
+    
     def update_ring_number_display(self, ring_num):
         """Update ring number display after auto-increment"""
         if hasattr(self, 'ring_num_input'):
             self.ring_num_input.setValue(ring_num)
             self.log(f"Ring number auto-incremented to: {ring_num}")
+        # Also sync the old spinbox if it exists
+        if hasattr(self, 'ring_number_spinbox'):
+            self.ring_number_spinbox.setValue(ring_num)
     
     def on_peak_mode_changed(self):
         """Handle peak selection mode change"""
@@ -2354,11 +2371,19 @@ class CalibrateModule(GUIBase):
     
     
     def clear_manual_peaks(self):
-        """Clear manually selected peaks"""
-        if MATPLOTLIB_AVAILABLE and hasattr(self, 'calibration_canvas'):
-            self.calibration_canvas.clear_manual_peaks()
+        """Clear manually selected peaks and reset ring number to 0"""
+        if MATPLOTLIB_AVAILABLE and hasattr(self, 'unified_canvas'):
+            self.unified_canvas.clear_manual_peaks()
             self.update_peak_count()
-            self.log("Cleared all manual peaks")
+            # Reset ring number to 0
+            if hasattr(self, 'ring_num_input'):
+                self.ring_num_input.setValue(0)
+            if hasattr(self, 'ring_number_spinbox'):
+                self.ring_number_spinbox.setValue(0)
+            # Reset canvas ring number
+            if hasattr(self, 'unified_canvas'):
+                self.unified_canvas.current_ring_num = 0
+            self.log("Cleared all manual peaks and reset ring number to 0")
     
     def update_peak_count(self):
         """Update peak count display"""
