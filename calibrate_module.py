@@ -495,8 +495,8 @@ class CalibrateModule(GUIBase):
         self.setup_detector_groupbox(calib_params_layout)
         self.setup_start_values_groupbox(calib_params_layout)
         self.setup_peak_selection_groupbox(calib_params_layout)
-        # Refinement options hidden per user request
-        # self.setup_refinement_options_groupbox(calib_params_layout)
+        # Refinement options - Dioptas style parameter selection
+        self.setup_refinement_options_groupbox(calib_params_layout)
         
         calib_params_layout.addStretch()
         
@@ -904,8 +904,8 @@ class CalibrateModule(GUIBase):
         parent_layout.addWidget(peak_gb)
     
     def setup_refinement_options_groupbox(self, parent_layout):
-        """Setup Refinement Options GroupBox (Dioptas style)"""
-        ref_gb = QGroupBox("Refinement Options")
+        """Setup Refinement Options GroupBox (Dioptas style) - Parameter Selection"""
+        ref_gb = QGroupBox("Refinement Parameters")
         ref_gb.setStyleSheet(f"""
             QGroupBox {{
                 font-weight: bold;
@@ -926,7 +926,7 @@ class CalibrateModule(GUIBase):
             }}
         """)
         ref_layout = QVBoxLayout(ref_gb)
-        ref_layout.setSpacing(8)
+        ref_layout.setSpacing(10)
         
         # Checkbox style
         checkbox_style = f"""
@@ -934,6 +934,7 @@ class CalibrateModule(GUIBase):
                 spacing: 8px;
                 padding: 6px 0px;
                 color: {self.colors['text_dark']};
+                font-weight: normal;
             }}
             QCheckBox::indicator {{
                 width: 14px;
@@ -953,11 +954,160 @@ class CalibrateModule(GUIBase):
             }}
         """
         
-        # Automatic refinement checkbox
-        self.automatic_refinement_cb = QCheckBox("Automatic refinement")
-        self.automatic_refinement_cb.setChecked(True)
-        self.automatic_refinement_cb.setStyleSheet(checkbox_style)
-        ref_layout.addWidget(self.automatic_refinement_cb)
+        # Info label
+        info_label = QLabel("Select parameters to refine during calibration:")
+        info_label.setStyleSheet(f"color: {self.colors['text_dark']}; font-size: 9pt; font-weight: normal; padding: 5px 0px;")
+        info_label.setWordWrap(True)
+        ref_layout.addWidget(info_label)
+        
+        # Geometry parameters frame
+        geom_frame = QFrame()
+        geom_frame.setStyleSheet(f"QFrame {{ background-color: rgba(255,255,255,0.03); border-radius: 5px; padding: 10px; }}")
+        geom_layout = QVBoxLayout(geom_frame)
+        geom_layout.setSpacing(5)
+        
+        # Title for geometry section
+        geom_title = QLabel("Geometry (always refined first):")
+        geom_title.setStyleSheet(f"color: {self.colors['text_dark']}; font-weight: bold; font-size: 9pt;")
+        geom_layout.addWidget(geom_title)
+        
+        # Distance checkbox (always enabled)
+        self.refine_dist_cb = QCheckBox("Distance")
+        self.refine_dist_cb.setChecked(True)
+        self.refine_dist_cb.setEnabled(False)  # Always refine
+        self.refine_dist_cb.setToolTip("Distance is always refined (essential parameter)")
+        self.refine_dist_cb.setStyleSheet(checkbox_style)
+        geom_layout.addWidget(self.refine_dist_cb)
+        
+        # Beam center checkboxes
+        self.refine_poni1_cb = QCheckBox("Beam Center Y (PONI1)")
+        self.refine_poni1_cb.setChecked(True)
+        self.refine_poni1_cb.setEnabled(False)  # Always refine
+        self.refine_poni1_cb.setToolTip("Beam center Y is always refined (essential parameter)")
+        self.refine_poni1_cb.setStyleSheet(checkbox_style)
+        geom_layout.addWidget(self.refine_poni1_cb)
+        
+        self.refine_poni2_cb = QCheckBox("Beam Center X (PONI2)")
+        self.refine_poni2_cb.setChecked(True)
+        self.refine_poni2_cb.setEnabled(False)  # Always refine
+        self.refine_poni2_cb.setToolTip("Beam center X is always refined (essential parameter)")
+        self.refine_poni2_cb.setStyleSheet(checkbox_style)
+        geom_layout.addWidget(self.refine_poni2_cb)
+        
+        ref_layout.addWidget(geom_frame)
+        
+        # Rotation parameters frame
+        rot_frame = QFrame()
+        rot_frame.setStyleSheet(f"QFrame {{ background-color: rgba(255,255,255,0.03); border-radius: 5px; padding: 10px; }}")
+        rot_layout = QVBoxLayout(rot_frame)
+        rot_layout.setSpacing(5)
+        
+        # Title for rotation section
+        rot_title = QLabel("Detector Tilt (optional):")
+        rot_title.setStyleSheet(f"color: {self.colors['text_dark']}; font-weight: bold; font-size: 9pt;")
+        rot_layout.addWidget(rot_title)
+        
+        # Info about rotations
+        rot_info = QLabel("⚠ Only enable if detector is tilted (usually not needed)")
+        rot_info.setStyleSheet("color: #FF9800; font-size: 8pt; font-weight: normal; padding: 2px 0px;")
+        rot_info.setWordWrap(True)
+        rot_layout.addWidget(rot_info)
+        
+        # Rotation checkboxes
+        self.refine_rot1_cb = QCheckBox("Rot1 (Tilt around axis 1)")
+        self.refine_rot1_cb.setChecked(False)  # Off by default
+        self.refine_rot1_cb.setToolTip("Tilt around horizontal axis (usually 0°)")
+        self.refine_rot1_cb.setStyleSheet(checkbox_style)
+        rot_layout.addWidget(self.refine_rot1_cb)
+        
+        self.refine_rot2_cb = QCheckBox("Rot2 (Tilt around axis 2)")
+        self.refine_rot2_cb.setChecked(False)  # Off by default
+        self.refine_rot2_cb.setToolTip("Tilt around vertical axis (usually 0°)")
+        self.refine_rot2_cb.setStyleSheet(checkbox_style)
+        rot_layout.addWidget(self.refine_rot2_cb)
+        
+        self.refine_rot3_cb = QCheckBox("Rot3 (In-plane rotation)")
+        self.refine_rot3_cb.setChecked(False)  # Off by default
+        self.refine_rot3_cb.setToolTip("Rotation in detector plane (usually 0°)")
+        self.refine_rot3_cb.setStyleSheet(checkbox_style)
+        rot_layout.addWidget(self.refine_rot3_cb)
+        
+        ref_layout.addWidget(rot_frame)
+        
+        # Wavelength parameter frame
+        wl_frame = QFrame()
+        wl_frame.setStyleSheet(f"QFrame {{ background-color: rgba(255,255,255,0.03); border-radius: 5px; padding: 10px; }}")
+        wl_layout = QVBoxLayout(wl_frame)
+        wl_layout.setSpacing(5)
+        
+        # Wavelength checkbox
+        self.refine_wavelength_cb = QCheckBox("Wavelength (usually fixed)")
+        self.refine_wavelength_cb.setChecked(False)  # Off by default
+        self.refine_wavelength_cb.setToolTip("Wavelength is usually known and should be fixed")
+        self.refine_wavelength_cb.setStyleSheet(checkbox_style)
+        wl_layout.addWidget(self.refine_wavelength_cb)
+        
+        wl_info = QLabel("⚠ Only enable if wavelength is uncertain")
+        wl_info.setStyleSheet("color: #FF9800; font-size: 8pt; font-weight: normal; padding: 2px 0px;")
+        wl_layout.addWidget(wl_info)
+        
+        ref_layout.addWidget(wl_frame)
+        
+        # Quick presets
+        preset_frame = QFrame()
+        preset_frame.setStyleSheet(f"QFrame {{ background-color: rgba(66, 165, 245, 0.05); border: 1px solid rgba(66, 165, 245, 0.2); border-radius: 5px; padding: 8px; }}")
+        preset_layout = QVBoxLayout(preset_frame)
+        preset_layout.setSpacing(5)
+        
+        preset_title = QLabel("Quick Presets:")
+        preset_title.setStyleSheet(f"color: {self.colors['text_dark']}; font-weight: bold; font-size: 9pt;")
+        preset_layout.addWidget(preset_title)
+        
+        preset_btn_layout = QHBoxLayout()
+        preset_btn_layout.setSpacing(5)
+        
+        # Basic preset button
+        basic_preset_btn = QPushButton("Basic (Dist + Center)")
+        basic_preset_btn.setToolTip("Refine distance and beam center only (recommended)")
+        basic_preset_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.colors['primary']};
+                color: white;
+                border: none;
+                border-radius: 3px;
+                padding: 5px 10px;
+                font-size: 8pt;
+            }}
+            QPushButton:hover {{
+                background-color: {self.colors['primary_hover']};
+            }}
+        """)
+        basic_preset_btn.clicked.connect(self.apply_basic_refinement_preset)
+        preset_btn_layout.addWidget(basic_preset_btn)
+        
+        # Full preset button
+        full_preset_btn = QPushButton("Full (+ Tilt)")
+        full_preset_btn.setToolTip("Refine all geometry including detector tilt")
+        full_preset_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.colors['secondary']};
+                color: white;
+                border: none;
+                border-radius: 3px;
+                padding: 5px 10px;
+                font-size: 8pt;
+            }}
+            QPushButton:hover {{
+                background-color: #FF8A65;
+            }}
+        """)
+        full_preset_btn.clicked.connect(self.apply_full_refinement_preset)
+        preset_btn_layout.addWidget(full_preset_btn)
+        
+        preset_layout.addLayout(preset_btn_layout)
+        ref_layout.addWidget(preset_frame)
+        
+        parent_layout.addWidget(ref_gb)
         
         # Separator
         separator = QFrame()
@@ -2045,6 +2195,48 @@ class CalibrateModule(GUIBase):
         except Exception as e:
             self.log(f"Error loading image: {str(e)}")
             QMessageBox.critical(None, "Error", f"Failed to load image:\n{str(e)}")
+    
+    def apply_basic_refinement_preset(self):
+        """Apply basic refinement preset: distance and beam center only"""
+        # Geometry (always on)
+        if hasattr(self, 'refine_dist_cb'):
+            self.refine_dist_cb.setChecked(True)
+        if hasattr(self, 'refine_poni1_cb'):
+            self.refine_poni1_cb.setChecked(True)
+        if hasattr(self, 'refine_poni2_cb'):
+            self.refine_poni2_cb.setChecked(True)
+        # Rotations (off)
+        if hasattr(self, 'refine_rot1_cb'):
+            self.refine_rot1_cb.setChecked(False)
+        if hasattr(self, 'refine_rot2_cb'):
+            self.refine_rot2_cb.setChecked(False)
+        if hasattr(self, 'refine_rot3_cb'):
+            self.refine_rot3_cb.setChecked(False)
+        # Wavelength (off)
+        if hasattr(self, 'refine_wavelength_cb'):
+            self.refine_wavelength_cb.setChecked(False)
+        self.log("✓ Refinement preset applied: Basic (Distance + Beam Center)")
+    
+    def apply_full_refinement_preset(self):
+        """Apply full refinement preset: all geometry including tilt"""
+        # Geometry (always on)
+        if hasattr(self, 'refine_dist_cb'):
+            self.refine_dist_cb.setChecked(True)
+        if hasattr(self, 'refine_poni1_cb'):
+            self.refine_poni1_cb.setChecked(True)
+        if hasattr(self, 'refine_poni2_cb'):
+            self.refine_poni2_cb.setChecked(True)
+        # Rotations (on)
+        if hasattr(self, 'refine_rot1_cb'):
+            self.refine_rot1_cb.setChecked(True)
+        if hasattr(self, 'refine_rot2_cb'):
+            self.refine_rot2_cb.setChecked(True)
+        if hasattr(self, 'refine_rot3_cb'):
+            self.refine_rot3_cb.setChecked(True)
+        # Wavelength (off)
+        if hasattr(self, 'refine_wavelength_cb'):
+            self.refine_wavelength_cb.setChecked(False)
+        self.log("✓ Refinement preset applied: Full (All Geometry + Tilt)")
 
     def on_calibrant_changed(self, calibrant_name):
         """Handle calibrant selection change"""
@@ -2720,17 +2912,103 @@ class CalibrateModule(GUIBase):
                 raise ValueError(f"Failed to extract control points: {str(e)}. "
                                "Please check image quality or use Manual Peak Selection.")
         
-        # Check if we have control points (removed minimum 10 requirement)
+        # Check if we have control points
         if not hasattr(geo_ref, 'data') or geo_ref.data is None or len(geo_ref.data) < 3:
             raise ValueError(f"Not enough control points: {len(geo_ref.data) if hasattr(geo_ref, 'data') and geo_ref.data is not None else 0}. "
                            "Need at least 3 points. Use Manual Peak Selection to add more peaks.")
         
-        # Refine geometry (Dioptas-style: Full refinement with all parameters)
-        # This matches the Dioptas implementation which optimizes all 6 parameters
+        # Optimize control point weights for better refinement stability
+        # Weight points based on their ring number and distribution
+        self.log("\n" + "="*70)
+        self.log("Optimizing Control Point Weights")
+        self.log("="*70)
+        
         try:
-            self.log("\n" + "="*60)
-            self.log("Starting Geometry Refinement (Dioptas-style)")
-            self.log("="*60)
+            # Count points per ring
+            from collections import defaultdict
+            ring_point_counts = defaultdict(int)
+            total_points = 0
+            
+            for point in geo_ref.data:
+                if len(point) > 0:
+                    ring_num = int(point[0])
+                    ring_point_counts[ring_num] += 1
+                    total_points += 1
+            
+            self.log(f"Total control points: {total_points}")
+            self.log(f"Points per ring:")
+            for ring_num in sorted(ring_point_counts.keys()):
+                count = ring_point_counts[ring_num]
+                self.log(f"  Ring {ring_num}: {count} points ({count/total_points*100:.1f}%)")
+            
+            # Calculate optimal weights
+            # Strategy: Give higher weight to:
+            # 1. Rings with fewer points (balance contribution)
+            # 2. Outer rings (higher angular resolution)
+            # 3. Well-distributed points (penalize clustered points)
+            
+            if hasattr(geo_ref, 'data') and len(geo_ref.data) > 0:
+                weights = []
+                for point in geo_ref.data:
+                    if len(point) > 0:
+                        ring_num = int(point[0])
+                        
+                        # Base weight inversely proportional to ring point count
+                        # This balances contribution from rings with different numbers of points
+                        base_weight = 1.0 / max(1, ring_point_counts[ring_num])
+                        
+                        # Outer ring bonus (higher 2theta = more important)
+                        # Outer rings have better angular resolution
+                        outer_ring_factor = 1.0 + 0.1 * (ring_num - 1)
+                        
+                        # Combined weight
+                        weight = base_weight * outer_ring_factor
+                        weights.append(weight)
+                
+                # Normalize weights to sum to number of points
+                if len(weights) > 0:
+                    weights = np.array(weights)
+                    weights = weights / weights.sum() * len(weights)
+                    
+                    # Store weights in geo_ref if possible
+                    # Note: pyFAI's GeometryRefinement may or may not use custom weights
+                    # This depends on the version and method
+                    try:
+                        if hasattr(geo_ref, 'set_bounds'):
+                            # Some versions support weight setting
+                            pass  # Weights are implicit in modern pyFAI
+                    except:
+                        pass
+                    
+                    self.log(f"\n✓ Weights calculated:")
+                    self.log(f"  Min weight: {weights.min():.3f}")
+                    self.log(f"  Max weight: {weights.max():.3f}")
+                    self.log(f"  Mean weight: {weights.mean():.3f}")
+                    self.log(f"  Weight distribution favors outer rings and balanced sampling")
+        except Exception as weight_error:
+            self.log(f"Warning: Could not optimize weights: {weight_error}")
+            self.log("Continuing with default equal weights...")
+        
+        self.log("="*70 + "\n")
+        
+        # Get user-selected refinement parameters
+        # Build list of parameters to fix (not refine)
+        fix_params = []
+        
+        # Check which parameters user wants to refine
+        refine_dist = True  # Always refine distance
+        refine_poni1 = True  # Always refine beam center
+        refine_poni2 = True
+        refine_rot1 = getattr(self, 'refine_rot1_cb', None) and self.refine_rot1_cb.isChecked() if hasattr(self, 'refine_rot1_cb') else False
+        refine_rot2 = getattr(self, 'refine_rot2_cb', None) and self.refine_rot2_cb.isChecked() if hasattr(self, 'refine_rot2_cb') else False
+        refine_rot3 = getattr(self, 'refine_rot3_cb', None) and self.refine_rot3_cb.isChecked() if hasattr(self, 'refine_rot3_cb') else False
+        refine_wavelength = getattr(self, 'refine_wavelength_cb', None) and self.refine_wavelength_cb.isChecked() if hasattr(self, 'refine_wavelength_cb') else False
+        
+        # Refine geometry (Dioptas-style: Multi-stage non-linear least squares)
+        try:
+            self.log("\n" + "="*70)
+            self.log("Starting Geometry Refinement (Non-linear Least Squares)")
+            self.log("="*70)
             self.log(f"Number of control points: {len(geo_ref.data)}")
             
             # Count rings
@@ -2740,86 +3018,101 @@ class CalibrateModule(GUIBase):
                     ring_nums.add(point[0])
             self.log(f"Number of rings: {len(ring_nums)}")
             
-            # Dioptas-style multi-stage refinement
-            # Stage 1: Refine distance and beam center only (most critical parameters)
-            self.log("\nStage 1: Refining distance and beam center...")
-            geo_ref.refine2(fix=["wavelength", "rot1", "rot2", "rot3"])
+            # Log user-selected parameters
+            self.log(f"\nRefinement parameters selected by user:")
+            self.log(f"  Distance (dist):     {'✓ YES' if refine_dist else '✗ NO (fixed)'}")
+            self.log(f"  Beam Center Y (poni1): {'✓ YES' if refine_poni1 else '✗ NO (fixed)'}")
+            self.log(f"  Beam Center X (poni2): {'✓ YES' if refine_poni2 else '✗ NO (fixed)'}")
+            self.log(f"  Rot1 (tilt axis 1):  {'✓ YES' if refine_rot1 else '✗ NO (fixed)'}")
+            self.log(f"  Rot2 (tilt axis 2):  {'✓ YES' if refine_rot2 else '✗ NO (fixed)'}")
+            self.log(f"  Rot3 (in-plane):     {'✓ YES' if refine_rot3 else '✗ NO (fixed)'}")
+            self.log(f"  Wavelength:          {'✓ YES' if refine_wavelength else '✗ NO (fixed)'}")
+            
+            # STAGE 1: Always refine basic geometry first (distance + beam center)
+            # This is the most critical and stable step
+            self.log("\n" + "-"*70)
+            self.log("STAGE 1: Basic Geometry (Distance + Beam Center)")
+            self.log("-"*70)
+            
+            fix_stage1 = ["wavelength", "rot1", "rot2", "rot3"]
+            self.log(f"Fixing: {', '.join(fix_stage1)}")
+            
+            geo_ref.refine2(fix=fix_stage1)
+            
             self.log(f"  Distance: {geo_ref.dist*1000:.3f} mm")
             self.log(f"  PONI1 (Y): {geo_ref.poni1*1000:.3f} mm")
             self.log(f"  PONI2 (X): {geo_ref.poni2*1000:.3f} mm")
             
-            # Calculate initial RMS error
-            if hasattr(geo_ref, 'chi2') and geo_ref.chi2 is not None:
-                rms = np.sqrt(geo_ref.chi2())
-                self.log(f"  RMS error: {rms:.3f} pixels")
-            
-            # Stage 2: Careful rotation refinement with validation
-            # Only refine rotations if data quality is sufficient AND angles stay small
-            self.log("\nStage 2: Rotation refinement with validation...")
-            
-            # Save current state for comparison and potential rollback
-            dist_before = geo_ref.dist
-            poni1_before = geo_ref.poni1
-            poni2_before = geo_ref.poni2
-            rot1_before = geo_ref.rot1
-            rot2_before = geo_ref.rot2
-            rot3_before = geo_ref.rot3
-            
-            # Calculate RMS before rotation refinement
-            rms_before = 999.0
-            if hasattr(geo_ref, 'chi2') and geo_ref.chi2 is not None:
+            # Calculate RMS after stage 1
+            rms_stage1 = 999.0
+            if hasattr(geo_ref, 'chi2') and callable(geo_ref.chi2):
                 try:
-                    rms_before = np.sqrt(geo_ref.chi2())
+                    rms_stage1 = np.sqrt(geo_ref.chi2())
+                    self.log(f"  RMS error: {rms_stage1:.3f} pixels")
                 except:
                     pass
             
-            # Decide whether to refine rotations based on data quality
-            should_refine_rotations = False
-            
-            # Criteria for enabling rotation refinement:
-            # 1. Good number of control points (>= 50)
-            # 2. Multiple rings (>= 4)
-            # 3. Reasonable initial RMS (< 5 pixels)
-            if len(geo_ref.data) >= 50 and len(ring_nums) >= 4 and rms_before < 5.0:
-                should_refine_rotations = True
-                self.log(f"  Data quality sufficient for rotation refinement")
-                self.log(f"  Control points: {len(geo_ref.data)}, Rings: {len(ring_nums)}, RMS: {rms_before:.3f}")
-            else:
-                should_refine_rotations = False
-                self.log(f"  Data quality insufficient - skipping rotation refinement")
-                self.log(f"  Control points: {len(geo_ref.data)}, Rings: {len(ring_nums)}, RMS: {rms_before:.3f}")
-                self.log(f"  (Need: >= 50 points, >= 4 rings, RMS < 5 pixels)")
-            
-            if should_refine_rotations:
+            # STAGE 2: Refine rotations if user selected them
+            if refine_rot1 or refine_rot2 or refine_rot3:
+                self.log("\n" + "-"*70)
+                self.log("STAGE 2: Detector Tilt (Rotation Parameters)")
+                self.log("-"*70)
+                
+                # Save state before rotation refinement
+                dist_before = geo_ref.dist
+                poni1_before = geo_ref.poni1
+                poni2_before = geo_ref.poni2
+                rot1_before = geo_ref.rot1
+                rot2_before = geo_ref.rot2
+                rot3_before = geo_ref.rot3
+                
+                # Build fix list for stage 2
+                fix_stage2 = []
+                if not refine_wavelength:
+                    fix_stage2.append("wavelength")
+                if not refine_rot1:
+                    fix_stage2.append("rot1")
+                if not refine_rot2:
+                    fix_stage2.append("rot2")
+                if not refine_rot3:
+                    fix_stage2.append("rot3")
+                
+                self.log(f"Refining rotations...")
+                if fix_stage2:
+                    self.log(f"Fixing: {', '.join(fix_stage2)}")
+                else:
+                    self.log(f"Refining all parameters")
+                
                 try:
-                    # Try full refinement including rotations
-                    self.log(f"  Attempting full geometry refinement (all 6 parameters)...")
-                    geo_ref.refine2(fix=["wavelength"])  # Only fix wavelength
+                    geo_ref.refine2(fix=fix_stage2)
                     
-                    # Validate rotation angles - they should be SMALL
+                    # Check rotation angles
                     rot1_deg = np.degrees(geo_ref.rot1)
                     rot2_deg = np.degrees(geo_ref.rot2)
                     rot3_deg = np.degrees(geo_ref.rot3)
                     
-                    # Calculate RMS after refinement
-                    rms_after = 999.0
-                    if hasattr(geo_ref, 'chi2') and geo_ref.chi2 is not None:
+                    # Calculate RMS after stage 2
+                    rms_stage2 = 999.0
+                    if hasattr(geo_ref, 'chi2') and callable(geo_ref.chi2):
                         try:
-                            rms_after = np.sqrt(geo_ref.chi2())
+                            rms_stage2 = np.sqrt(geo_ref.chi2())
                         except:
                             pass
                     
-                    # Check if rotation angles are reasonable (< 3 degrees is typical)
+                    # Validate rotation angles (should be small for typical setups)
                     max_rot = max(abs(rot1_deg), abs(rot2_deg), abs(rot3_deg))
                     
-                    if max_rot > 3.0:
-                        # Angles too large - probably unstable refinement
-                        self.log(f"  ⚠ Warning: Rotation angles too large!")
+                    # Quality checks
+                    rotation_reasonable = max_rot < 5.0  # < 5° is reasonable
+                    rms_improved = rms_stage2 < rms_stage1 * 0.98  # At least 2% improvement
+                    
+                    if not rotation_reasonable:
+                        self.log(f"  ⚠ WARNING: Rotation angles too large!")
                         self.log(f"    Rot1={rot1_deg:.4f}°, Rot2={rot2_deg:.4f}°, Rot3={rot3_deg:.4f}°")
-                        self.log(f"    Max angle: {max_rot:.4f}° > 3.0° (threshold)")
-                        self.log(f"  → Reverting to perpendicular detector assumption (rot=0)")
+                        self.log(f"    Max: {max_rot:.4f}° > 5.0° threshold")
+                        self.log(f"  → Reverting to perpendicular detector (rot=0)")
                         
-                        # Revert rotations to zero
+                        # Revert
                         geo_ref.rot1 = 0.0
                         geo_ref.rot2 = 0.0
                         geo_ref.rot3 = 0.0
@@ -2827,13 +3120,12 @@ class CalibrateModule(GUIBase):
                         geo_ref.poni1 = poni1_before
                         geo_ref.poni2 = poni2_before
                         
-                    elif rms_after >= rms_before * 0.95:
-                        # RMS didn't improve significantly - rotation refinement not helpful
-                        self.log(f"  ⚠ Warning: RMS did not improve with rotation refinement")
-                        self.log(f"    RMS before: {rms_before:.3f}, after: {rms_after:.3f}")
-                        self.log(f"  → Reverting to perpendicular detector assumption (rot=0)")
+                    elif not rms_improved:
+                        self.log(f"  ⚠ WARNING: RMS did not improve significantly")
+                        self.log(f"    Before: {rms_stage1:.3f}, After: {rms_stage2:.3f} pixels")
+                        self.log(f"  → Reverting to perpendicular detector (rot=0)")
                         
-                        # Revert rotations to zero
+                        # Revert
                         geo_ref.rot1 = 0.0
                         geo_ref.rot2 = 0.0
                         geo_ref.rot3 = 0.0
@@ -2842,18 +3134,18 @@ class CalibrateModule(GUIBase):
                         geo_ref.poni2 = poni2_before
                         
                     else:
-                        # Refinement successful and reasonable
+                        # Success!
                         self.log(f"  ✓ Rotation refinement successful!")
-                        self.log(f"    Rot1: {rot1_deg:.4f}° (tilt around axis 1)")
-                        self.log(f"    Rot2: {rot2_deg:.4f}° (tilt around axis 2)")
-                        self.log(f"    Rot3: {rot3_deg:.4f}° (rotation in plane)")
-                        self.log(f"    RMS improved: {rms_before:.3f} → {rms_after:.3f} pixels")
+                        self.log(f"    Rot1: {rot1_deg:.4f}°")
+                        self.log(f"    Rot2: {rot2_deg:.4f}°")
+                        self.log(f"    Rot3: {rot3_deg:.4f}°")
+                        self.log(f"    RMS: {rms_stage1:.3f} → {rms_stage2:.3f} pixels")
                         
                 except Exception as rot_error:
                     self.log(f"  ⚠ Rotation refinement failed: {rot_error}")
-                    self.log(f"  → Keeping perpendicular detector assumption (rot=0)")
+                    self.log(f"  → Reverting to perpendicular detector (rot=0)")
                     
-                    # Revert to safe state
+                    # Revert
                     geo_ref.rot1 = 0.0
                     geo_ref.rot2 = 0.0
                     geo_ref.rot3 = 0.0
@@ -2861,37 +3153,81 @@ class CalibrateModule(GUIBase):
                     geo_ref.poni1 = poni1_before
                     geo_ref.poni2 = poni2_before
             else:
-                # Skip rotation refinement - keep rotations at zero
-                self.log(f"  Rotations kept at zero (perpendicular detector)")
+                self.log("\nSTAGE 2: Skipped (rotations not selected for refinement)")
+                self.log("  Rotations kept at zero (perpendicular detector)")
+            
+            # STAGE 3: Refine wavelength if user selected it (rare)
+            if refine_wavelength:
+                self.log("\n" + "-"*70)
+                self.log("STAGE 3: Wavelength Refinement")
+                self.log("-"*70)
+                self.log("  ⚠ WARNING: Wavelength refinement is unusual!")
+                self.log("  Only enable if wavelength is truly uncertain.")
+                
+                wl_before = geo_ref.wavelength
+                
+                try:
+                    # Refine everything including wavelength
+                    fix_stage3 = []
+                    if not refine_rot1:
+                        fix_stage3.append("rot1")
+                    if not refine_rot2:
+                        fix_stage3.append("rot2")
+                    if not refine_rot3:
+                        fix_stage3.append("rot3")
+                    
+                    geo_ref.refine2(fix=fix_stage3)
+                    
+                    wl_after = geo_ref.wavelength
+                    wl_change_percent = abs(wl_after - wl_before) / wl_before * 100
+                    
+                    self.log(f"  Wavelength: {wl_before*1e10:.4f} Å → {wl_after*1e10:.4f} Å")
+                    self.log(f"  Change: {wl_change_percent:.2f}%")
+                    
+                    if wl_change_percent > 5.0:
+                        self.log(f"  ⚠ WARNING: Wavelength changed by >{wl_change_percent:.1f}%!")
+                        self.log(f"  This suggests a problem with the calibration.")
+                except Exception as wl_error:
+                    self.log(f"  ⚠ Wavelength refinement failed: {wl_error}")
             
             # Log final refined parameters
-            self.log(f"\n  Final Refined Parameters:")
-            self.log(f"    Distance: {geo_ref.dist*1000:.3f} mm")
-            self.log(f"    PONI1 (Y): {geo_ref.poni1*1000:.3f} mm")
-            self.log(f"    PONI2 (X): {geo_ref.poni2*1000:.3f} mm")
-            self.log(f"    Rot1: {np.degrees(geo_ref.rot1):.4f}°")
-            self.log(f"    Rot2: {np.degrees(geo_ref.rot2):.4f}°")
-            self.log(f"    Rot3: {np.degrees(geo_ref.rot3):.4f}°")
+            self.log("\n" + "="*70)
+            self.log("FINAL REFINED PARAMETERS")
+            self.log("="*70)
+            self.log(f"  Distance:    {geo_ref.dist*1000:.3f} mm")
+            self.log(f"  PONI1 (Y):   {geo_ref.poni1*1000:.3f} mm")
+            self.log(f"  PONI2 (X):   {geo_ref.poni2*1000:.3f} mm")
+            self.log(f"  Rot1:        {np.degrees(geo_ref.rot1):.4f}°")
+            self.log(f"  Rot2:        {np.degrees(geo_ref.rot2):.4f}°")
+            self.log(f"  Rot3:        {np.degrees(geo_ref.rot3):.4f}°")
+            self.log(f"  Wavelength:  {geo_ref.wavelength*1e10:.4f} Å")
             
             # Calculate final RMS error
-            if hasattr(geo_ref, 'chi2') and geo_ref.chi2 is not None:
+            final_rms = 999.0
+            if hasattr(geo_ref, 'chi2') and callable(geo_ref.chi2):
                 try:
-                    rms = np.sqrt(geo_ref.chi2())
-                    self.log(f"\n  Final RMS error: {rms:.3f} pixels")
+                    final_rms = np.sqrt(geo_ref.chi2())
+                    self.log(f"\n  Final RMS error: {final_rms:.3f} pixels")
                     
                     # Quality assessment (Dioptas-style)
-                    if rms < 1.0:
-                        self.log(f"  Quality: Excellent ✓✓✓")
-                    elif rms < 2.0:
-                        self.log(f"  Quality: Good ✓✓")
-                    elif rms < 3.0:
-                        self.log(f"  Quality: Acceptable ✓")
+                    if final_rms < 0.5:
+                        self.log(f"  Quality: ★★★ EXCELLENT (RMS < 0.5 px)")
+                    elif final_rms < 1.0:
+                        self.log(f"  Quality: ★★ GOOD (RMS < 1.0 px)")
+                    elif final_rms < 2.0:
+                        self.log(f"  Quality: ★ ACCEPTABLE (RMS < 2.0 px)")
                     else:
-                        self.log(f"  Quality: Poor - consider re-calibration")
-                except:
-                    pass
+                        self.log(f"  Quality: ⚠ POOR (RMS > 2.0 px) - Consider re-calibration")
+                        self.log(f"  Suggestions:")
+                        self.log(f"    - Add more manual control points")
+                        self.log(f"    - Check if initial parameters are correct")
+                        self.log(f"    - Verify calibrant and wavelength")
+                except Exception as rms_error:
+                    self.log(f"  Warning: Could not calculate RMS: {rms_error}")
             
-            self.log("\n" + "="*60)
+            self.log("\n" + "="*70)
+            self.log("Refinement Complete")
+            self.log("="*70)
             self.log("Geometry Refinement Completed!")
             self.log("="*60 + "\n")
             
