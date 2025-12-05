@@ -211,6 +211,7 @@ class CalibrateModule(GUIBase):
         if layout is None:
             layout = QVBoxLayout(self.parent)
             layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(0)
         else:
             # Clear existing items carefully
             while layout.count():
@@ -223,26 +224,41 @@ class CalibrateModule(GUIBase):
 
         # Main horizontal splitter: Display (left) + Control (right)
         main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        main_splitter.setContentsMargins(0, 0, 0, 0)
         
         # ============== LEFT PANEL: DISPLAY WIDGET ==============
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(0)
         
         # Tab widget for Image/Cake/Pattern views (Dioptas style)
         self.display_tab_widget = QTabWidget()
+        self.display_tab_widget.setContentsMargins(0, 0, 0, 0)
+        self.display_tab_widget.setStyleSheet("""
+            QTabWidget::pane {
+                border: none;
+                padding: 0px;
+                margin: 0px;
+            }
+            QTabBar::tab {
+                padding: 3px 8px;
+                margin: 0px;
+            }
+        """)
         
         # Image tab
         image_tab = QWidget()
         image_layout = QVBoxLayout(image_tab)
         image_layout.setContentsMargins(0, 0, 0, 0)
+        image_layout.setSpacing(0)
         
         if MATPLOTLIB_AVAILABLE:
             # Horizontal layout for canvas and contrast slider
             canvas_container = QWidget()
             canvas_layout = QHBoxLayout(canvas_container)
-            canvas_layout.setContentsMargins(0, 0, 0, 0)
-            canvas_layout.setSpacing(5)
+            canvas_layout.setContentsMargins(2, 2, 2, 2)
+            canvas_layout.setSpacing(2)
             
             try:
                 # Create canvas with large size for better visibility
@@ -359,7 +375,8 @@ class CalibrateModule(GUIBase):
         # Pattern tab (1D integration)
         pattern_tab = QWidget()
         pattern_layout = QVBoxLayout(pattern_tab)
-        pattern_layout.setContentsMargins(0, 0, 0, 0)
+        pattern_layout.setContentsMargins(2, 2, 2, 2)
+        pattern_layout.setSpacing(0)
         
         if MATPLOTLIB_AVAILABLE:
             self.pattern_figure = Figure(figsize=(10, 8), dpi=100)
@@ -383,7 +400,8 @@ class CalibrateModule(GUIBase):
         # Status bar with display controls and Calibrate/Refine buttons
         status_frame = QFrame()
         status_layout = QHBoxLayout(status_frame)
-        status_layout.setContentsMargins(6, 0, 0, 0)
+        status_layout.setContentsMargins(3, 2, 3, 2)
+        status_layout.setSpacing(3)
         
         # Display control buttons
         auto_contrast_btn = ModernButton("Auto Contrast",
@@ -442,18 +460,20 @@ class CalibrateModule(GUIBase):
         right_scroll = QScrollArea()
         right_scroll.setWidgetResizable(True)
         right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        right_scroll.setMinimumWidth(280)
-        right_scroll.setMaximumWidth(290)
+        right_scroll.setMinimumWidth(270)
+        right_scroll.setMaximumWidth(275)
+        right_scroll.setContentsMargins(0, 0, 0, 0)
         
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(3, 3, 3, 3)
-        right_layout.setSpacing(3)
+        right_layout.setContentsMargins(2, 2, 2, 2)
+        right_layout.setSpacing(2)
         
         # File loading section
         file_frame = QFrame()
         file_layout = QHBoxLayout(file_frame)
-        file_layout.setContentsMargins(5, 5, 5, 5)
+        file_layout.setContentsMargins(2, 2, 2, 2)
+        file_layout.setSpacing(2)
         
         self.load_img_btn = ModernButton("Load Image",
                                          self.browse_and_load_image,
@@ -528,7 +548,8 @@ class CalibrateModule(GUIBase):
         # Bottom buttons: Load/Save Calibration
         bottom_frame = QFrame()
         bottom_layout = QHBoxLayout(bottom_frame)
-        bottom_layout.setContentsMargins(5, 5, 5, 5)
+        bottom_layout.setContentsMargins(2, 2, 2, 2)
+        bottom_layout.setSpacing(2)
         
         self.load_calibration_btn = ModernButton("Load PONI",
                                                 self.load_calibration,
@@ -556,20 +577,20 @@ class CalibrateModule(GUIBase):
         # Add log output to right panel (compact version)
         log_label = QLabel("📋 Log:")
         log_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        log_label.setStyleSheet(f"color: {self.colors['text_dark']}; padding: 2px 5px;")
+        log_label.setStyleSheet(f"color: {self.colors['text_dark']}; padding: 1px 2px;")
         right_layout.addWidget(log_label)
         
         self.log_output = QTextEdit()
-        self.log_output.setMaximumHeight(200)
-        self.log_output.setMinimumHeight(150)
+        self.log_output.setMaximumHeight(180)
+        self.log_output.setMinimumHeight(120)
         self.log_output.setReadOnly(True)
         self.log_output.setFont(QFont('Consolas', 8))
         self.log_output.setStyleSheet(f"""
             QTextEdit {{
                 background-color: #f8f9fa;
                 border: 1px solid {self.colors['border']};
-                border-radius: 3px;
-                padding: 3px;
+                border-radius: 2px;
+                padding: 2px;
                 color: #2c3e50;
             }}
         """)
@@ -587,8 +608,11 @@ class CalibrateModule(GUIBase):
         main_splitter.setStretchFactor(1, 0)
         
         # Set initial splitter sizes to favor left panel
-        # Total width e.g. 1400: left gets 1110, right gets 290
-        main_splitter.setSizes([1200, 290])
+        # Total width e.g. 1400: left gets more space, right gets 275
+        main_splitter.setSizes([1300, 275])
+        
+        # Reduce handle width for more space
+        main_splitter.setHandleWidth(1)
         
         layout.addWidget(main_splitter)
         
@@ -604,22 +628,22 @@ class CalibrateModule(GUIBase):
                 font-weight: bold;
                 font-size: 9pt;
                 border: 1px solid {self.colors['border']};
-                border-radius: 3px;
-                margin-top: 10px;
-                margin-bottom: 5px;
-                padding: 10px 5px 5px 5px;
+                border-radius: 2px;
+                margin-top: 5px;
+                margin-bottom: 3px;
+                padding: 8px 3px 3px 3px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 8px;
-                padding: 0 3px 0 3px;
+                left: 6px;
+                padding: 0 2px 0 2px;
                 color: {self.colors['text_dark']};
             }}
         """)
         detector_layout = QVBoxLayout(detector_gb)
-        detector_layout.setSpacing(4)
-        detector_layout.setContentsMargins(3, 3, 3, 3)
+        detector_layout.setSpacing(3)
+        detector_layout.setContentsMargins(2, 2, 2, 2)
         
         # Detector selection combo box
         self.detector_combo = QComboBox()
@@ -681,22 +705,22 @@ class CalibrateModule(GUIBase):
                 font-weight: bold;
                 font-size: 9pt;
                 border: 1px solid {self.colors['border']};
-                border-radius: 3px;
-                margin-top: 10px;
-                margin-bottom: 5px;
-                padding: 10px 5px 5px 5px;
+                border-radius: 2px;
+                margin-top: 5px;
+                margin-bottom: 3px;
+                padding: 8px 3px 3px 3px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 8px;
-                padding: 0 3px 0 3px;
+                left: 6px;
+                padding: 0 2px 0 2px;
                 color: {self.colors['text_dark']};
             }}
         """)
         sv_layout = QVBoxLayout(sv_gb)
-        sv_layout.setSpacing(4)
-        sv_layout.setContentsMargins(3, 3, 3, 3)
+        sv_layout.setSpacing(3)
+        sv_layout.setContentsMargins(2, 2, 2, 2)
         
         # Calibrant selection
         calib_layout = QHBoxLayout()
@@ -793,22 +817,22 @@ class CalibrateModule(GUIBase):
                 font-weight: bold;
                 font-size: 9pt;
                 border: 1px solid {self.colors['border']};
-                border-radius: 3px;
-                margin-top: 10px;
-                margin-bottom: 5px;
-                padding: 10px 5px 5px 5px;
+                border-radius: 2px;
+                margin-top: 5px;
+                margin-bottom: 3px;
+                padding: 8px 3px 3px 3px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 8px;
-                padding: 0 3px 0 3px;
+                left: 6px;
+                padding: 0 2px 0 2px;
                 color: {self.colors['text_dark']};
             }}
         """)
         peak_layout = QVBoxLayout(peak_gb)
-        peak_layout.setSpacing(4)
-        peak_layout.setContentsMargins(3, 3, 3, 3)
+        peak_layout.setSpacing(3)
+        peak_layout.setContentsMargins(2, 2, 2, 2)
         
         # Radio buttons for peak selection mode
         self.peak_mode_group = QButtonGroup()
@@ -922,22 +946,22 @@ class CalibrateModule(GUIBase):
                 font-weight: bold;
                 font-size: 9pt;
                 border: 1px solid {self.colors['border']};
-                border-radius: 3px;
-                margin-top: 10px;
-                margin-bottom: 5px;
-                padding: 10px 5px 5px 5px;
+                border-radius: 2px;
+                margin-top: 5px;
+                margin-bottom: 3px;
+                padding: 8px 3px 3px 3px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 8px;
-                padding: 0 3px 0 3px;
+                left: 6px;
+                padding: 0 2px 0 2px;
                 color: {self.colors['text_dark']};
             }}
         """)
         ref_layout = QVBoxLayout(ref_gb)
-        ref_layout.setSpacing(5)
-        ref_layout.setContentsMargins(3, 3, 3, 3)
+        ref_layout.setSpacing(3)
+        ref_layout.setContentsMargins(2, 2, 2, 2)
         
         # Checkbox style
         checkbox_style = f"""
@@ -973,9 +997,9 @@ class CalibrateModule(GUIBase):
         
         # Geometry parameters frame - compact
         geom_frame = QFrame()
-        geom_frame.setStyleSheet(f"QFrame {{ background-color: rgba(255,255,255,0.03); border-radius: 3px; padding: 5px; }}")
+        geom_frame.setStyleSheet(f"QFrame {{ background-color: rgba(255,255,255,0.03); border-radius: 2px; padding: 3px; }}")
         geom_layout = QVBoxLayout(geom_frame)
-        geom_layout.setSpacing(3)
+        geom_layout.setSpacing(2)
         
         # Title for geometry section - compact
         geom_title = QLabel("Geometry (always refined):")
@@ -1009,9 +1033,9 @@ class CalibrateModule(GUIBase):
         
         # Rotation parameters frame - compact
         rot_frame = QFrame()
-        rot_frame.setStyleSheet(f"QFrame {{ background-color: rgba(255,255,255,0.03); border-radius: 3px; padding: 5px; }}")
+        rot_frame.setStyleSheet(f"QFrame {{ background-color: rgba(255,255,255,0.03); border-radius: 2px; padding: 3px; }}")
         rot_layout = QVBoxLayout(rot_frame)
-        rot_layout.setSpacing(3)
+        rot_layout.setSpacing(2)
         
         # Title for rotation section - compact
         rot_title = QLabel("Detector Tilt (optional):")
@@ -1047,9 +1071,9 @@ class CalibrateModule(GUIBase):
         
         # Wavelength parameter frame - compact
         wl_frame = QFrame()
-        wl_frame.setStyleSheet(f"QFrame {{ background-color: rgba(255,255,255,0.03); border-radius: 3px; padding: 5px; }}")
+        wl_frame.setStyleSheet(f"QFrame {{ background-color: rgba(255,255,255,0.03); border-radius: 2px; padding: 3px; }}")
         wl_layout = QVBoxLayout(wl_frame)
-        wl_layout.setSpacing(3)
+        wl_layout.setSpacing(2)
         
         # Wavelength checkbox
         self.refine_wavelength_cb = QCheckBox("Wavelength (usually fixed)")
@@ -1066,16 +1090,16 @@ class CalibrateModule(GUIBase):
         
         # Quick presets - compact
         preset_frame = QFrame()
-        preset_frame.setStyleSheet(f"QFrame {{ background-color: rgba(66, 165, 245, 0.05); border: 1px solid rgba(66, 165, 245, 0.2); border-radius: 3px; padding: 5px; }}")
+        preset_frame.setStyleSheet(f"QFrame {{ background-color: rgba(66, 165, 245, 0.05); border: 1px solid rgba(66, 165, 245, 0.2); border-radius: 2px; padding: 3px; }}")
         preset_layout = QVBoxLayout(preset_frame)
-        preset_layout.setSpacing(3)
+        preset_layout.setSpacing(2)
         
         preset_title = QLabel("Quick Presets:")
         preset_title.setStyleSheet(f"color: {self.colors['text_dark']}; font-weight: bold; font-size: 8pt;")
         preset_layout.addWidget(preset_title)
         
         preset_btn_layout = QHBoxLayout()
-        preset_btn_layout.setSpacing(3)
+        preset_btn_layout.setSpacing(2)
         
         # Basic preset button - compact
         basic_preset_btn = QPushButton("Basic")
