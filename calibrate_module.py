@@ -48,12 +48,22 @@ INT32_MAX = 2147483647  # Maximum value for 32-bit signed integer (Qt widgets us
 try:
     import pyFAI
     from pyFAI.calibrant import Calibrant, ALL_CALIBRANTS
+    try:
+        from pyFAI.calibrant import get_calibrant
+    except ImportError:
+        # Fallback for older versions - create wrapper function
+        def get_calibrant(name):
+            if name in ALL_CALIBRANTS:
+                return Calibrant(name)
+            return None
     from pyFAI.geometryRefinement import GeometryRefinement
     from pyFAI.azimuthalIntegrator import AzimuthalIntegrator
     PYFAI_AVAILABLE = True
 except ImportError:
     PYFAI_AVAILABLE = False
     print("Warning: pyFAI not available. Install with: pip install pyFAI")
+    def get_calibrant(name):
+        return None
 
 try:
     import fabio
@@ -1587,7 +1597,7 @@ class CalibrateModule(GUIBase):
                 try:
                     calibrant_name = self.calibrant_combo.currentText()
                     if calibrant_name in ALL_CALIBRANTS:
-                        self.calibrant = ALL_CALIBRANTS[calibrant_name]
+                        self.calibrant = get_calibrant(calibrant_name)
                 except:
                     pass
     
@@ -2442,7 +2452,7 @@ class CalibrateModule(GUIBase):
             if self.calibrant is None:
                 calibrant_name = self.calibrant_combo.currentText()
                 if calibrant_name in ALL_CALIBRANTS:
-                    self.calibrant = ALL_CALIBRANTS[calibrant_name]
+                    self.calibrant = get_calibrant(calibrant_name)
                 else:
                     return
             
@@ -2812,7 +2822,10 @@ class CalibrateModule(GUIBase):
             self.log(f"Pixel size: {pixel_size*1e6:.1f} μm")
             
             # Create calibrant
-            calibrant = ALL_CALIBRANTS[calibrant_name]
+            calibrant = get_calibrant(calibrant_name)
+            if calibrant is None:
+                self.log(f"Error: Invalid calibrant '{calibrant_name}'")
+                return
             calibrant.wavelength = wavelength
             
             # Get mask - use imported mask if "use mask" is checked
