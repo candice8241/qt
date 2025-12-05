@@ -2206,7 +2206,7 @@ class CalibrateModule(GUIBase):
                 try:
                     calibrant_name = self.calibrant_combo.currentText()
                     if calibrant_name in ALL_CALIBRANTS:
-                        self.calibrant = Calibrant(calibrant_name)
+                        self.calibrant = ALL_CALIBRANTS[calibrant_name]
                 except:
                     pass
     
@@ -2974,7 +2974,7 @@ class CalibrateModule(GUIBase):
             if self.calibrant is None:
                 calibrant_name = self.calibrant_combo.currentText()
                 if calibrant_name in ALL_CALIBRANTS:
-                    self.calibrant = Calibrant(calibrant_name)
+                    self.calibrant = ALL_CALIBRANTS[calibrant_name]
                 else:
                     return
             
