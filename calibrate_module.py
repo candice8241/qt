@@ -272,7 +272,7 @@ class CalibrateModule(GUIBase):
             
             try:
                 # Create canvas with larger size for better visibility
-                self.unified_canvas = CalibrationCanvas(canvas_container, width=16, height=16, dpi=100)
+                self.unified_canvas = CalibrationCanvas(canvas_container, width=18, height=18, dpi=100)
                 canvas_layout.addWidget(self.unified_canvas)
             except Exception as e:
                 # Simplified error message
@@ -283,63 +283,13 @@ class CalibrateModule(GUIBase):
                 canvas_layout.addWidget(placeholder)
                 self.unified_canvas = None
             
-            # Middle panel with control buttons (vertical arrangement)
-            button_widget = QWidget()
-            button_widget.setMinimumWidth(120)
-            button_widget.setMaximumWidth(140)
-            button_layout = QVBoxLayout(button_widget)
-            button_layout.setContentsMargins(5, 5, 5, 5)
-            button_layout.setSpacing(8)
-            
-            # Add top stretch to push buttons towards middle
-            button_layout.addStretch(2)
-            
-            # Control buttons (vertical arrangement)
-            button_width = 115
-            button_height = 38
-            
-            reset_zoom_btn = ModernButton("Reset Zoom",
-                                         self.reset_zoom,
-                                         "",
-                                         bg_color=self.colors['secondary'],
-                                         hover_color=self.colors['primary'],
-                                         width=button_width, height=button_height,
-                                         font_size=9,
-                                         parent=button_widget)
-            button_layout.addWidget(reset_zoom_btn)
-
-            self.calibrate_btn = ModernButton("Calibrate",
-                                             self.run_calibration,
-                                             "",
-                                             bg_color=self.colors['primary'],
-                                             hover_color=self.colors['primary_hover'],
-                                             width=button_width, height=button_height,
-                                             font_size=9,
-                                             parent=button_widget)
-            button_layout.addWidget(self.calibrate_btn)
-
-            self.refine_btn = ModernButton("Refine",
-                                           self.refine_calibration,
-                                           "",
-                                           bg_color=self.colors['secondary'],
-                                           hover_color=self.colors['primary'],
-                                           width=button_width, height=button_height,
-                                           font_size=9,
-                                           parent=button_widget)
-            button_layout.addWidget(self.refine_btn)
-            
-            # Add bottom stretch
-            button_layout.addStretch(2)
-            
-            canvas_layout.addWidget(button_widget)
-            
-            # Right side panel with position label and contrast slider
-            contrast_widget = QWidget()
-            contrast_widget.setMinimumWidth(180)
-            contrast_widget.setMaximumWidth(200)
-            contrast_layout = QVBoxLayout(contrast_widget)
-            contrast_layout.setContentsMargins(5, 5, 5, 5)
-            contrast_layout.setSpacing(3)
+            # Right side panel with position label, buttons, and contrast slider
+            right_panel_widget = QWidget()
+            right_panel_widget.setMinimumWidth(280)
+            right_panel_widget.setMaximumWidth(320)
+            right_panel_layout = QVBoxLayout(right_panel_widget)
+            right_panel_layout.setContentsMargins(5, 5, 5, 5)
+            right_panel_layout.setSpacing(5)
 
             # Position label at top (more visible, no background)
             self.position_lbl = QLabel("Position: x=0, y=0")
@@ -351,24 +301,73 @@ class CalibrateModule(GUIBase):
                 padding-left: 10px;
             """)
             self.position_lbl.setMinimumHeight(25)
-            contrast_layout.addWidget(self.position_lbl)
+            right_panel_layout.addWidget(self.position_lbl)
 
-            # Add stretch
-            contrast_layout.addStretch(1)
+            # Add small stretch
+            right_panel_layout.addStretch(1)
 
-            # Contrast percentage label (top)
-            contrast_top_lbl = QLabel("100%")
-            contrast_top_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            contrast_top_lbl.setFont(QFont('Arial', 8))
-            contrast_top_lbl.setStyleSheet("color: #555;")
-            contrast_layout.addWidget(contrast_top_lbl)
+            # Horizontal layout for buttons and contrast slider
+            controls_container = QWidget()
+            controls_layout = QHBoxLayout(controls_container)
+            controls_layout.setContentsMargins(0, 0, 0, 0)
+            controls_layout.setSpacing(10)
+            
+            # Left side: Control buttons (vertical arrangement with spacing)
+            button_widget = QWidget()
+            button_layout = QVBoxLayout(button_widget)
+            button_layout.setContentsMargins(0, 0, 0, 0)
+            button_layout.setSpacing(0)
+            
+            # Control buttons (vertical arrangement with large spacing)
+            button_width = 120
+            button_height = 38
+            
+            reset_zoom_btn = ModernButton("Reset Zoom",
+                                         self.reset_zoom,
+                                         "",
+                                         bg_color=self.colors['secondary'],
+                                         hover_color=self.colors['primary'],
+                                         width=button_width, height=button_height,
+                                         font_size=9,
+                                         parent=button_widget)
+            button_layout.addWidget(reset_zoom_btn)
+            button_layout.addSpacing(30)  # Add spacing between buttons
+
+            self.calibrate_btn = ModernButton("Calibrate",
+                                             self.run_calibration,
+                                             "",
+                                             bg_color=self.colors['primary'],
+                                             hover_color=self.colors['primary_hover'],
+                                             width=button_width, height=button_height,
+                                             font_size=9,
+                                             parent=button_widget)
+            button_layout.addWidget(self.calibrate_btn)
+            button_layout.addSpacing(30)  # Add spacing between buttons
+
+            self.refine_btn = ModernButton("Refine",
+                                           self.refine_calibration,
+                                           "",
+                                           bg_color=self.colors['secondary'],
+                                           hover_color=self.colors['primary'],
+                                           width=button_width, height=button_height,
+                                           font_size=9,
+                                           parent=button_widget)
+            button_layout.addWidget(self.refine_btn)
+            
+            controls_layout.addWidget(button_widget)
+            
+            # Right side: Contrast slider with percentage display
+            slider_widget = QWidget()
+            slider_layout = QVBoxLayout(slider_widget)
+            slider_layout.setContentsMargins(0, 0, 0, 0)
+            slider_layout.setSpacing(5)
             
             # Current contrast percentage display
             self.contrast_pct_lbl = QLabel("Contrast: 100%")
             self.contrast_pct_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self.contrast_pct_lbl.setFont(QFont('Arial', 9, QFont.Weight.Bold))
             self.contrast_pct_lbl.setStyleSheet("color: #2E5C8A; padding: 3px;")
-            contrast_layout.addWidget(self.contrast_pct_lbl)
+            slider_layout.addWidget(self.contrast_pct_lbl)
             
             # Vertical slider with reasonable range (0-100 for percentage)
             self.contrast_slider = QSlider(Qt.Orientation.Vertical)
@@ -376,7 +375,7 @@ class CalibrateModule(GUIBase):
             self.contrast_slider.setMaximum(100)  # Use percentage scale
             self.contrast_slider.setValue(100)  # Default to max
             self.contrast_slider.setInvertedAppearance(True)  # Max at top
-            self.contrast_slider.setFixedHeight(450)  # Adjusted for new layout
+            self.contrast_slider.setFixedHeight(450)  # Match button area height
             self.contrast_slider.setStyleSheet("""
                 QSlider::groove:vertical {
                     width: 25px;
@@ -400,23 +399,20 @@ class CalibrateModule(GUIBase):
                 }
             """)
             self.contrast_slider.valueChanged.connect(self.on_contrast_slider_changed)
-            contrast_layout.addWidget(self.contrast_slider)
+            slider_layout.addWidget(self.contrast_slider, 0, Qt.AlignmentFlag.AlignCenter)
 
             # Store image statistics for contrast mapping
             self.image_vmin = 0
             self.image_vmax = 65535  # Will be updated when image is loaded
-
-            # Contrast percentage label (bottom)
-            contrast_bottom_lbl = QLabel("0%")
-            contrast_bottom_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            contrast_bottom_lbl.setFont(QFont('Arial', 8))
-            contrast_bottom_lbl.setStyleSheet("color: #555;")
-            contrast_layout.addWidget(contrast_bottom_lbl)
+            
+            controls_layout.addWidget(slider_widget)
+            
+            right_panel_layout.addWidget(controls_container)
             
             # Add stretch at bottom
-            contrast_layout.addStretch(1)
+            right_panel_layout.addStretch(1)
             
-            canvas_layout.addWidget(contrast_widget)
+            canvas_layout.addWidget(right_panel_widget)
             
             image_layout.addWidget(canvas_container)
 
