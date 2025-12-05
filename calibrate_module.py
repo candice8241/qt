@@ -622,110 +622,115 @@ class CalibrateModule(GUIBase):
         self._ui_initializing = False
 
     def setup_detector_groupbox(self, parent_layout):
-        """Setup Detector GroupBox (Dioptas style) - Compact"""
+        """Setup Detector GroupBox - Clean and organized layout"""
         detector_gb = QGroupBox("Detector")
         detector_gb.setStyleSheet(f"""
             QGroupBox {{
                 font-weight: bold;
-                font-size: 9pt;
-                border: 1px solid {self.colors['border']};
-                border-radius: 3px;
-                margin-top: 6px;
-                margin-bottom: 4px;
-                padding: 10px 5px 5px 5px;
+                font-size: 10pt;
+                border: 2px solid {self.colors['border']};
+                border-radius: 5px;
+                margin-top: 8px;
+                margin-bottom: 6px;
+                padding: 12px 8px 8px 8px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 8px;
-                padding: 0 3px 0 3px;
-                color: {self.colors['text_dark']};
+                left: 10px;
+                padding: 0 5px 0 5px;
+                color: {self.colors['primary']};
             }}
         """)
         detector_layout = QVBoxLayout(detector_gb)
-        detector_layout.setSpacing(5)
-        detector_layout.setContentsMargins(4, 4, 4, 4)
+        detector_layout.setSpacing(8)
+        detector_layout.setContentsMargins(8, 10, 8, 8)
         
-        # Detector selection combo box
+        # Detector selection with label
+        det_row = QHBoxLayout()
+        det_label = QLabel("Type:")
+        det_label.setFixedWidth(80)
+        det_label.setStyleSheet("font-weight: normal; font-size: 9pt;")
+        det_row.addWidget(det_label)
+        
         self.detector_combo = QComboBox()
         detectors = ["Pilatus2M", "Pilatus1M", "Pilatus300K", "PerkinElmer", 
                      "Eiger2M", "Eiger1M", "Eiger4M", "Mar345", "Rayonix", "Custom"]
         self.detector_combo.addItems(detectors)
         self.detector_combo.currentTextChanged.connect(self.on_detector_changed)
-        detector_layout.addWidget(self.detector_combo)
+        self.detector_combo.setStyleSheet("""
+            QComboBox {
+                padding: 3px 5px;
+                border: 1px solid #ccc;
+                border-radius: 3px;
+                background: white;
+            }
+        """)
+        det_row.addWidget(self.detector_combo)
+        detector_layout.addLayout(det_row)
         
-        # Pixel size grid
-        pixel_grid = QHBoxLayout()
+        # Pixel size in a grid (2 rows, cleaner)
+        pixel_label = QLabel("Pixel Size:")
+        pixel_label.setStyleSheet("font-weight: normal; font-size: 9pt; color: #555;")
+        detector_layout.addWidget(pixel_label)
         
-        pixel_grid.addWidget(QLabel("Pixel width:"))
+        pixel_grid = QGridLayout()
+        pixel_grid.setHorizontalSpacing(6)
+        pixel_grid.setVerticalSpacing(4)
+        pixel_grid.setContentsMargins(15, 0, 0, 0)
+        
+        # Width
+        pixel_grid.addWidget(QLabel("Width:"), 0, 0)
         self.pixel_width_txt = QLineEdit(str(self.pixel_size * 1e6))
-        self.pixel_width_txt.setFixedWidth(60)
-        pixel_grid.addWidget(self.pixel_width_txt)
-        pixel_grid.addWidget(QLabel("μm"))
-        pixel_grid.addStretch()
+        self.pixel_width_txt.setFixedWidth(70)
+        self.pixel_width_txt.setStyleSheet("padding: 2px 4px; border: 1px solid #ccc; border-radius: 2px;")
+        pixel_grid.addWidget(self.pixel_width_txt, 0, 1)
+        pixel_grid.addWidget(QLabel("μm"), 0, 2)
+        
+        # Height
+        pixel_grid.addWidget(QLabel("Height:"), 1, 0)
+        self.pixel_height_txt = QLineEdit(str(self.pixel_size * 1e6))
+        self.pixel_height_txt.setFixedWidth(70)
+        self.pixel_height_txt.setStyleSheet("padding: 2px 4px; border: 1px solid #ccc; border-radius: 2px;")
+        pixel_grid.addWidget(self.pixel_height_txt, 1, 1)
+        pixel_grid.addWidget(QLabel("μm"), 1, 2)
         
         detector_layout.addLayout(pixel_grid)
-        
-        pixel_grid2 = QHBoxLayout()
-        pixel_grid2.addWidget(QLabel("Pixel height:"))
-        self.pixel_height_txt = QLineEdit(str(self.pixel_size * 1e6))
-        self.pixel_height_txt.setFixedWidth(60)
-        pixel_grid2.addWidget(self.pixel_height_txt)
-        pixel_grid2.addWidget(QLabel("μm"))
-        pixel_grid2.addStretch()
-        
-        detector_layout.addLayout(pixel_grid2)
-        
-        # Distortion/Spline file
-        distortion_layout = QHBoxLayout()
-        distortion_layout.addWidget(QLabel("Distortion:"))
-        self.spline_name_lbl = QLabel("None")
-        self.spline_name_lbl.setStyleSheet("color: gray;")
-        distortion_layout.addWidget(self.spline_name_lbl)
-        distortion_layout.addStretch()
-        
-        self.spline_load_btn = QPushButton("Load")
-        self.spline_load_btn.setMaximumWidth(50)
-        self.spline_load_btn.setToolTip("Load spline correction file")
-        distortion_layout.addWidget(self.spline_load_btn)
-        
-        self.spline_reset_btn = QPushButton("Reset")
-        self.spline_reset_btn.setMaximumWidth(50)
-        self.spline_reset_btn.setEnabled(False)
-        distortion_layout.addWidget(self.spline_reset_btn)
-        
-        detector_layout.addLayout(distortion_layout)
         
         parent_layout.addWidget(detector_gb)
     
     def setup_start_values_groupbox(self, parent_layout):
-        """Setup Start Values GroupBox (Dioptas style) - Compact"""
-        sv_gb = QGroupBox("Start values")
+        """Setup Start Values GroupBox - Clean and organized layout"""
+        sv_gb = QGroupBox("Start Values")
         sv_gb.setStyleSheet(f"""
             QGroupBox {{
                 font-weight: bold;
-                font-size: 9pt;
-                border: 1px solid {self.colors['border']};
-                border-radius: 3px;
-                margin-top: 6px;
-                margin-bottom: 4px;
-                padding: 10px 5px 5px 5px;
+                font-size: 10pt;
+                border: 2px solid {self.colors['border']};
+                border-radius: 5px;
+                margin-top: 8px;
+                margin-bottom: 6px;
+                padding: 12px 8px 8px 8px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 8px;
-                padding: 0 3px 0 3px;
-                color: {self.colors['text_dark']};
+                left: 10px;
+                padding: 0 5px 0 5px;
+                color: {self.colors['primary']};
             }}
         """)
         sv_layout = QVBoxLayout(sv_gb)
-        sv_layout.setSpacing(5)
-        sv_layout.setContentsMargins(4, 4, 4, 4)
+        sv_layout.setSpacing(8)
+        sv_layout.setContentsMargins(8, 10, 8, 8)
         
-        # Calibrant selection
-        calib_layout = QHBoxLayout()
-        calib_layout.addWidget(QLabel("Calibrant:"))
+        # Calibrant selection with label
+        calib_row = QHBoxLayout()
+        calib_label = QLabel("Calibrant:")
+        calib_label.setFixedWidth(80)
+        calib_label.setStyleSheet("font-weight: normal; font-size: 9pt;")
+        calib_row.addWidget(calib_label)
+        
         self.calibrant_combo = QComboBox()
         if PYFAI_AVAILABLE:
             calibrants = sorted(ALL_CALIBRANTS.keys())
@@ -733,107 +738,78 @@ class CalibrateModule(GUIBase):
             if "LaB6" in calibrants:
                 self.calibrant_combo.setCurrentText("LaB6")
         self.calibrant_combo.currentTextChanged.connect(self.on_calibrant_changed)
-        calib_layout.addWidget(self.calibrant_combo)
-        sv_layout.addLayout(calib_layout)
+        self.calibrant_combo.setStyleSheet("""
+            QComboBox {
+                padding: 3px 5px;
+                border: 1px solid #ccc;
+                border-radius: 3px;
+                background: white;
+            }
+        """)
+        calib_row.addWidget(self.calibrant_combo)
+        sv_layout.addLayout(calib_row)
         
-        # Distance with refinement checkbox
-        dist_layout = QHBoxLayout()
-        dist_layout.addWidget(QLabel("Distance:"))
-        self.distance_txt = QLineEdit(str(self.distance * 1000))  # Convert to mm
-        self.distance_txt.setFixedWidth(80)
-        dist_layout.addWidget(self.distance_txt)
-        dist_layout.addWidget(QLabel("mm"))
-        self.distance_cb = QCheckBox("refine")
-        self.distance_cb.setChecked(True)
-        dist_layout.addWidget(self.distance_cb)
-        dist_layout.addStretch()
-        sv_layout.addLayout(dist_layout)
+        # Parameters in a clean grid
+        params_label = QLabel("Parameters:")
+        params_label.setStyleSheet("font-weight: normal; font-size: 9pt; color: #555;")
+        sv_layout.addWidget(params_label)
         
-        # Wavelength with refinement checkbox
-        wl_layout = QHBoxLayout()
-        wl_layout.addWidget(QLabel("Wavelength:"))
+        params_grid = QGridLayout()
+        params_grid.setHorizontalSpacing(8)
+        params_grid.setVerticalSpacing(6)
+        params_grid.setContentsMargins(15, 0, 0, 0)
+        
+        # Distance
+        params_grid.addWidget(QLabel("Distance:"), 0, 0)
+        self.distance_txt = QLineEdit(str(self.distance * 1000))
+        self.distance_txt.setFixedWidth(70)
+        self.distance_txt.setStyleSheet("padding: 2px 4px; border: 1px solid #ccc; border-radius: 2px;")
+        params_grid.addWidget(self.distance_txt, 0, 1)
+        params_grid.addWidget(QLabel("mm"), 0, 2)
+        
+        # Wavelength
+        params_grid.addWidget(QLabel("Wavelength:"), 1, 0)
         self.wavelength_txt = QLineEdit(str(self.wavelength))
-        self.wavelength_txt.setFixedWidth(80)
-        wl_layout.addWidget(self.wavelength_txt)
-        wl_layout.addWidget(QLabel("Å"))
-        self.wavelength_cb = QCheckBox("refine")
-        self.wavelength_cb.setChecked(False)  # Wavelength usually fixed
-        wl_layout.addWidget(self.wavelength_cb)
-        wl_layout.addStretch()
-        sv_layout.addLayout(wl_layout)
+        self.wavelength_txt.setFixedWidth(70)
+        self.wavelength_txt.setStyleSheet("padding: 2px 4px; border: 1px solid #ccc; border-radius: 2px;")
+        params_grid.addWidget(self.wavelength_txt, 1, 1)
+        params_grid.addWidget(QLabel("Å"), 1, 2)
         
-        # Polarization factor
-        pol_layout = QHBoxLayout()
-        pol_layout.addWidget(QLabel("Polarization:"))
+        # Polarization
+        params_grid.addWidget(QLabel("Polarization:"), 2, 0)
         self.polarization_txt = QLineEdit("0.99")
-        self.polarization_txt.setFixedWidth(80)
-        pol_layout.addWidget(self.polarization_txt)
-        pol_layout.addStretch()
-        sv_layout.addLayout(pol_layout)
+        self.polarization_txt.setFixedWidth(70)
+        self.polarization_txt.setStyleSheet("padding: 2px 4px; border: 1px solid #ccc; border-radius: 2px;")
+        params_grid.addWidget(self.polarization_txt, 2, 1)
         
-        # Image transformation buttons
-        transform_frame = QFrame()
-        transform_frame.setFrameShape(QFrame.Shape.StyledPanel)
-        transform_layout = QVBoxLayout(transform_frame)
-        transform_layout.setSpacing(3)
-        
-        transform_label = QLabel("Image transformations:")
-        transform_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))
-        transform_layout.addWidget(transform_label)
-        
-        # Rotation buttons
-        rot_layout = QHBoxLayout()
-        self.rotate_m90_btn = QPushButton("↶ -90°")
-        self.rotate_m90_btn.setStyleSheet("padding: 3px;")
-        self.rotate_p90_btn = QPushButton("↷ +90°")
-        self.rotate_p90_btn.setStyleSheet("padding: 3px;")
-        rot_layout.addWidget(self.rotate_m90_btn)
-        rot_layout.addWidget(self.rotate_p90_btn)
-        transform_layout.addLayout(rot_layout)
-        
-        # Flip buttons
-        flip_layout = QHBoxLayout()
-        self.flip_horizontal_btn = QPushButton("Flip H")
-        self.flip_horizontal_btn.setStyleSheet("padding: 3px;")
-        self.flip_vertical_btn = QPushButton("Flip V")
-        self.flip_vertical_btn.setStyleSheet("padding: 3px;")
-        flip_layout.addWidget(self.flip_horizontal_btn)
-        flip_layout.addWidget(self.flip_vertical_btn)
-        transform_layout.addLayout(flip_layout)
-        
-        # Reset button
-        self.reset_transformations_btn = QPushButton("Reset Transformations")
-        self.reset_transformations_btn.setStyleSheet("padding: 3px;")
-        transform_layout.addWidget(self.reset_transformations_btn)
-        
-        sv_layout.addWidget(transform_frame)
+        sv_layout.addLayout(params_grid)
         
         parent_layout.addWidget(sv_gb)
     
     def setup_peak_selection_groupbox(self, parent_layout):
-        """Setup Peak Selection GroupBox (Dioptas style) - Compact"""
+        """Setup Peak Selection GroupBox - Clean and organized layout"""
         peak_gb = QGroupBox("Peak Selection")
         peak_gb.setStyleSheet(f"""
             QGroupBox {{
                 font-weight: bold;
-                font-size: 9pt;
-                border: 1px solid {self.colors['border']};
-                border-radius: 3px;
-                margin-top: 6px;
-                margin-bottom: 4px;
-                padding: 10px 5px 5px 5px;
+                font-size: 10pt;
+                border: 2px solid {self.colors['border']};
+                border-radius: 5px;
+                margin-top: 8px;
+                margin-bottom: 6px;
+                padding: 12px 8px 8px 8px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 8px;
-                padding: 0 3px 0 3px;
-                color: {self.colors['text_dark']};
+                left: 10px;
+                padding: 0 5px 0 5px;
+                color: {self.colors['primary']};
             }}
         """)
         peak_layout = QVBoxLayout(peak_gb)
-        peak_layout.setSpacing(5)
-        peak_layout.setContentsMargins(4, 4, 4, 4)
+        peak_layout.setSpacing(8)
+        peak_layout.setContentsMargins(8, 10, 8, 8)
         
         # Radio buttons for peak selection mode
         self.peak_mode_group = QButtonGroup()
@@ -876,65 +852,95 @@ class CalibrateModule(GUIBase):
         self.peak_mode_group.addButton(self.select_peak_rb, 1)
         peak_layout.addWidget(self.select_peak_rb)
         
-        # Current Ring Number (Dioptas style) - OLD UI, keep for compatibility
-        ring_num_row = QHBoxLayout()
-        ring_num_row.addWidget(QLabel("Current Ring #:"))
-        self.ring_number_spinbox = QSpinBox()
-        self.ring_number_spinbox.setMinimum(1)  # Start from 1 per user request
-        self.ring_number_spinbox.setMaximum(50)
-        self.ring_number_spinbox.setValue(1)  # Default to ring 1
-        self.ring_number_spinbox.setFixedWidth(60)
-        self.ring_number_spinbox.setStyleSheet("""
-            QSpinBox {
-                background-color: #FFF8DC;
-                font-weight: bold;
-                padding: 3px;
-            }
-        """)
-        # Sync with main ring_num_input if it exists
-        self.ring_number_spinbox.valueChanged.connect(self.on_ring_number_changed)
-        ring_num_row.addWidget(self.ring_number_spinbox)
-        ring_num_row.addStretch()
-        peak_layout.addLayout(ring_num_row)
+        # Parameters in a clean grid
+        params_label = QLabel("Peak Parameters:")
+        params_label.setStyleSheet("font-weight: normal; font-size: 9pt; color: #555; margin-top: 4px;")
+        peak_layout.addWidget(params_label)
         
-        # Auto increment checkbox (Dioptas style)
-        self.automatic_peak_num_inc_cb = QCheckBox("Automatic increase ring number")
+        params_grid = QGridLayout()
+        params_grid.setHorizontalSpacing(8)
+        params_grid.setVerticalSpacing(6)
+        params_grid.setContentsMargins(15, 0, 0, 0)
+        
+        # Current Ring Number
+        params_grid.addWidget(QLabel("Ring #:"), 0, 0)
+        self.ring_number_spinbox = QSpinBox()
+        self.ring_number_spinbox.setMinimum(1)
+        self.ring_number_spinbox.setMaximum(50)
+        self.ring_number_spinbox.setValue(1)
+        self.ring_number_spinbox.setFixedWidth(65)
+        self.ring_number_spinbox.setStyleSheet("padding: 2px 4px; border: 1px solid #ccc; border-radius: 2px; background: #FFF8DC;")
+        self.ring_number_spinbox.valueChanged.connect(self.on_ring_number_changed)
+        params_grid.addWidget(self.ring_number_spinbox, 0, 1)
+        
+        # Search size
+        params_grid.addWidget(QLabel("Search Size:"), 1, 0)
+        self.search_size_sb = QSpinBox()
+        self.search_size_sb.setMinimum(1)
+        self.search_size_sb.setMaximum(100)
+        self.search_size_sb.setValue(1)
+        self.search_size_sb.setFixedWidth(65)
+        self.search_size_sb.setStyleSheet("padding: 2px 4px; border: 1px solid #ccc; border-radius: 2px;")
+        params_grid.addWidget(self.search_size_sb, 1, 1)
+        params_grid.addWidget(QLabel("px"), 1, 2)
+        
+        peak_layout.addLayout(params_grid)
+        
+        # Auto increment checkbox
+        self.automatic_peak_num_inc_cb = QCheckBox("Auto-increment ring number")
         self.automatic_peak_num_inc_cb.setChecked(True)
-        self.automatic_peak_num_inc_cb.setStyleSheet(f"color: {self.colors['text_dark']};")
+        self.automatic_peak_num_inc_cb.setStyleSheet(f"color: {self.colors['text_dark']}; margin-left: 15px;")
         peak_layout.addWidget(self.automatic_peak_num_inc_cb)
         
-        # Peak search size
-        search_size_row = QHBoxLayout()
-        search_size_row.addWidget(QLabel("Search Size:"))
-        self.search_size_sb = QSpinBox()
-        self.search_size_sb.setMinimum(1)  # Allow smaller values
-        self.search_size_sb.setMaximum(100)
-        self.search_size_sb.setValue(1)  # Set default to 1 per user request
-        self.search_size_sb.setFixedWidth(60)
-        search_size_row.addWidget(self.search_size_sb)
-        search_size_row.addWidget(QLabel("pixels"))
-        search_size_row.addStretch()
-        peak_layout.addLayout(search_size_row)
+        # Control buttons with modern style
+        btn_label = QLabel("Actions:")
+        btn_label.setStyleSheet("font-weight: normal; font-size: 9pt; color: #555; margin-top: 4px;")
+        peak_layout.addWidget(btn_label)
         
-        # Clear and Undo buttons
         btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(5)
+        btn_layout.setContentsMargins(15, 0, 0, 0)
         
-        self.clear_peaks_btn = QPushButton("Clear Peaks")
-        self.clear_peaks_btn.setStyleSheet("padding: 5px;")
+        self.clear_peaks_btn = QPushButton("🗑 Clear")
+        self.clear_peaks_btn.setStyleSheet("""
+            QPushButton {
+                padding: 5px 10px;
+                font-size: 9pt;
+                background-color: #f44336;
+                color: white;
+                border: none;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #da190b;
+            }
+        """)
         self.clear_peaks_btn.clicked.connect(self.clear_manual_peaks)
         btn_layout.addWidget(self.clear_peaks_btn)
         
-        self.undo_peaks_btn = QPushButton("Undo Last")
-        self.undo_peaks_btn.setStyleSheet("padding: 5px;")
+        self.undo_peaks_btn = QPushButton("↶ Undo")
+        self.undo_peaks_btn.setStyleSheet("""
+            QPushButton {
+                padding: 5px 10px;
+                font-size: 9pt;
+                background-color: #FF9800;
+                color: white;
+                border: none;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #F57C00;
+            }
+        """)
         self.undo_peaks_btn.clicked.connect(self.undo_last_peak)
         btn_layout.addWidget(self.undo_peaks_btn)
         
         peak_layout.addLayout(btn_layout)
         
-        # Peak count label
+        # Peak count label with better styling
         self.peak_count_label = QLabel("Peaks: 0")
-        self.peak_count_label.setFont(QFont('Arial', 8))
-        self.peak_count_label.setStyleSheet("color: blue; padding: 3px;")
+        self.peak_count_label.setFont(QFont('Arial', 9))
+        self.peak_count_label.setStyleSheet("color: #2196F3; padding: 5px; margin-left: 15px; font-weight: bold;")
         peak_layout.addWidget(self.peak_count_label)
         
         parent_layout.addWidget(peak_gb)
@@ -2213,6 +2219,17 @@ class CalibrateModule(GUIBase):
                 # Link canvas to module before display
                 self.unified_canvas.parent_module = self
                 
+                # Initialize contrast settings (auto-contrast on load)
+                vmin = float(np.percentile(self.current_image, 1))
+                vmax = float(np.percentile(self.current_image, 99))
+                self.unified_canvas.contrast_min = vmin
+                self.unified_canvas.contrast_max = vmax
+                
+                # Update slider to match
+                if hasattr(self, 'contrast_slider'):
+                    self.contrast_slider.setMaximum(int(np.max(self.current_image)))
+                    self.contrast_slider.setValue(int(vmax))
+                
                 # Display image immediately with forced update
                 self.unified_canvas.display_calibration_image(self.current_image)
                 
@@ -2222,6 +2239,8 @@ class CalibrateModule(GUIBase):
                 
                 # Also load to mask canvas for legacy mask operations (async)
                 QTimer.singleShot(10, lambda: self.mask_canvas.load_image(image_path))
+                
+                self.log(f"Auto-contrast applied: {vmin:.0f} - {vmax:.0f}")
             
             # Sync image to mask module
             if self.mask_module_reference is not None:
