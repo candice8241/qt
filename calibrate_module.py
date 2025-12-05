@@ -1798,6 +1798,13 @@ class CalibrateModule(GUIBase):
         self.automatic_peak_num_inc_cb.setStyleSheet(f"color: {self.colors['text_dark']}; font-size: 9pt;")
         card_layout.addWidget(self.automatic_peak_num_inc_cb)
         
+        # Real-time auto peak finding checkbox (Dioptas style)
+        self.auto_peak_search_cb = QCheckBox("Real-time automatic peak finding")
+        self.auto_peak_search_cb.setChecked(True)
+        self.auto_peak_search_cb.setStyleSheet(f"color: {self.colors['text_dark']}; font-size: 9pt;")
+        self.auto_peak_search_cb.stateChanged.connect(self.on_auto_peak_search_changed)
+        card_layout.addWidget(self.auto_peak_search_cb)
+        
         # Separator
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
@@ -2292,6 +2299,30 @@ class CalibrateModule(GUIBase):
         """Update ring number display after auto-increment"""
         if hasattr(self, 'ring_num_input'):
             self.ring_num_input.setValue(ring_num)
+    
+    def on_auto_peak_search_changed(self, state):
+        """Handle real-time auto peak search checkbox change (Dioptas-style)"""
+        enabled = (state == Qt.CheckState.Checked.value)
+        
+        # Update canvas setting
+        if hasattr(self, 'unified_canvas'):
+            self.unified_canvas.show_auto_peaks = enabled
+            
+            if enabled:
+                self.log("✓ Real-time automatic peak finding ENABLED")
+                self.log("  When you click a point on a ring, the system will automatically")
+                self.log("  search for and display other peaks on the same ring (cyan circles)")
+                
+                # If there are existing manual peaks, refresh auto peaks for them
+                if hasattr(self.unified_canvas, 'manual_peaks') and self.unified_canvas.manual_peaks:
+                    self.log(f"  Refreshing auto peaks for {len(self.unified_canvas.manual_peaks)} existing manual peaks...")
+                    self.unified_canvas.refresh_auto_peaks_for_all_manual()
+            else:
+                self.log("✗ Real-time automatic peak finding DISABLED")
+                # Clear existing auto peaks
+                self.unified_canvas.clear_auto_peaks()
+                if self.current_image is not None:
+                    self.unified_canvas.display_calibration_image(self.current_image)
             self.log(f"Ring number auto-incremented to: {ring_num}")
         # Also sync the old spinbox if it exists
         if hasattr(self, 'ring_number_spinbox'):
@@ -2327,9 +2358,30 @@ class CalibrateModule(GUIBase):
             self.log("Automatic peak search mode: ENABLED")
     
     def toggle_peak_picking(self):
-        """Toggle manual peak picking mode"""
+        """Toggle manual peak picking mode (Dioptas-style with auto peak finding)"""
         self.peak_picking_mode = not self.peak_picking_mode
         
+        if MATPLOTLIB_AVAILABLE and hasattr(self, 'unified_canvas'):
+            self.unified_canvas.peak_picking_mode = self.peak_picking_mode
+            
+            # Update canvas settings when entering peak picking mode
+            if self.peak_picking_mode:
+                # Set ring number
+                if hasattr(self, 'ring_num_input'):
+                    self.unified_canvas.current_ring_num = self.ring_num_input.value()
+                
+                # Set auto-increment flag
+                if hasattr(self, 'automatic_peak_num_inc_cb'):
+                    self.unified_canvas.auto_increment_ring = self.automatic_peak_num_inc_cb.isChecked()
+                
+                # Set auto peak search flag
+                if hasattr(self, 'auto_peak_search_cb'):
+                    self.unified_canvas.show_auto_peaks = self.auto_peak_search_cb.isChecked()
+                
+                # Set parent reference for callbacks
+                self.unified_canvas.parent_module = self
+        
+        # Fallback for old calibration_canvas (compatibility)
         if MATPLOTLIB_AVAILABLE and hasattr(self, 'calibration_canvas'):
             self.calibration_canvas.peak_picking_mode = self.peak_picking_mode
         

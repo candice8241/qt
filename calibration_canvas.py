@@ -11,6 +11,15 @@ import numpy as np
 # PyQt imports
 from PyQt6.QtCore import Qt
 
+# SciPy imports for auto peak finding
+try:
+    from scipy.ndimage import maximum_filter
+    from scipy.spatial.distance import cdist
+    SCIPY_AVAILABLE = True
+except ImportError:
+    SCIPY_AVAILABLE = False
+    print("Warning: scipy not available. Auto peak finding will be disabled.")
+
 # Matplotlib imports
 try:
     from matplotlib.backends.backend_qt5agg import FigureCanvasQTAgg as FigureCanvas
@@ -364,6 +373,11 @@ class CalibrationCanvas(FigureCanvas):
             self.manual_peaks = []  # List of (x, y, ring_num)
             self.peak_markers = []  # List of matplotlib artists
             
+            # Real-time auto peak finding (Dioptas-style)
+            self.auto_detected_peaks = []  # List of (x, y, ring_num) for auto-detected peaks
+            self.auto_peak_markers = []  # List of matplotlib artists for auto peaks
+            self.show_auto_peaks = True  # Enable/disable auto peak display
+            
             # Ring number for peak picking (starts from 1 per user request)
             self.current_ring_num = 1
             self.auto_increment_ring = False
@@ -452,7 +466,15 @@ class CalibrationCanvas(FigureCanvas):
                                      markersize=2,
                                      alpha=self.ring_alpha)
         
-        # Restore manual peaks
+        # Display auto-detected peaks first (in cyan, smaller) - Dioptas style
+        if hasattr(self, 'auto_detected_peaks') and self.auto_detected_peaks and self.show_auto_peaks:
+            for x, y, ring_num in self.auto_detected_peaks:
+                # Draw auto peaks as cyan circles (smaller than manual)
+                marker = self.axes.plot(x, y, 'o', markersize=4, markerfacecolor='cyan', 
+                                       markeredgecolor='blue', markeredgewidth=0.5, alpha=0.7)[0]
+                self.auto_peak_markers.append(marker)
+        
+        # Restore manual peaks (displayed on top, in red, larger)
         if temp_manual_peaks:
             for x, y, ring_num in temp_manual_peaks:
                 # Draw marker as red filled circle
@@ -647,7 +669,7 @@ class CalibrationCanvas(FigureCanvas):
             self.on_mask_click(event)
     
     def on_peak_click(self, event):
-        """Handle mouse click for peak picking"""
+        """Handle mouse click for peak picking with real-time auto peak finding (Dioptas-style)"""
         if not self.peak_picking_mode:
             return
         
@@ -657,7 +679,7 @@ class CalibrationCanvas(FigureCanvas):
         # Get current ring number (should be set by parent)
         ring_num = getattr(self, 'current_ring_num', 0)
         
-        # Add peak
+        # Add manual peak
         self.manual_peaks.append((x, y, ring_num))
         
         # Draw marker
@@ -670,6 +692,29 @@ class CalibrationCanvas(FigureCanvas):
                               horizontalalignment='center', verticalalignment='bottom',
                               fontweight='bold')
         self.peak_markers.append(label)
+        
+        # ===== REAL-TIME AUTO PEAK FINDING (Dioptas-style) =====
+        # Automatically search for peaks on the same ring
+        if self.show_auto_peaks and self.image_data is not None:
+            print(f"[Auto Peak] Searching ring {ring_num} based on manual point at ({x:.1f}, {y:.1f})")
+            
+            # Find peaks on this ring
+            auto_peaks = self.auto_find_peaks_on_ring(x, y, ring_num)
+            
+            if auto_peaks:
+                print(f"[Auto Peak] Found {len(auto_peaks)} peaks on ring {ring_num}")
+                
+                # Add to auto_detected_peaks
+                self.auto_detected_peaks.extend(auto_peaks)
+                
+                # Display them immediately
+                for peak_x, peak_y, peak_ring in auto_peaks:
+                    marker = self.axes.plot(peak_x, peak_y, 'o', markersize=4, 
+                                          markerfacecolor='cyan', markeredgecolor='blue', 
+                                          markeredgewidth=0.5, alpha=0.7)[0]
+                    self.auto_peak_markers.append(marker)
+            else:
+                print(f"[Auto Peak] No additional peaks found on ring {ring_num}")
         
         self.draw_idle()
         
@@ -797,6 +842,7 @@ class CalibrationCanvas(FigureCanvas):
     
     def get_manual_control_points(self):
         """Get manually selected control points in format for calibration
+        (Dioptas-style: includes both manual and auto-detected peaks)
         
         Returns:
             list: Control points in format [[row, col, ring_num], ...]
@@ -806,9 +852,18 @@ class CalibrationCanvas(FigureCanvas):
         
         # Convert from (x, y, ring_num) to [[row, col, ring_num], ...]
         control_points = []
+        
+        # Add manual peaks
         for x, y, ring_num in self.manual_peaks:
             # x corresponds to col, y corresponds to row
             control_points.append([y, x, ring_num])
+        
+        # Add auto-detected peaks if enabled (Dioptas-style)
+        if self.show_auto_peaks and hasattr(self, 'auto_detected_peaks') and self.auto_detected_peaks:
+            for x, y, ring_num in self.auto_detected_peaks:
+                control_points.append([y, x, ring_num])
+            print(f"[Calibration] Total control points: {len(control_points)} "
+                  f"({len(self.manual_peaks)} manual + {len(self.auto_detected_peaks)} auto)")
         
         return control_points
     
@@ -822,7 +877,156 @@ class CalibrationCanvas(FigureCanvas):
             except:
                 pass
         self.peak_markers = []
+        
+        # Also clear auto-detected peaks
+        self.clear_auto_peaks()
+        
         self.draw_idle()
+    
+    def clear_auto_peaks(self):
+        """Clear all auto-detected peaks"""
+        self.auto_detected_peaks = []
+        for marker in self.auto_peak_markers:
+            try:
+                marker.remove()
+            except:
+                pass
+        self.auto_peak_markers = []
+    
+    def auto_find_peaks_on_ring(self, seed_x, seed_y, ring_num):
+        """
+        Automatically find peaks on the same ring as the seed point (Dioptas-style)
+        
+        Args:
+            seed_x: X coordinate of seed point (manual click)
+            seed_y: Y coordinate of seed point (manual click)
+            ring_num: Ring number for this peak
+        
+        Returns:
+            list: List of (x, y, ring_num) tuples for auto-detected peaks
+        """
+        if self.image_data is None:
+            return []
+        
+        # Check if scipy is available
+        if not SCIPY_AVAILABLE:
+            print("[Auto Peak] Warning: scipy not available, skipping auto peak finding")
+            return []
+        
+        try:
+            # Import necessary modules
+            from scipy.ndimage import maximum_filter
+            
+            # Calculate radius from center of image to seed point
+            center_y, center_x = self.image_data.shape[0] / 2, self.image_data.shape[1] / 2
+            radius = np.sqrt((seed_x - center_x)**2 + (seed_y - center_y)**2)
+            
+            # Define ring width (tolerance) - typically 2-5% of radius
+            ring_width = max(5, radius * 0.03)  # At least 5 pixels
+            
+            # Create polar coordinate arrays
+            y_coords, x_coords = np.ogrid[:self.image_data.shape[0], :self.image_data.shape[1]]
+            distances = np.sqrt((x_coords - center_x)**2 + (y_coords - center_y)**2)
+            
+            # Create ring mask
+            ring_mask = (distances >= radius - ring_width) & (distances <= radius + ring_width)
+            
+            # Get intensities in ring region
+            ring_data = self.image_data.copy()
+            ring_data[~ring_mask] = 0
+            
+            # Apply maximum filter to find local maxima
+            footprint_size = 5  # Size of local region
+            local_max = maximum_filter(ring_data, size=footprint_size)
+            peaks_mask = (ring_data == local_max) & (ring_data > 0)
+            
+            # Get peak coordinates
+            peak_coords = np.argwhere(peaks_mask)
+            
+            if len(peak_coords) == 0:
+                return []
+            
+            # Convert to (x, y) format
+            peaks = [(coord[1], coord[0]) for coord in peak_coords]
+            
+            # Filter peaks by intensity (top percentile)
+            intensities = [self.image_data[int(y), int(x)] for x, y in peaks]
+            if len(intensities) > 0:
+                intensity_threshold = np.percentile(intensities, 70)  # Keep top 30%
+                peaks = [(x, y) for (x, y), intensity in zip(peaks, intensities) 
+                        if intensity >= intensity_threshold]
+            
+            # Limit number of peaks per ring (Dioptas typically shows ~36-360 points per ring)
+            # We'll use fewer for clarity: ~36 points (every 10 degrees)
+            max_peaks_per_ring = 36
+            if len(peaks) > max_peaks_per_ring:
+                # Sample evenly around the ring by angle
+                angles = [np.arctan2(y - center_y, x - center_x) for x, y in peaks]
+                # Sort by angle
+                sorted_indices = np.argsort(angles)
+                # Select evenly spaced indices
+                step = len(peaks) // max_peaks_per_ring
+                selected_indices = sorted_indices[::step][:max_peaks_per_ring]
+                peaks = [peaks[i] for i in selected_indices]
+            
+            # Remove seed point from results (avoid duplication)
+            peaks = [(x, y) for x, y in peaks 
+                    if np.sqrt((x - seed_x)**2 + (y - seed_y)**2) > footprint_size]
+            
+            # Return as list of (x, y, ring_num)
+            return [(x, y, ring_num) for x, y in peaks]
+            
+        except Exception as e:
+            print(f"Auto peak finding error: {e}")
+            import traceback
+            traceback.print_exc()
+            return []
+    
+    def update_auto_peaks_display(self):
+        """Update display with current auto-detected peaks (Dioptas-style real-time update)"""
+        if not self.show_auto_peaks:
+            return
+        
+        # Clear old auto peak markers
+        for marker in self.auto_peak_markers:
+            try:
+                marker.remove()
+            except:
+                pass
+        self.auto_peak_markers = []
+        
+        # Draw new auto peaks
+        if self.auto_detected_peaks:
+            for x, y, ring_num in self.auto_detected_peaks:
+                # Draw auto peaks as cyan circles
+                marker = self.axes.plot(x, y, 'o', markersize=4, markerfacecolor='cyan', 
+                                       markeredgecolor='blue', markeredgewidth=0.5, alpha=0.7)[0]
+                self.auto_peak_markers.append(marker)
+        
+        self.draw_idle()
+    
+    def refresh_auto_peaks_for_all_manual(self):
+        """Re-run auto peak detection for all existing manual peaks (Dioptas-style)"""
+        if not self.show_auto_peaks or not self.manual_peaks or self.image_data is None:
+            return
+        
+        print(f"[Auto Peak] Refreshing auto peaks for {len(self.manual_peaks)} manual peaks...")
+        
+        # Clear existing auto peaks
+        self.clear_auto_peaks()
+        
+        # Re-run auto detection for each manual peak
+        for x, y, ring_num in self.manual_peaks:
+            auto_peaks = self.auto_find_peaks_on_ring(x, y, ring_num)
+            if auto_peaks:
+                self.auto_detected_peaks.extend(auto_peaks)
+                print(f"[Auto Peak] Ring {ring_num}: Found {len(auto_peaks)} peaks")
+        
+        print(f"[Auto Peak] Total auto-detected peaks: {len(self.auto_detected_peaks)}")
+        
+        # Update display
+        if self.image_data is not None:
+            self.display_calibration_image(self.image_data, self.calibration_points)
     
     def remove_last_peak(self):
         """Remove the last added peak"""
