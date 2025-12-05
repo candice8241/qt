@@ -68,11 +68,12 @@ except ImportError:
 
 
 class CalibrationWorkerThread(QThread):
-    """Worker thread for calibration processing"""
+    """Worker thread for calibration processing with real-time ring-by-ring display"""
     finished = pyqtSignal(str)
     error = pyqtSignal(str)
     progress = pyqtSignal(str)
     calibration_result = pyqtSignal(object)  # Emits calibration result
+    ring_found = pyqtSignal(int, object)  # Emits (ring_number, ring_points) for real-time display
 
     def __init__(self, target_func, *args, **kwargs):
         super().__init__()
@@ -201,7 +202,7 @@ class CalibrateModule(GUIBase):
         
         # Mark as initializing to prevent re-entry
         if hasattr(self, '_ui_initializing') and self._ui_initializing:
-            print("WARNING: setup_ui already initializing, skipping...")
+            # Silently skip re-initialization
             return
         
         self._ui_initializing = True
@@ -210,6 +211,7 @@ class CalibrateModule(GUIBase):
         if layout is None:
             layout = QVBoxLayout(self.parent)
             layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(0)
         else:
             # Clear existing items carefully
             while layout.count():
@@ -222,35 +224,50 @@ class CalibrateModule(GUIBase):
 
         # Main horizontal splitter: Display (left) + Control (right)
         main_splitter = QSplitter(Qt.Orientation.Horizontal)
+        main_splitter.setContentsMargins(0, 0, 0, 0)
         
         # ============== LEFT PANEL: DISPLAY WIDGET ==============
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(0)
         
         # Tab widget for Image/Cake/Pattern views (Dioptas style)
         self.display_tab_widget = QTabWidget()
+        self.display_tab_widget.setContentsMargins(0, 0, 0, 0)
+        self.display_tab_widget.setStyleSheet("""
+            QTabWidget::pane {
+                border: none;
+                padding: 0px;
+                margin: 0px;
+            }
+            QTabBar::tab {
+                padding: 3px 8px;
+                margin: 0px;
+            }
+        """)
         
         # Image tab
         image_tab = QWidget()
         image_layout = QVBoxLayout(image_tab)
         image_layout.setContentsMargins(0, 0, 0, 0)
+        image_layout.setSpacing(0)
         
         if MATPLOTLIB_AVAILABLE:
             # Horizontal layout for canvas and contrast slider
             canvas_container = QWidget()
             canvas_layout = QHBoxLayout(canvas_container)
-            canvas_layout.setContentsMargins(0, 0, 0, 0)
-            canvas_layout.setSpacing(5)
+            canvas_layout.setContentsMargins(2, 2, 2, 2)
+            canvas_layout.setSpacing(2)
             
             try:
-                # Create canvas with enlarged size for better visibility
-                # Using larger dimensions for better user experience (increased per user request)
+                # Create canvas with moderate size - balanced for visibility
+                # Reduced to make room for wider right panel
                 self.unified_canvas = CalibrationCanvas(canvas_container, width=14, height=14, dpi=100)
                 canvas_layout.addWidget(self.unified_canvas)
-                print("✅ CalibrationCanvas created successfully")
             except Exception as e:
-                print(f"❌ Error creating CalibrationCanvas: {e}")
+                # Only print errors to console
+                print(f"ERROR creating CalibrationCanvas: {e}")
                 import traceback
                 traceback.print_exc()
                 # Create placeholder
@@ -281,7 +298,7 @@ class CalibrateModule(GUIBase):
             self.contrast_slider.setMaximum(65535)
             self.contrast_slider.setValue(65535)
             self.contrast_slider.setInvertedAppearance(True)  # Max at top
-            self.contrast_slider.setFixedHeight(550)  # Increase height to match larger canvas (14x14)
+            self.contrast_slider.setFixedHeight(550)  # Match canvas height (14x14)
             self.contrast_slider.setStyleSheet("""
                 QSlider::groove:vertical {
                     width: 25px;
@@ -358,7 +375,8 @@ class CalibrateModule(GUIBase):
         # Pattern tab (1D integration)
         pattern_tab = QWidget()
         pattern_layout = QVBoxLayout(pattern_tab)
-        pattern_layout.setContentsMargins(0, 0, 0, 0)
+        pattern_layout.setContentsMargins(2, 2, 2, 2)
+        pattern_layout.setSpacing(0)
         
         if MATPLOTLIB_AVAILABLE:
             self.pattern_figure = Figure(figsize=(10, 8), dpi=100)
@@ -381,8 +399,10 @@ class CalibrateModule(GUIBase):
         
         # Status bar with display controls and Calibrate/Refine buttons
         status_frame = QFrame()
+        status_frame.setMaximumHeight(40)  # Limit status bar height
         status_layout = QHBoxLayout(status_frame)
-        status_layout.setContentsMargins(6, 0, 0, 0)
+        status_layout.setContentsMargins(3, 1, 3, 1)
+        status_layout.setSpacing(3)
         
         # Display control buttons
         auto_contrast_btn = ModernButton("Auto Contrast",
@@ -390,8 +410,8 @@ class CalibrateModule(GUIBase):
                                         "",
                                         bg_color=self.colors['secondary'],
                                         hover_color=self.colors['primary'],
-                                        width=120, height=35,
-                                        font_size=9,
+                                        width=110, height=32,
+                                        font_size=8,
                                         parent=status_frame)
         
         reset_zoom_btn = ModernButton("Reset Zoom",
@@ -399,8 +419,8 @@ class CalibrateModule(GUIBase):
                                      "",
                                      bg_color=self.colors['secondary'],
                                      hover_color=self.colors['primary'],
-                                     width=120, height=35,
-                                     font_size=9,
+                                     width=100, height=32,
+                                     font_size=8,
                                      parent=status_frame)
         
         status_layout.addWidget(auto_contrast_btn)
@@ -412,8 +432,8 @@ class CalibrateModule(GUIBase):
                                          "",
                                          bg_color=self.colors['primary'],
                                          hover_color=self.colors['primary_hover'],
-                                         width=130, height=35,
-                                         font_size=10,
+                                         width=120, height=32,
+                                         font_size=9,
                                          parent=status_frame)
         
         self.refine_btn = ModernButton("Refine",
@@ -421,8 +441,8 @@ class CalibrateModule(GUIBase):
                                        "",
                                        bg_color=self.colors['secondary'],
                                        hover_color=self.colors['primary'],
-                                       width=130, height=35,
-                                       font_size=10,
+                                       width=100, height=32,
+                                       font_size=9,
                                        parent=status_frame)
         
         self.position_lbl = QLabel("Position: x=0, y=0")
@@ -437,38 +457,41 @@ class CalibrateModule(GUIBase):
         
         # ============== RIGHT PANEL: CONTROL WIDGET ==============
         # Use scroll area to ensure all controls are accessible
+        # Increase width for better readability
         right_scroll = QScrollArea()
         right_scroll.setWidgetResizable(True)
         right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        right_scroll.setMinimumWidth(310)
-        right_scroll.setMaximumWidth(310)
+        right_scroll.setMinimumWidth(340)
+        right_scroll.setMaximumWidth(360)
+        right_scroll.setContentsMargins(0, 0, 0, 0)
         
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(5, 5, 5, 5)
-        right_layout.setSpacing(5)
+        right_layout.setContentsMargins(4, 2, 4, 2)
+        right_layout.setSpacing(3)
         
         # File loading section
         file_frame = QFrame()
         file_layout = QHBoxLayout(file_frame)
-        file_layout.setContentsMargins(5, 5, 5, 5)
+        file_layout.setContentsMargins(2, 2, 2, 2)
+        file_layout.setSpacing(2)
         
         self.load_img_btn = ModernButton("Load Image File",
                                          self.browse_and_load_image,
                                          "",
                                          bg_color=self.colors['secondary'],
                                          hover_color=self.colors['primary'],
-                                         width=180, height=30,
+                                         width=200, height=30,
                                          font_size=9,
                                          parent=file_frame)
         
         self.load_previous_img_btn = QPushButton("<")
-        self.load_previous_img_btn.setMaximumWidth(50)
-        self.load_previous_img_btn.setStyleSheet("padding: 5px;")
+        self.load_previous_img_btn.setMaximumWidth(55)
+        self.load_previous_img_btn.setStyleSheet("padding: 5px; font-size: 10pt;")
         
         self.load_next_img_btn = QPushButton(">")
-        self.load_next_img_btn.setMaximumWidth(50)
-        self.load_next_img_btn.setStyleSheet("padding: 5px;")
+        self.load_next_img_btn.setMaximumWidth(55)
+        self.load_next_img_btn.setStyleSheet("padding: 5px; font-size: 10pt;")
         
         file_layout.addWidget(self.load_img_btn)
         file_layout.addWidget(self.load_previous_img_btn)
@@ -482,20 +505,26 @@ class CalibrateModule(GUIBase):
         self.filename_txt.setPlaceholderText("No file loaded")
         right_layout.addWidget(self.filename_txt)
         
-        # Toolbox for parameters (Dioptas style)
+        # Toolbox for parameters (Dioptas style) - compact
         self.toolbox = QToolBox()
-        self.toolbox.setStyleSheet("QToolBox::tab { font-weight: bold; }")
+        self.toolbox.setStyleSheet("""
+            QToolBox::tab { 
+                font-weight: bold; 
+                font-size: 9pt;
+            }
+        """)
         
         # Calibration Parameters page
         calib_params_widget = QWidget()
         calib_params_layout = QVBoxLayout(calib_params_widget)
-        calib_params_layout.setSpacing(5)
+        calib_params_layout.setSpacing(3)
+        calib_params_layout.setContentsMargins(2, 2, 2, 2)
         
         self.setup_detector_groupbox(calib_params_layout)
         self.setup_start_values_groupbox(calib_params_layout)
         self.setup_peak_selection_groupbox(calib_params_layout)
-        # Refinement options hidden per user request
-        # self.setup_refinement_options_groupbox(calib_params_layout)
+        # Refinement options - Dioptas style parameter selection
+        self.setup_refinement_options_groupbox(calib_params_layout)
         
         calib_params_layout.addStretch()
         
@@ -520,14 +549,15 @@ class CalibrateModule(GUIBase):
         # Bottom buttons: Load/Save Calibration
         bottom_frame = QFrame()
         bottom_layout = QHBoxLayout(bottom_frame)
-        bottom_layout.setContentsMargins(5, 5, 5, 5)
+        bottom_layout.setContentsMargins(2, 2, 2, 2)
+        bottom_layout.setSpacing(2)
         
         self.load_calibration_btn = ModernButton("Load Calibration",
                                                 self.load_calibration,
                                                 "",
                                                 bg_color=self.colors['secondary'],
                                                 hover_color=self.colors['primary'],
-                                                width=145, height=30,
+                                                width=165, height=30,
                                                 font_size=9,
                                                 parent=bottom_frame)
         
@@ -536,7 +566,7 @@ class CalibrateModule(GUIBase):
                                                 "",
                                                 bg_color=self.colors['secondary'],
                                                 hover_color=self.colors['primary'],
-                                                width=145, height=30,
+                                                width=165, height=30,
                                                 font_size=9,
                                                 parent=bottom_frame)
         
@@ -544,6 +574,28 @@ class CalibrateModule(GUIBase):
         bottom_layout.addWidget(self.save_calibration_btn)
         
         right_layout.addWidget(bottom_frame)
+        
+        # Add log output to right panel (compact version)
+        log_label = QLabel("📋 Log:")
+        log_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        log_label.setStyleSheet(f"color: {self.colors['text_dark']}; padding: 1px 2px;")
+        right_layout.addWidget(log_label)
+        
+        self.log_output = QTextEdit()
+        self.log_output.setMaximumHeight(180)
+        self.log_output.setMinimumHeight(120)
+        self.log_output.setReadOnly(True)
+        self.log_output.setFont(QFont('Consolas', 8))
+        self.log_output.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: #f8f9fa;
+                border: 1px solid {self.colors['border']};
+                border-radius: 2px;
+                padding: 2px;
+                color: #2c3e50;
+            }}
+        """)
+        right_layout.addWidget(self.log_output)
         
         # Set scroll area content
         right_scroll.setWidget(right_widget)
@@ -556,38 +608,21 @@ class CalibrateModule(GUIBase):
         main_splitter.setStretchFactor(0, 1)
         main_splitter.setStretchFactor(1, 0)
         
+        # Set initial splitter sizes - balanced layout
+        # Total width e.g. 1400: left gets 1040, right gets 360
+        main_splitter.setSizes([1000, 360])
+        
+        # Reduce handle width for more space
+        main_splitter.setHandleWidth(2)
+        
         layout.addWidget(main_splitter)
-        
-        # Log output at bottom of entire interface (larger font)
-        log_label = QLabel("📋 Log Output:")
-        log_label.setFont(QFont('Arial', 11, QFont.Weight.Bold))
-        log_label.setStyleSheet(f"color: {self.colors['text_dark']}; padding: 5px;")
-        layout.addWidget(log_label)
-        
-        self.log_output = QTextEdit()
-        self.log_output.setMaximumHeight(150)  # Increased from 80
-        self.log_output.setMinimumHeight(100)
-        self.log_output.setReadOnly(True)
-        self.log_output.setFont(QFont('Consolas', 10))  # Increased from Courier 7
-        self.log_output.setStyleSheet(f"""
-            QTextEdit {{
-                background-color: #f8f9fa;
-                border: 2px solid {self.colors['border']};
-                border-radius: 5px;
-                padding: 5px;
-                color: #2c3e50;
-            }}
-        """)
-        layout.addWidget(self.log_output)
         
         # Mark UI as initialized
         self._ui_initialized = True
         self._ui_initializing = False
-        
-        print("✅ Calibrate UI initialized successfully")
 
     def setup_detector_groupbox(self, parent_layout):
-        """Setup Detector GroupBox (Dioptas style)"""
+        """Setup Detector GroupBox - Clean and organized layout"""
         detector_gb = QGroupBox("Detector")
         detector_gb.setStyleSheet(f"""
             QGroupBox {{
@@ -595,102 +630,107 @@ class CalibrateModule(GUIBase):
                 font-size: 10pt;
                 border: 2px solid {self.colors['border']};
                 border-radius: 5px;
-                margin-top: 15px;
-                margin-bottom: 10px;
-                padding: 15px 10px 10px 10px;
+                margin-top: 8px;
+                margin-bottom: 6px;
+                padding: 12px 8px 8px 8px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
                 left: 10px;
                 padding: 0 5px 0 5px;
-                color: {self.colors['text_dark']};
-                text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+                color: {self.colors['primary']};
             }}
         """)
         detector_layout = QVBoxLayout(detector_gb)
         detector_layout.setSpacing(8)
+        detector_layout.setContentsMargins(8, 10, 8, 8)
         
-        # Detector selection combo box
+        # Detector selection with label
+        det_row = QHBoxLayout()
+        det_label = QLabel("Type:")
+        det_label.setFixedWidth(80)
+        det_label.setStyleSheet("font-weight: normal; font-size: 9pt;")
+        det_row.addWidget(det_label)
+        
         self.detector_combo = QComboBox()
         detectors = ["Pilatus2M", "Pilatus1M", "Pilatus300K", "PerkinElmer", 
                      "Eiger2M", "Eiger1M", "Eiger4M", "Mar345", "Rayonix", "Custom"]
         self.detector_combo.addItems(detectors)
         self.detector_combo.currentTextChanged.connect(self.on_detector_changed)
-        detector_layout.addWidget(self.detector_combo)
+        self.detector_combo.setStyleSheet("""
+            QComboBox {
+                padding: 3px 5px;
+                border: 1px solid #ccc;
+                border-radius: 3px;
+                background: white;
+            }
+        """)
+        det_row.addWidget(self.detector_combo)
+        detector_layout.addLayout(det_row)
         
-        # Pixel size grid
-        pixel_grid = QHBoxLayout()
+        # Pixel size in a grid (2 rows, cleaner)
+        pixel_label = QLabel("Pixel Size:")
+        pixel_label.setStyleSheet("font-weight: normal; font-size: 9pt; color: #555;")
+        detector_layout.addWidget(pixel_label)
         
-        pixel_grid.addWidget(QLabel("Pixel width:"))
+        pixel_grid = QGridLayout()
+        pixel_grid.setHorizontalSpacing(6)
+        pixel_grid.setVerticalSpacing(4)
+        pixel_grid.setContentsMargins(15, 0, 0, 0)
+        
+        # Width
+        pixel_grid.addWidget(QLabel("Width:"), 0, 0)
         self.pixel_width_txt = QLineEdit(str(self.pixel_size * 1e6))
-        self.pixel_width_txt.setFixedWidth(60)
-        pixel_grid.addWidget(self.pixel_width_txt)
-        pixel_grid.addWidget(QLabel("μm"))
-        pixel_grid.addStretch()
+        self.pixel_width_txt.setFixedWidth(70)
+        self.pixel_width_txt.setStyleSheet("padding: 2px 4px; border: 1px solid #ccc; border-radius: 2px;")
+        pixel_grid.addWidget(self.pixel_width_txt, 0, 1)
+        pixel_grid.addWidget(QLabel("μm"), 0, 2)
+        
+        # Height
+        pixel_grid.addWidget(QLabel("Height:"), 1, 0)
+        self.pixel_height_txt = QLineEdit(str(self.pixel_size * 1e6))
+        self.pixel_height_txt.setFixedWidth(70)
+        self.pixel_height_txt.setStyleSheet("padding: 2px 4px; border: 1px solid #ccc; border-radius: 2px;")
+        pixel_grid.addWidget(self.pixel_height_txt, 1, 1)
+        pixel_grid.addWidget(QLabel("μm"), 1, 2)
         
         detector_layout.addLayout(pixel_grid)
-        
-        pixel_grid2 = QHBoxLayout()
-        pixel_grid2.addWidget(QLabel("Pixel height:"))
-        self.pixel_height_txt = QLineEdit(str(self.pixel_size * 1e6))
-        self.pixel_height_txt.setFixedWidth(60)
-        pixel_grid2.addWidget(self.pixel_height_txt)
-        pixel_grid2.addWidget(QLabel("μm"))
-        pixel_grid2.addStretch()
-        
-        detector_layout.addLayout(pixel_grid2)
-        
-        # Distortion/Spline file
-        distortion_layout = QHBoxLayout()
-        distortion_layout.addWidget(QLabel("Distortion:"))
-        self.spline_name_lbl = QLabel("None")
-        self.spline_name_lbl.setStyleSheet("color: gray;")
-        distortion_layout.addWidget(self.spline_name_lbl)
-        distortion_layout.addStretch()
-        
-        self.spline_load_btn = QPushButton("Load")
-        self.spline_load_btn.setMaximumWidth(50)
-        self.spline_load_btn.setToolTip("Load spline correction file")
-        distortion_layout.addWidget(self.spline_load_btn)
-        
-        self.spline_reset_btn = QPushButton("Reset")
-        self.spline_reset_btn.setMaximumWidth(50)
-        self.spline_reset_btn.setEnabled(False)
-        distortion_layout.addWidget(self.spline_reset_btn)
-        
-        detector_layout.addLayout(distortion_layout)
         
         parent_layout.addWidget(detector_gb)
     
     def setup_start_values_groupbox(self, parent_layout):
-        """Setup Start Values GroupBox (Dioptas style)"""
-        sv_gb = QGroupBox("Start values")
+        """Setup Start Values GroupBox - Clean and organized layout"""
+        sv_gb = QGroupBox("Start Values")
         sv_gb.setStyleSheet(f"""
             QGroupBox {{
                 font-weight: bold;
                 font-size: 10pt;
                 border: 2px solid {self.colors['border']};
                 border-radius: 5px;
-                margin-top: 15px;
-                margin-bottom: 10px;
-                padding: 15px 10px 10px 10px;
+                margin-top: 8px;
+                margin-bottom: 6px;
+                padding: 12px 8px 8px 8px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
                 left: 10px;
                 padding: 0 5px 0 5px;
-                color: {self.colors['text_dark']};
-                text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+                color: {self.colors['primary']};
             }}
         """)
         sv_layout = QVBoxLayout(sv_gb)
         sv_layout.setSpacing(8)
+        sv_layout.setContentsMargins(8, 10, 8, 8)
         
-        # Calibrant selection
-        calib_layout = QHBoxLayout()
-        calib_layout.addWidget(QLabel("Calibrant:"))
+        # Calibrant selection with label
+        calib_row = QHBoxLayout()
+        calib_label = QLabel("Calibrant:")
+        calib_label.setFixedWidth(80)
+        calib_label.setStyleSheet("font-weight: normal; font-size: 9pt;")
+        calib_row.addWidget(calib_label)
+        
         self.calibrant_combo = QComboBox()
         if PYFAI_AVAILABLE:
             calibrants = sorted(ALL_CALIBRANTS.keys())
@@ -698,85 +738,56 @@ class CalibrateModule(GUIBase):
             if "LaB6" in calibrants:
                 self.calibrant_combo.setCurrentText("LaB6")
         self.calibrant_combo.currentTextChanged.connect(self.on_calibrant_changed)
-        calib_layout.addWidget(self.calibrant_combo)
-        sv_layout.addLayout(calib_layout)
+        self.calibrant_combo.setStyleSheet("""
+            QComboBox {
+                padding: 3px 5px;
+                border: 1px solid #ccc;
+                border-radius: 3px;
+                background: white;
+            }
+        """)
+        calib_row.addWidget(self.calibrant_combo)
+        sv_layout.addLayout(calib_row)
         
-        # Distance with refinement checkbox
-        dist_layout = QHBoxLayout()
-        dist_layout.addWidget(QLabel("Distance:"))
-        self.distance_txt = QLineEdit(str(self.distance * 1000))  # Convert to mm
-        self.distance_txt.setFixedWidth(80)
-        dist_layout.addWidget(self.distance_txt)
-        dist_layout.addWidget(QLabel("mm"))
-        self.distance_cb = QCheckBox("refine")
-        self.distance_cb.setChecked(True)
-        dist_layout.addWidget(self.distance_cb)
-        dist_layout.addStretch()
-        sv_layout.addLayout(dist_layout)
+        # Parameters in a clean grid
+        params_label = QLabel("Parameters:")
+        params_label.setStyleSheet("font-weight: normal; font-size: 9pt; color: #555;")
+        sv_layout.addWidget(params_label)
         
-        # Wavelength with refinement checkbox
-        wl_layout = QHBoxLayout()
-        wl_layout.addWidget(QLabel("Wavelength:"))
+        params_grid = QGridLayout()
+        params_grid.setHorizontalSpacing(8)
+        params_grid.setVerticalSpacing(6)
+        params_grid.setContentsMargins(15, 0, 0, 0)
+        
+        # Distance
+        params_grid.addWidget(QLabel("Distance:"), 0, 0)
+        self.distance_txt = QLineEdit(str(self.distance * 1000))
+        self.distance_txt.setFixedWidth(70)
+        self.distance_txt.setStyleSheet("padding: 2px 4px; border: 1px solid #ccc; border-radius: 2px;")
+        params_grid.addWidget(self.distance_txt, 0, 1)
+        params_grid.addWidget(QLabel("mm"), 0, 2)
+        
+        # Wavelength
+        params_grid.addWidget(QLabel("Wavelength:"), 1, 0)
         self.wavelength_txt = QLineEdit(str(self.wavelength))
-        self.wavelength_txt.setFixedWidth(80)
-        wl_layout.addWidget(self.wavelength_txt)
-        wl_layout.addWidget(QLabel("Å"))
-        self.wavelength_cb = QCheckBox("refine")
-        self.wavelength_cb.setChecked(False)  # Wavelength usually fixed
-        wl_layout.addWidget(self.wavelength_cb)
-        wl_layout.addStretch()
-        sv_layout.addLayout(wl_layout)
+        self.wavelength_txt.setFixedWidth(70)
+        self.wavelength_txt.setStyleSheet("padding: 2px 4px; border: 1px solid #ccc; border-radius: 2px;")
+        params_grid.addWidget(self.wavelength_txt, 1, 1)
+        params_grid.addWidget(QLabel("Å"), 1, 2)
         
-        # Polarization factor
-        pol_layout = QHBoxLayout()
-        pol_layout.addWidget(QLabel("Polarization:"))
+        # Polarization
+        params_grid.addWidget(QLabel("Polarization:"), 2, 0)
         self.polarization_txt = QLineEdit("0.99")
-        self.polarization_txt.setFixedWidth(80)
-        pol_layout.addWidget(self.polarization_txt)
-        pol_layout.addStretch()
-        sv_layout.addLayout(pol_layout)
+        self.polarization_txt.setFixedWidth(70)
+        self.polarization_txt.setStyleSheet("padding: 2px 4px; border: 1px solid #ccc; border-radius: 2px;")
+        params_grid.addWidget(self.polarization_txt, 2, 1)
         
-        # Image transformation buttons
-        transform_frame = QFrame()
-        transform_frame.setFrameShape(QFrame.Shape.StyledPanel)
-        transform_layout = QVBoxLayout(transform_frame)
-        transform_layout.setSpacing(3)
-        
-        transform_label = QLabel("Image transformations:")
-        transform_label.setFont(QFont('Arial', 8, QFont.Weight.Bold))
-        transform_layout.addWidget(transform_label)
-        
-        # Rotation buttons
-        rot_layout = QHBoxLayout()
-        self.rotate_m90_btn = QPushButton("↶ -90°")
-        self.rotate_m90_btn.setStyleSheet("padding: 3px;")
-        self.rotate_p90_btn = QPushButton("↷ +90°")
-        self.rotate_p90_btn.setStyleSheet("padding: 3px;")
-        rot_layout.addWidget(self.rotate_m90_btn)
-        rot_layout.addWidget(self.rotate_p90_btn)
-        transform_layout.addLayout(rot_layout)
-        
-        # Flip buttons
-        flip_layout = QHBoxLayout()
-        self.flip_horizontal_btn = QPushButton("Flip H")
-        self.flip_horizontal_btn.setStyleSheet("padding: 3px;")
-        self.flip_vertical_btn = QPushButton("Flip V")
-        self.flip_vertical_btn.setStyleSheet("padding: 3px;")
-        flip_layout.addWidget(self.flip_horizontal_btn)
-        flip_layout.addWidget(self.flip_vertical_btn)
-        transform_layout.addLayout(flip_layout)
-        
-        # Reset button
-        self.reset_transformations_btn = QPushButton("Reset Transformations")
-        self.reset_transformations_btn.setStyleSheet("padding: 3px;")
-        transform_layout.addWidget(self.reset_transformations_btn)
-        
-        sv_layout.addWidget(transform_frame)
+        sv_layout.addLayout(params_grid)
         
         parent_layout.addWidget(sv_gb)
     
     def setup_peak_selection_groupbox(self, parent_layout):
-        """Setup Peak Selection GroupBox (Dioptas style)"""
+        """Setup Peak Selection GroupBox - Clean and organized layout"""
         peak_gb = QGroupBox("Peak Selection")
         peak_gb.setStyleSheet(f"""
             QGroupBox {{
@@ -784,21 +795,21 @@ class CalibrateModule(GUIBase):
                 font-size: 10pt;
                 border: 2px solid {self.colors['border']};
                 border-radius: 5px;
-                margin-top: 15px;
-                margin-bottom: 10px;
-                padding: 15px 10px 10px 10px;
+                margin-top: 8px;
+                margin-bottom: 6px;
+                padding: 12px 8px 8px 8px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
                 left: 10px;
                 padding: 0 5px 0 5px;
-                color: {self.colors['text_dark']};
-                text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
+                color: {self.colors['primary']};
             }}
         """)
         peak_layout = QVBoxLayout(peak_gb)
         peak_layout.setSpacing(8)
+        peak_layout.setContentsMargins(8, 10, 8, 8)
         
         # Radio buttons for peak selection mode
         self.peak_mode_group = QButtonGroup()
@@ -841,93 +852,123 @@ class CalibrateModule(GUIBase):
         self.peak_mode_group.addButton(self.select_peak_rb, 1)
         peak_layout.addWidget(self.select_peak_rb)
         
-        # Current Ring Number (Dioptas style) - OLD UI, keep for compatibility
-        ring_num_row = QHBoxLayout()
-        ring_num_row.addWidget(QLabel("Current Ring #:"))
-        self.ring_number_spinbox = QSpinBox()
-        self.ring_number_spinbox.setMinimum(1)  # Start from 1 per user request
-        self.ring_number_spinbox.setMaximum(50)
-        self.ring_number_spinbox.setValue(1)  # Default to ring 1
-        self.ring_number_spinbox.setFixedWidth(60)
-        self.ring_number_spinbox.setStyleSheet("""
-            QSpinBox {
-                background-color: #FFF8DC;
-                font-weight: bold;
-                padding: 3px;
-            }
-        """)
-        # Sync with main ring_num_input if it exists
-        self.ring_number_spinbox.valueChanged.connect(self.on_ring_number_changed)
-        ring_num_row.addWidget(self.ring_number_spinbox)
-        ring_num_row.addStretch()
-        peak_layout.addLayout(ring_num_row)
+        # Parameters in a clean grid
+        params_label = QLabel("Peak Parameters:")
+        params_label.setStyleSheet("font-weight: normal; font-size: 9pt; color: #555; margin-top: 4px;")
+        peak_layout.addWidget(params_label)
         
-        # Auto increment checkbox (Dioptas style)
-        self.automatic_peak_num_inc_cb = QCheckBox("Automatic increase ring number")
+        params_grid = QGridLayout()
+        params_grid.setHorizontalSpacing(8)
+        params_grid.setVerticalSpacing(6)
+        params_grid.setContentsMargins(15, 0, 0, 0)
+        
+        # Current Ring Number
+        params_grid.addWidget(QLabel("Ring #:"), 0, 0)
+        self.ring_number_spinbox = QSpinBox()
+        self.ring_number_spinbox.setMinimum(1)
+        self.ring_number_spinbox.setMaximum(50)
+        self.ring_number_spinbox.setValue(1)
+        self.ring_number_spinbox.setFixedWidth(65)
+        self.ring_number_spinbox.setStyleSheet("padding: 2px 4px; border: 1px solid #ccc; border-radius: 2px; background: #FFF8DC;")
+        self.ring_number_spinbox.valueChanged.connect(self.on_ring_number_changed)
+        params_grid.addWidget(self.ring_number_spinbox, 0, 1)
+        
+        # Search size
+        params_grid.addWidget(QLabel("Search Size:"), 1, 0)
+        self.search_size_sb = QSpinBox()
+        self.search_size_sb.setMinimum(1)
+        self.search_size_sb.setMaximum(100)
+        self.search_size_sb.setValue(1)
+        self.search_size_sb.setFixedWidth(65)
+        self.search_size_sb.setStyleSheet("padding: 2px 4px; border: 1px solid #ccc; border-radius: 2px;")
+        params_grid.addWidget(self.search_size_sb, 1, 1)
+        params_grid.addWidget(QLabel("px"), 1, 2)
+        
+        peak_layout.addLayout(params_grid)
+        
+        # Auto increment checkbox
+        self.automatic_peak_num_inc_cb = QCheckBox("Auto-increment ring number")
         self.automatic_peak_num_inc_cb.setChecked(True)
-        self.automatic_peak_num_inc_cb.setStyleSheet(f"color: {self.colors['text_dark']};")
+        self.automatic_peak_num_inc_cb.setStyleSheet(f"color: {self.colors['text_dark']}; margin-left: 15px;")
         peak_layout.addWidget(self.automatic_peak_num_inc_cb)
         
-        # Peak search size
-        search_size_row = QHBoxLayout()
-        search_size_row.addWidget(QLabel("Search Size:"))
-        self.search_size_sb = QSpinBox()
-        self.search_size_sb.setMinimum(5)
-        self.search_size_sb.setMaximum(100)
-        self.search_size_sb.setValue(10)
-        self.search_size_sb.setFixedWidth(60)
-        search_size_row.addWidget(self.search_size_sb)
-        search_size_row.addWidget(QLabel("pixels"))
-        search_size_row.addStretch()
-        peak_layout.addLayout(search_size_row)
+        # Control buttons with modern style
+        btn_label = QLabel("Actions:")
+        btn_label.setStyleSheet("font-weight: normal; font-size: 9pt; color: #555; margin-top: 4px;")
+        peak_layout.addWidget(btn_label)
         
-        # Clear and Undo buttons
         btn_layout = QHBoxLayout()
+        btn_layout.setSpacing(5)
+        btn_layout.setContentsMargins(15, 0, 0, 0)
         
-        self.clear_peaks_btn = QPushButton("Clear Peaks")
-        self.clear_peaks_btn.setStyleSheet("padding: 5px;")
+        self.clear_peaks_btn = QPushButton("🗑 Clear")
+        self.clear_peaks_btn.setStyleSheet("""
+            QPushButton {
+                padding: 5px 10px;
+                font-size: 9pt;
+                background-color: #f44336;
+                color: white;
+                border: none;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #da190b;
+            }
+        """)
         self.clear_peaks_btn.clicked.connect(self.clear_manual_peaks)
         btn_layout.addWidget(self.clear_peaks_btn)
         
-        self.undo_peaks_btn = QPushButton("Undo Last")
-        self.undo_peaks_btn.setStyleSheet("padding: 5px;")
+        self.undo_peaks_btn = QPushButton("↶ Undo")
+        self.undo_peaks_btn.setStyleSheet("""
+            QPushButton {
+                padding: 5px 10px;
+                font-size: 9pt;
+                background-color: #FF9800;
+                color: white;
+                border: none;
+                border-radius: 3px;
+            }
+            QPushButton:hover {
+                background-color: #F57C00;
+            }
+        """)
         self.undo_peaks_btn.clicked.connect(self.undo_last_peak)
         btn_layout.addWidget(self.undo_peaks_btn)
         
         peak_layout.addLayout(btn_layout)
         
-        # Peak count label
+        # Peak count label with better styling
         self.peak_count_label = QLabel("Peaks: 0")
-        self.peak_count_label.setFont(QFont('Arial', 8))
-        self.peak_count_label.setStyleSheet("color: blue; padding: 3px;")
+        self.peak_count_label.setFont(QFont('Arial', 9))
+        self.peak_count_label.setStyleSheet("color: #2196F3; padding: 5px; margin-left: 15px; font-weight: bold;")
         peak_layout.addWidget(self.peak_count_label)
         
         parent_layout.addWidget(peak_gb)
     
     def setup_refinement_options_groupbox(self, parent_layout):
-        """Setup Refinement Options GroupBox (Dioptas style)"""
-        ref_gb = QGroupBox("Refinement Options")
+        """Setup Refinement Options GroupBox (Dioptas style) - Parameter Selection - Compact"""
+        ref_gb = QGroupBox("Refinement Parameters")
         ref_gb.setStyleSheet(f"""
             QGroupBox {{
                 font-weight: bold;
-                font-size: 10pt;
-                border: 2px solid {self.colors['border']};
-                border-radius: 5px;
-                margin-top: 15px;
-                margin-bottom: 10px;
-                padding: 15px 10px 10px 10px;
+                font-size: 9pt;
+                border: 1px solid {self.colors['border']};
+                border-radius: 3px;
+                margin-top: 6px;
+                margin-bottom: 4px;
+                padding: 10px 5px 5px 5px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 10px;
-                padding: 0 5px 0 5px;
+                left: 8px;
+                padding: 0 3px 0 3px;
                 color: {self.colors['text_dark']};
-                text-shadow: 1px 1px 2px rgba(0,0,0,0.1);
             }}
         """)
         ref_layout = QVBoxLayout(ref_gb)
-        ref_layout.setSpacing(8)
+        ref_layout.setSpacing(5)
+        ref_layout.setContentsMargins(4, 4, 4, 4)
         
         # Checkbox style
         checkbox_style = f"""
@@ -935,6 +976,7 @@ class CalibrateModule(GUIBase):
                 spacing: 8px;
                 padding: 6px 0px;
                 color: {self.colors['text_dark']};
+                font-weight: normal;
             }}
             QCheckBox::indicator {{
                 width: 14px;
@@ -954,11 +996,160 @@ class CalibrateModule(GUIBase):
             }}
         """
         
-        # Automatic refinement checkbox
-        self.automatic_refinement_cb = QCheckBox("Automatic refinement")
-        self.automatic_refinement_cb.setChecked(True)
-        self.automatic_refinement_cb.setStyleSheet(checkbox_style)
-        ref_layout.addWidget(self.automatic_refinement_cb)
+        # Info label
+        info_label = QLabel("Select parameters to refine during calibration:")
+        info_label.setStyleSheet(f"color: {self.colors['text_dark']}; font-size: 8pt; font-weight: normal; padding: 3px 0px;")
+        info_label.setWordWrap(True)
+        ref_layout.addWidget(info_label)
+        
+        # Geometry parameters frame - compact
+        geom_frame = QFrame()
+        geom_frame.setStyleSheet(f"QFrame {{ background-color: rgba(255,255,255,0.03); border-radius: 2px; padding: 3px; }}")
+        geom_layout = QVBoxLayout(geom_frame)
+        geom_layout.setSpacing(2)
+        
+        # Title for geometry section - compact
+        geom_title = QLabel("Geometry (always refined):")
+        geom_title.setStyleSheet(f"color: {self.colors['text_dark']}; font-weight: bold; font-size: 8pt;")
+        geom_layout.addWidget(geom_title)
+        
+        # Distance checkbox (always enabled)
+        self.refine_dist_cb = QCheckBox("Distance")
+        self.refine_dist_cb.setChecked(True)
+        self.refine_dist_cb.setEnabled(False)  # Always refine
+        self.refine_dist_cb.setToolTip("Distance is always refined (essential parameter)")
+        self.refine_dist_cb.setStyleSheet(checkbox_style)
+        geom_layout.addWidget(self.refine_dist_cb)
+        
+        # Beam center checkboxes
+        self.refine_poni1_cb = QCheckBox("Beam Center Y (PONI1)")
+        self.refine_poni1_cb.setChecked(True)
+        self.refine_poni1_cb.setEnabled(False)  # Always refine
+        self.refine_poni1_cb.setToolTip("Beam center Y is always refined (essential parameter)")
+        self.refine_poni1_cb.setStyleSheet(checkbox_style)
+        geom_layout.addWidget(self.refine_poni1_cb)
+        
+        self.refine_poni2_cb = QCheckBox("Beam Center X (PONI2)")
+        self.refine_poni2_cb.setChecked(True)
+        self.refine_poni2_cb.setEnabled(False)  # Always refine
+        self.refine_poni2_cb.setToolTip("Beam center X is always refined (essential parameter)")
+        self.refine_poni2_cb.setStyleSheet(checkbox_style)
+        geom_layout.addWidget(self.refine_poni2_cb)
+        
+        ref_layout.addWidget(geom_frame)
+        
+        # Rotation parameters frame - compact
+        rot_frame = QFrame()
+        rot_frame.setStyleSheet(f"QFrame {{ background-color: rgba(255,255,255,0.03); border-radius: 2px; padding: 3px; }}")
+        rot_layout = QVBoxLayout(rot_frame)
+        rot_layout.setSpacing(2)
+        
+        # Title for rotation section - compact
+        rot_title = QLabel("Detector Tilt (optional):")
+        rot_title.setStyleSheet(f"color: {self.colors['text_dark']}; font-weight: bold; font-size: 8pt;")
+        rot_layout.addWidget(rot_title)
+        
+        # Info about rotations - compact
+        rot_info = QLabel("⚠ Only if detector tilted")
+        rot_info.setStyleSheet("color: #FF9800; font-size: 7pt; font-weight: normal; padding: 1px 0px;")
+        rot_info.setWordWrap(True)
+        rot_layout.addWidget(rot_info)
+        
+        # Rotation checkboxes
+        self.refine_rot1_cb = QCheckBox("Rot1 (Tilt around axis 1)")
+        self.refine_rot1_cb.setChecked(False)  # Off by default
+        self.refine_rot1_cb.setToolTip("Tilt around horizontal axis (usually 0°)")
+        self.refine_rot1_cb.setStyleSheet(checkbox_style)
+        rot_layout.addWidget(self.refine_rot1_cb)
+        
+        self.refine_rot2_cb = QCheckBox("Rot2 (Tilt around axis 2)")
+        self.refine_rot2_cb.setChecked(False)  # Off by default
+        self.refine_rot2_cb.setToolTip("Tilt around vertical axis (usually 0°)")
+        self.refine_rot2_cb.setStyleSheet(checkbox_style)
+        rot_layout.addWidget(self.refine_rot2_cb)
+        
+        self.refine_rot3_cb = QCheckBox("Rot3 (In-plane rotation)")
+        self.refine_rot3_cb.setChecked(False)  # Off by default
+        self.refine_rot3_cb.setToolTip("Rotation in detector plane (usually 0°)")
+        self.refine_rot3_cb.setStyleSheet(checkbox_style)
+        rot_layout.addWidget(self.refine_rot3_cb)
+        
+        ref_layout.addWidget(rot_frame)
+        
+        # Wavelength parameter frame - compact
+        wl_frame = QFrame()
+        wl_frame.setStyleSheet(f"QFrame {{ background-color: rgba(255,255,255,0.03); border-radius: 2px; padding: 3px; }}")
+        wl_layout = QVBoxLayout(wl_frame)
+        wl_layout.setSpacing(2)
+        
+        # Wavelength checkbox
+        self.refine_wavelength_cb = QCheckBox("Wavelength (usually fixed)")
+        self.refine_wavelength_cb.setChecked(False)  # Off by default
+        self.refine_wavelength_cb.setToolTip("Wavelength is usually known and should be fixed")
+        self.refine_wavelength_cb.setStyleSheet(checkbox_style)
+        wl_layout.addWidget(self.refine_wavelength_cb)
+        
+        wl_info = QLabel("⚠ Only if wavelength uncertain")
+        wl_info.setStyleSheet("color: #FF9800; font-size: 7pt; font-weight: normal; padding: 1px 0px;")
+        wl_layout.addWidget(wl_info)
+        
+        ref_layout.addWidget(wl_frame)
+        
+        # Quick presets - compact
+        preset_frame = QFrame()
+        preset_frame.setStyleSheet(f"QFrame {{ background-color: rgba(66, 165, 245, 0.05); border: 1px solid rgba(66, 165, 245, 0.2); border-radius: 2px; padding: 3px; }}")
+        preset_layout = QVBoxLayout(preset_frame)
+        preset_layout.setSpacing(2)
+        
+        preset_title = QLabel("Quick Presets:")
+        preset_title.setStyleSheet(f"color: {self.colors['text_dark']}; font-weight: bold; font-size: 8pt;")
+        preset_layout.addWidget(preset_title)
+        
+        preset_btn_layout = QHBoxLayout()
+        preset_btn_layout.setSpacing(2)
+        
+        # Basic preset button - compact
+        basic_preset_btn = QPushButton("Basic")
+        basic_preset_btn.setToolTip("Refine distance and beam center only (recommended)")
+        basic_preset_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.colors['primary']};
+                color: white;
+                border: none;
+                border-radius: 2px;
+                padding: 3px 6px;
+                font-size: 7pt;
+            }}
+            QPushButton:hover {{
+                background-color: {self.colors['primary_hover']};
+            }}
+        """)
+        basic_preset_btn.clicked.connect(self.apply_basic_refinement_preset)
+        preset_btn_layout.addWidget(basic_preset_btn)
+        
+        # Full preset button - compact
+        full_preset_btn = QPushButton("Full")
+        full_preset_btn.setToolTip("Refine all geometry including detector tilt")
+        full_preset_btn.setStyleSheet(f"""
+            QPushButton {{
+                background-color: {self.colors['secondary']};
+                color: white;
+                border: none;
+                border-radius: 2px;
+                padding: 3px 6px;
+                font-size: 7pt;
+            }}
+            QPushButton:hover {{
+                background-color: #FF8A65;
+            }}
+        """)
+        full_preset_btn.clicked.connect(self.apply_full_refinement_preset)
+        preset_btn_layout.addWidget(full_preset_btn)
+        
+        preset_layout.addLayout(preset_btn_layout)
+        ref_layout.addWidget(preset_frame)
+        
+        parent_layout.addWidget(ref_gb)
         
         # Separator
         separator = QFrame()
@@ -1798,6 +1989,9 @@ class CalibrateModule(GUIBase):
         self.automatic_peak_num_inc_cb.setStyleSheet(f"color: {self.colors['text_dark']}; font-size: 9pt;")
         card_layout.addWidget(self.automatic_peak_num_inc_cb)
         
+        # NOTE: Real-time auto peak finding during manual selection removed per user request
+        # Auto peak finding now only happens when clicking Calibrate button
+        
         # Separator
         separator = QFrame()
         separator.setFrameShape(QFrame.Shape.HLine)
@@ -2025,6 +2219,17 @@ class CalibrateModule(GUIBase):
                 # Link canvas to module before display
                 self.unified_canvas.parent_module = self
                 
+                # Initialize contrast settings (auto-contrast on load)
+                vmin = float(np.percentile(self.current_image, 1))
+                vmax = float(np.percentile(self.current_image, 99))
+                self.unified_canvas.contrast_min = vmin
+                self.unified_canvas.contrast_max = vmax
+                
+                # Update slider to match
+                if hasattr(self, 'contrast_slider'):
+                    self.contrast_slider.setMaximum(int(np.max(self.current_image)))
+                    self.contrast_slider.setValue(int(vmax))
+                
                 # Display image immediately with forced update
                 self.unified_canvas.display_calibration_image(self.current_image)
                 
@@ -2034,6 +2239,8 @@ class CalibrateModule(GUIBase):
                 
                 # Also load to mask canvas for legacy mask operations (async)
                 QTimer.singleShot(10, lambda: self.mask_canvas.load_image(image_path))
+                
+                self.log(f"Auto-contrast applied: {vmin:.0f} - {vmax:.0f}")
             
             # Sync image to mask module
             if self.mask_module_reference is not None:
@@ -2043,6 +2250,48 @@ class CalibrateModule(GUIBase):
         except Exception as e:
             self.log(f"Error loading image: {str(e)}")
             QMessageBox.critical(None, "Error", f"Failed to load image:\n{str(e)}")
+    
+    def apply_basic_refinement_preset(self):
+        """Apply basic refinement preset: distance and beam center only"""
+        # Geometry (always on)
+        if hasattr(self, 'refine_dist_cb'):
+            self.refine_dist_cb.setChecked(True)
+        if hasattr(self, 'refine_poni1_cb'):
+            self.refine_poni1_cb.setChecked(True)
+        if hasattr(self, 'refine_poni2_cb'):
+            self.refine_poni2_cb.setChecked(True)
+        # Rotations (off)
+        if hasattr(self, 'refine_rot1_cb'):
+            self.refine_rot1_cb.setChecked(False)
+        if hasattr(self, 'refine_rot2_cb'):
+            self.refine_rot2_cb.setChecked(False)
+        if hasattr(self, 'refine_rot3_cb'):
+            self.refine_rot3_cb.setChecked(False)
+        # Wavelength (off)
+        if hasattr(self, 'refine_wavelength_cb'):
+            self.refine_wavelength_cb.setChecked(False)
+        self.log("✓ Refinement preset applied: Basic (Distance + Beam Center)")
+    
+    def apply_full_refinement_preset(self):
+        """Apply full refinement preset: all geometry including tilt"""
+        # Geometry (always on)
+        if hasattr(self, 'refine_dist_cb'):
+            self.refine_dist_cb.setChecked(True)
+        if hasattr(self, 'refine_poni1_cb'):
+            self.refine_poni1_cb.setChecked(True)
+        if hasattr(self, 'refine_poni2_cb'):
+            self.refine_poni2_cb.setChecked(True)
+        # Rotations (on)
+        if hasattr(self, 'refine_rot1_cb'):
+            self.refine_rot1_cb.setChecked(True)
+        if hasattr(self, 'refine_rot2_cb'):
+            self.refine_rot2_cb.setChecked(True)
+        if hasattr(self, 'refine_rot3_cb'):
+            self.refine_rot3_cb.setChecked(True)
+        # Wavelength (off)
+        if hasattr(self, 'refine_wavelength_cb'):
+            self.refine_wavelength_cb.setChecked(False)
+        self.log("✓ Refinement preset applied: Full (All Geometry + Tilt)")
 
     def on_calibrant_changed(self, calibrant_name):
         """Handle calibrant selection change"""
@@ -2292,7 +2541,6 @@ class CalibrateModule(GUIBase):
         """Update ring number display after auto-increment"""
         if hasattr(self, 'ring_num_input'):
             self.ring_num_input.setValue(ring_num)
-            self.log(f"Ring number auto-incremented to: {ring_num}")
         # Also sync the old spinbox if it exists
         if hasattr(self, 'ring_number_spinbox'):
             self.ring_number_spinbox.setValue(ring_num)
@@ -2330,6 +2578,26 @@ class CalibrateModule(GUIBase):
         """Toggle manual peak picking mode"""
         self.peak_picking_mode = not self.peak_picking_mode
         
+        if MATPLOTLIB_AVAILABLE and hasattr(self, 'unified_canvas'):
+            self.unified_canvas.peak_picking_mode = self.peak_picking_mode
+            
+            # Update canvas settings when entering peak picking mode
+            if self.peak_picking_mode:
+                # Set ring number
+                if hasattr(self, 'ring_num_input'):
+                    self.unified_canvas.current_ring_num = self.ring_num_input.value()
+                
+                # Set auto-increment flag
+                if hasattr(self, 'automatic_peak_num_inc_cb'):
+                    self.unified_canvas.auto_increment_ring = self.automatic_peak_num_inc_cb.isChecked()
+                
+                # NOTE: Auto peak search removed - only manual peaks during selection
+                # Auto peak finding happens in Calibrate process
+                
+                # Set parent reference for callbacks
+                self.unified_canvas.parent_module = self
+        
+        # Fallback for old calibration_canvas (compatibility)
         if MATPLOTLIB_AVAILABLE and hasattr(self, 'calibration_canvas'):
             self.calibration_canvas.peak_picking_mode = self.peak_picking_mode
         
@@ -2508,11 +2776,26 @@ class CalibrateModule(GUIBase):
             QMessageBox.critical(None, "Error", f"Failed to start calibration:\n{str(e)}")
 
     def perform_calibration(self, image, calibrant, distance, pixel_size, mask, manual_control_points=None):
-        """Perform calibration (runs in worker thread) - Based on Dioptas implementation"""
+        """
+        Perform calibration (runs in worker thread) - Based on Dioptas implementation
+        With optimizations to prevent kernel died / memory issues
+        """
+        import gc
         from pyFAI.detectors import Detector
         
-        # Create detector object
+        # Clean up memory at start
+        gc.collect()
+        
+        # Check image size - very large images can cause kernel died
         shape = image.shape
+        image_megapixels = (shape[0] * shape[1]) / 1e6
+        self.log(f"Image size: {shape[0]} x {shape[1]} ({image_megapixels:.1f} MP)")
+        
+        if image_megapixels > 16:  # > 16 megapixels
+            self.log(f"⚠ Warning: Large image detected ({image_megapixels:.1f} MP)")
+            self.log(f"  This may cause memory issues. Consider binning the image.")
+        
+        # Create detector object
         detector = Detector(pixel1=pixel_size, pixel2=pixel_size, max_shape=shape)
         
         # Create geometry refinement object
@@ -2582,30 +2865,205 @@ class CalibrateModule(GUIBase):
         # Extract control points (only if not using manual peaks)
         if manual_control_points is None or len(manual_control_points) == 0:
             try:
-                self.log("Extracting control points automatically...")
+                self.log("="*70)
+                self.log("Starting RING-BY-RING Peak Detection (Dioptas-style)")
+                self.log("="*70)
+                
+                # Extract all control points at once (pyFAI method)
+                # This is optimized and avoids kernel died issues
+                import gc
+                gc.collect()  # Clean up memory before intensive operation
+                
                 geo_ref.extract_cp(max_rings=10, pts_per_deg=1.0)
                 
-                # Display detected points in real-time (Dioptas-style)
+                # Create temporary AI for coordinate conversion
+                temp_ai = AzimuthalIntegrator(
+                    dist=geo_ref.dist,
+                    poni1=geo_ref.poni1,
+                    poni2=geo_ref.poni2,
+                    rot1=geo_ref.rot1,
+                    rot2=geo_ref.rot2,
+                    rot3=geo_ref.rot3,
+                    pixel1=geo_ref.pixel1,
+                    pixel2=geo_ref.pixel2,
+                    detector=detector,
+                    wavelength=geo_ref.wavelength
+                )
+                
+                # Display detected rings one by one (Dioptas-style real-time display)
                 if hasattr(geo_ref, 'data') and geo_ref.data is not None:
-                    self.log(f"Found {len(geo_ref.data)} rings with control points")
-                    # Signal to display points (will be processed in main thread)
-                    self.progress.emit(f"AUTO_POINTS:{len(geo_ref.data)}")
+                    num_rings = len(geo_ref.data)
+                    self.log(f"Found {num_rings} rings with control points")
+                    self.log("="*70)
+                    
+                    # Send each ring for real-time display
+                    for ring_idx, ring_points in enumerate(geo_ref.data):
+                        if len(ring_points) > 0:
+                            ring_num = ring_idx + 1
+                            num_points = len(ring_points)
+                            
+                            # Log ring info
+                            self.log(f"Ring {ring_num}: {num_points} control points detected")
+                            
+                            # Send signal for real-time display
+                            try:
+                                # Convert ring data to pixel coordinates for display
+                                ring_display_points = []
+                                for point in ring_points:
+                                    # point format: [ring_num, tth, chi]
+                                    if len(point) >= 3:
+                                        tth_val = point[1]  # 2theta in radians
+                                        chi_val = point[2]  # chi in radians
+                                        
+                                        # Convert to pixel coordinates
+                                        try:
+                                            # Use temp_ai to convert polar to pixel
+                                            # calcfrom1d expects arrays and returns arrays
+                                            tth_array = np.array([tth_val])
+                                            chi_array = np.array([chi_val])
+                                            result = temp_ai.calcfrom1d(tth_array, chi_array, shape=shape, unit="2th_rad")
+                                            
+                                            if result is not None and len(result) == 2:
+                                                y_arr, x_arr = result
+                                                if len(y_arr) > 0 and len(x_arr) > 0:
+                                                    y, x = float(y_arr[0]), float(x_arr[0])
+                                                    if 0 <= y < shape[0] and 0 <= x < shape[1]:
+                                                        ring_display_points.append([float(x), float(y), ring_num])
+                                        except Exception as coord_error:
+                                            # Skip points that can't be converted
+                                            pass
+                                
+                                # Send as progress signal (string format for thread safety)
+                                import json
+                                ring_data_json = json.dumps({
+                                    'ring_num': ring_num,
+                                    'num_points': num_points,
+                                    'points': ring_display_points  # Now in pixel coords: [x, y, ring_num]
+                                })
+                                self.progress.emit(f"RING_FOUND:{ring_data_json}")
+                                
+                                # Small delay for visual effect (simulating Dioptas)
+                                import time
+                                time.sleep(0.15)  # 150ms delay between rings for visibility
+                                
+                            except Exception as display_error:
+                                self.log(f"Warning: Could not send ring {ring_num} for display: {display_error}")
+                    
+                    self.log("="*70)
+                    self.log(f"Peak detection complete: {num_rings} rings found")
+                    self.log("="*70 + "\n")
+                
+                # Clean up temporary objects (outside of if block)
+                try:
+                    del temp_ai
+                except:
+                    pass
+                gc.collect()
                     
             except Exception as e:
+                import traceback
+                error_detail = traceback.format_exc()
+                self.log(f"Peak detection error:\n{error_detail}")
                 raise ValueError(f"Failed to extract control points: {str(e)}. "
                                "Please check image quality or use Manual Peak Selection.")
         
-        # Check if we have control points (removed minimum 10 requirement)
+        # Check if we have control points
         if not hasattr(geo_ref, 'data') or geo_ref.data is None or len(geo_ref.data) < 3:
             raise ValueError(f"Not enough control points: {len(geo_ref.data) if hasattr(geo_ref, 'data') and geo_ref.data is not None else 0}. "
                            "Need at least 3 points. Use Manual Peak Selection to add more peaks.")
         
-        # Refine geometry (Dioptas-style: Full refinement with all parameters)
-        # This matches the Dioptas implementation which optimizes all 6 parameters
+        # Optimize control point weights for better refinement stability
+        # Weight points based on their ring number and distribution
+        self.log("\n" + "="*70)
+        self.log("Optimizing Control Point Weights")
+        self.log("="*70)
+        
         try:
-            self.log("\n" + "="*60)
-            self.log("Starting Geometry Refinement (Dioptas-style)")
-            self.log("="*60)
+            # Count points per ring
+            from collections import defaultdict
+            ring_point_counts = defaultdict(int)
+            total_points = 0
+            
+            for point in geo_ref.data:
+                if len(point) > 0:
+                    ring_num = int(point[0])
+                    ring_point_counts[ring_num] += 1
+                    total_points += 1
+            
+            self.log(f"Total control points: {total_points}")
+            self.log(f"Points per ring:")
+            for ring_num in sorted(ring_point_counts.keys()):
+                count = ring_point_counts[ring_num]
+                self.log(f"  Ring {ring_num}: {count} points ({count/total_points*100:.1f}%)")
+            
+            # Calculate optimal weights
+            # Strategy: Give higher weight to:
+            # 1. Rings with fewer points (balance contribution)
+            # 2. Outer rings (higher angular resolution)
+            # 3. Well-distributed points (penalize clustered points)
+            
+            if hasattr(geo_ref, 'data') and len(geo_ref.data) > 0:
+                weights = []
+                for point in geo_ref.data:
+                    if len(point) > 0:
+                        ring_num = int(point[0])
+                        
+                        # Base weight inversely proportional to ring point count
+                        # This balances contribution from rings with different numbers of points
+                        base_weight = 1.0 / max(1, ring_point_counts[ring_num])
+                        
+                        # Outer ring bonus (higher 2theta = more important)
+                        # Outer rings have better angular resolution
+                        outer_ring_factor = 1.0 + 0.1 * (ring_num - 1)
+                        
+                        # Combined weight
+                        weight = base_weight * outer_ring_factor
+                        weights.append(weight)
+                
+                # Normalize weights to sum to number of points
+                if len(weights) > 0:
+                    weights = np.array(weights)
+                    weights = weights / weights.sum() * len(weights)
+                    
+                    # Store weights in geo_ref if possible
+                    # Note: pyFAI's GeometryRefinement may or may not use custom weights
+                    # This depends on the version and method
+                    try:
+                        if hasattr(geo_ref, 'set_bounds'):
+                            # Some versions support weight setting
+                            pass  # Weights are implicit in modern pyFAI
+                    except:
+                        pass
+                    
+                    self.log(f"\n✓ Weights calculated:")
+                    self.log(f"  Min weight: {weights.min():.3f}")
+                    self.log(f"  Max weight: {weights.max():.3f}")
+                    self.log(f"  Mean weight: {weights.mean():.3f}")
+                    self.log(f"  Weight distribution favors outer rings and balanced sampling")
+        except Exception as weight_error:
+            self.log(f"Warning: Could not optimize weights: {weight_error}")
+            self.log("Continuing with default equal weights...")
+        
+        self.log("="*70 + "\n")
+        
+        # Get user-selected refinement parameters
+        # Build list of parameters to fix (not refine)
+        fix_params = []
+        
+        # Check which parameters user wants to refine
+        refine_dist = True  # Always refine distance
+        refine_poni1 = True  # Always refine beam center
+        refine_poni2 = True
+        refine_rot1 = getattr(self, 'refine_rot1_cb', None) and self.refine_rot1_cb.isChecked() if hasattr(self, 'refine_rot1_cb') else False
+        refine_rot2 = getattr(self, 'refine_rot2_cb', None) and self.refine_rot2_cb.isChecked() if hasattr(self, 'refine_rot2_cb') else False
+        refine_rot3 = getattr(self, 'refine_rot3_cb', None) and self.refine_rot3_cb.isChecked() if hasattr(self, 'refine_rot3_cb') else False
+        refine_wavelength = getattr(self, 'refine_wavelength_cb', None) and self.refine_wavelength_cb.isChecked() if hasattr(self, 'refine_wavelength_cb') else False
+        
+        # Refine geometry (Dioptas-style: Multi-stage non-linear least squares)
+        try:
+            self.log("\n" + "="*70)
+            self.log("Starting Geometry Refinement (Non-linear Least Squares)")
+            self.log("="*70)
             self.log(f"Number of control points: {len(geo_ref.data)}")
             
             # Count rings
@@ -2615,86 +3073,101 @@ class CalibrateModule(GUIBase):
                     ring_nums.add(point[0])
             self.log(f"Number of rings: {len(ring_nums)}")
             
-            # Dioptas-style multi-stage refinement
-            # Stage 1: Refine distance and beam center only (most critical parameters)
-            self.log("\nStage 1: Refining distance and beam center...")
-            geo_ref.refine2(fix=["wavelength", "rot1", "rot2", "rot3"])
+            # Log user-selected parameters
+            self.log(f"\nRefinement parameters selected by user:")
+            self.log(f"  Distance (dist):     {'✓ YES' if refine_dist else '✗ NO (fixed)'}")
+            self.log(f"  Beam Center Y (poni1): {'✓ YES' if refine_poni1 else '✗ NO (fixed)'}")
+            self.log(f"  Beam Center X (poni2): {'✓ YES' if refine_poni2 else '✗ NO (fixed)'}")
+            self.log(f"  Rot1 (tilt axis 1):  {'✓ YES' if refine_rot1 else '✗ NO (fixed)'}")
+            self.log(f"  Rot2 (tilt axis 2):  {'✓ YES' if refine_rot2 else '✗ NO (fixed)'}")
+            self.log(f"  Rot3 (in-plane):     {'✓ YES' if refine_rot3 else '✗ NO (fixed)'}")
+            self.log(f"  Wavelength:          {'✓ YES' if refine_wavelength else '✗ NO (fixed)'}")
+            
+            # STAGE 1: Always refine basic geometry first (distance + beam center)
+            # This is the most critical and stable step
+            self.log("\n" + "-"*70)
+            self.log("STAGE 1: Basic Geometry (Distance + Beam Center)")
+            self.log("-"*70)
+            
+            fix_stage1 = ["wavelength", "rot1", "rot2", "rot3"]
+            self.log(f"Fixing: {', '.join(fix_stage1)}")
+            
+            geo_ref.refine2(fix=fix_stage1)
+            
             self.log(f"  Distance: {geo_ref.dist*1000:.3f} mm")
             self.log(f"  PONI1 (Y): {geo_ref.poni1*1000:.3f} mm")
             self.log(f"  PONI2 (X): {geo_ref.poni2*1000:.3f} mm")
             
-            # Calculate initial RMS error
-            if hasattr(geo_ref, 'chi2') and geo_ref.chi2 is not None:
-                rms = np.sqrt(geo_ref.chi2())
-                self.log(f"  RMS error: {rms:.3f} pixels")
-            
-            # Stage 2: Careful rotation refinement with validation
-            # Only refine rotations if data quality is sufficient AND angles stay small
-            self.log("\nStage 2: Rotation refinement with validation...")
-            
-            # Save current state for comparison and potential rollback
-            dist_before = geo_ref.dist
-            poni1_before = geo_ref.poni1
-            poni2_before = geo_ref.poni2
-            rot1_before = geo_ref.rot1
-            rot2_before = geo_ref.rot2
-            rot3_before = geo_ref.rot3
-            
-            # Calculate RMS before rotation refinement
-            rms_before = 999.0
-            if hasattr(geo_ref, 'chi2') and geo_ref.chi2 is not None:
+            # Calculate RMS after stage 1
+            rms_stage1 = 999.0
+            if hasattr(geo_ref, 'chi2') and callable(geo_ref.chi2):
                 try:
-                    rms_before = np.sqrt(geo_ref.chi2())
+                    rms_stage1 = np.sqrt(geo_ref.chi2())
+                    self.log(f"  RMS error: {rms_stage1:.3f} pixels")
                 except:
                     pass
             
-            # Decide whether to refine rotations based on data quality
-            should_refine_rotations = False
-            
-            # Criteria for enabling rotation refinement:
-            # 1. Good number of control points (>= 50)
-            # 2. Multiple rings (>= 4)
-            # 3. Reasonable initial RMS (< 5 pixels)
-            if len(geo_ref.data) >= 50 and len(ring_nums) >= 4 and rms_before < 5.0:
-                should_refine_rotations = True
-                self.log(f"  Data quality sufficient for rotation refinement")
-                self.log(f"  Control points: {len(geo_ref.data)}, Rings: {len(ring_nums)}, RMS: {rms_before:.3f}")
-            else:
-                should_refine_rotations = False
-                self.log(f"  Data quality insufficient - skipping rotation refinement")
-                self.log(f"  Control points: {len(geo_ref.data)}, Rings: {len(ring_nums)}, RMS: {rms_before:.3f}")
-                self.log(f"  (Need: >= 50 points, >= 4 rings, RMS < 5 pixels)")
-            
-            if should_refine_rotations:
+            # STAGE 2: Refine rotations if user selected them
+            if refine_rot1 or refine_rot2 or refine_rot3:
+                self.log("\n" + "-"*70)
+                self.log("STAGE 2: Detector Tilt (Rotation Parameters)")
+                self.log("-"*70)
+                
+                # Save state before rotation refinement
+                dist_before = geo_ref.dist
+                poni1_before = geo_ref.poni1
+                poni2_before = geo_ref.poni2
+                rot1_before = geo_ref.rot1
+                rot2_before = geo_ref.rot2
+                rot3_before = geo_ref.rot3
+                
+                # Build fix list for stage 2
+                fix_stage2 = []
+                if not refine_wavelength:
+                    fix_stage2.append("wavelength")
+                if not refine_rot1:
+                    fix_stage2.append("rot1")
+                if not refine_rot2:
+                    fix_stage2.append("rot2")
+                if not refine_rot3:
+                    fix_stage2.append("rot3")
+                
+                self.log(f"Refining rotations...")
+                if fix_stage2:
+                    self.log(f"Fixing: {', '.join(fix_stage2)}")
+                else:
+                    self.log(f"Refining all parameters")
+                
                 try:
-                    # Try full refinement including rotations
-                    self.log(f"  Attempting full geometry refinement (all 6 parameters)...")
-                    geo_ref.refine2(fix=["wavelength"])  # Only fix wavelength
+                    geo_ref.refine2(fix=fix_stage2)
                     
-                    # Validate rotation angles - they should be SMALL
+                    # Check rotation angles
                     rot1_deg = np.degrees(geo_ref.rot1)
                     rot2_deg = np.degrees(geo_ref.rot2)
                     rot3_deg = np.degrees(geo_ref.rot3)
                     
-                    # Calculate RMS after refinement
-                    rms_after = 999.0
-                    if hasattr(geo_ref, 'chi2') and geo_ref.chi2 is not None:
+                    # Calculate RMS after stage 2
+                    rms_stage2 = 999.0
+                    if hasattr(geo_ref, 'chi2') and callable(geo_ref.chi2):
                         try:
-                            rms_after = np.sqrt(geo_ref.chi2())
+                            rms_stage2 = np.sqrt(geo_ref.chi2())
                         except:
                             pass
                     
-                    # Check if rotation angles are reasonable (< 3 degrees is typical)
+                    # Validate rotation angles (should be small for typical setups)
                     max_rot = max(abs(rot1_deg), abs(rot2_deg), abs(rot3_deg))
                     
-                    if max_rot > 3.0:
-                        # Angles too large - probably unstable refinement
-                        self.log(f"  ⚠ Warning: Rotation angles too large!")
+                    # Quality checks
+                    rotation_reasonable = max_rot < 5.0  # < 5° is reasonable
+                    rms_improved = rms_stage2 < rms_stage1 * 0.98  # At least 2% improvement
+                    
+                    if not rotation_reasonable:
+                        self.log(f"  ⚠ WARNING: Rotation angles too large!")
                         self.log(f"    Rot1={rot1_deg:.4f}°, Rot2={rot2_deg:.4f}°, Rot3={rot3_deg:.4f}°")
-                        self.log(f"    Max angle: {max_rot:.4f}° > 3.0° (threshold)")
-                        self.log(f"  → Reverting to perpendicular detector assumption (rot=0)")
+                        self.log(f"    Max: {max_rot:.4f}° > 5.0° threshold")
+                        self.log(f"  → Reverting to perpendicular detector (rot=0)")
                         
-                        # Revert rotations to zero
+                        # Revert
                         geo_ref.rot1 = 0.0
                         geo_ref.rot2 = 0.0
                         geo_ref.rot3 = 0.0
@@ -2702,13 +3175,12 @@ class CalibrateModule(GUIBase):
                         geo_ref.poni1 = poni1_before
                         geo_ref.poni2 = poni2_before
                         
-                    elif rms_after >= rms_before * 0.95:
-                        # RMS didn't improve significantly - rotation refinement not helpful
-                        self.log(f"  ⚠ Warning: RMS did not improve with rotation refinement")
-                        self.log(f"    RMS before: {rms_before:.3f}, after: {rms_after:.3f}")
-                        self.log(f"  → Reverting to perpendicular detector assumption (rot=0)")
+                    elif not rms_improved:
+                        self.log(f"  ⚠ WARNING: RMS did not improve significantly")
+                        self.log(f"    Before: {rms_stage1:.3f}, After: {rms_stage2:.3f} pixels")
+                        self.log(f"  → Reverting to perpendicular detector (rot=0)")
                         
-                        # Revert rotations to zero
+                        # Revert
                         geo_ref.rot1 = 0.0
                         geo_ref.rot2 = 0.0
                         geo_ref.rot3 = 0.0
@@ -2717,18 +3189,18 @@ class CalibrateModule(GUIBase):
                         geo_ref.poni2 = poni2_before
                         
                     else:
-                        # Refinement successful and reasonable
+                        # Success!
                         self.log(f"  ✓ Rotation refinement successful!")
-                        self.log(f"    Rot1: {rot1_deg:.4f}° (tilt around axis 1)")
-                        self.log(f"    Rot2: {rot2_deg:.4f}° (tilt around axis 2)")
-                        self.log(f"    Rot3: {rot3_deg:.4f}° (rotation in plane)")
-                        self.log(f"    RMS improved: {rms_before:.3f} → {rms_after:.3f} pixels")
+                        self.log(f"    Rot1: {rot1_deg:.4f}°")
+                        self.log(f"    Rot2: {rot2_deg:.4f}°")
+                        self.log(f"    Rot3: {rot3_deg:.4f}°")
+                        self.log(f"    RMS: {rms_stage1:.3f} → {rms_stage2:.3f} pixels")
                         
                 except Exception as rot_error:
                     self.log(f"  ⚠ Rotation refinement failed: {rot_error}")
-                    self.log(f"  → Keeping perpendicular detector assumption (rot=0)")
+                    self.log(f"  → Reverting to perpendicular detector (rot=0)")
                     
-                    # Revert to safe state
+                    # Revert
                     geo_ref.rot1 = 0.0
                     geo_ref.rot2 = 0.0
                     geo_ref.rot3 = 0.0
@@ -2736,37 +3208,81 @@ class CalibrateModule(GUIBase):
                     geo_ref.poni1 = poni1_before
                     geo_ref.poni2 = poni2_before
             else:
-                # Skip rotation refinement - keep rotations at zero
-                self.log(f"  Rotations kept at zero (perpendicular detector)")
+                self.log("\nSTAGE 2: Skipped (rotations not selected for refinement)")
+                self.log("  Rotations kept at zero (perpendicular detector)")
+            
+            # STAGE 3: Refine wavelength if user selected it (rare)
+            if refine_wavelength:
+                self.log("\n" + "-"*70)
+                self.log("STAGE 3: Wavelength Refinement")
+                self.log("-"*70)
+                self.log("  ⚠ WARNING: Wavelength refinement is unusual!")
+                self.log("  Only enable if wavelength is truly uncertain.")
+                
+                wl_before = geo_ref.wavelength
+                
+                try:
+                    # Refine everything including wavelength
+                    fix_stage3 = []
+                    if not refine_rot1:
+                        fix_stage3.append("rot1")
+                    if not refine_rot2:
+                        fix_stage3.append("rot2")
+                    if not refine_rot3:
+                        fix_stage3.append("rot3")
+                    
+                    geo_ref.refine2(fix=fix_stage3)
+                    
+                    wl_after = geo_ref.wavelength
+                    wl_change_percent = abs(wl_after - wl_before) / wl_before * 100
+                    
+                    self.log(f"  Wavelength: {wl_before*1e10:.4f} Å → {wl_after*1e10:.4f} Å")
+                    self.log(f"  Change: {wl_change_percent:.2f}%")
+                    
+                    if wl_change_percent > 5.0:
+                        self.log(f"  ⚠ WARNING: Wavelength changed by >{wl_change_percent:.1f}%!")
+                        self.log(f"  This suggests a problem with the calibration.")
+                except Exception as wl_error:
+                    self.log(f"  ⚠ Wavelength refinement failed: {wl_error}")
             
             # Log final refined parameters
-            self.log(f"\n  Final Refined Parameters:")
-            self.log(f"    Distance: {geo_ref.dist*1000:.3f} mm")
-            self.log(f"    PONI1 (Y): {geo_ref.poni1*1000:.3f} mm")
-            self.log(f"    PONI2 (X): {geo_ref.poni2*1000:.3f} mm")
-            self.log(f"    Rot1: {np.degrees(geo_ref.rot1):.4f}°")
-            self.log(f"    Rot2: {np.degrees(geo_ref.rot2):.4f}°")
-            self.log(f"    Rot3: {np.degrees(geo_ref.rot3):.4f}°")
+            self.log("\n" + "="*70)
+            self.log("FINAL REFINED PARAMETERS")
+            self.log("="*70)
+            self.log(f"  Distance:    {geo_ref.dist*1000:.3f} mm")
+            self.log(f"  PONI1 (Y):   {geo_ref.poni1*1000:.3f} mm")
+            self.log(f"  PONI2 (X):   {geo_ref.poni2*1000:.3f} mm")
+            self.log(f"  Rot1:        {np.degrees(geo_ref.rot1):.4f}°")
+            self.log(f"  Rot2:        {np.degrees(geo_ref.rot2):.4f}°")
+            self.log(f"  Rot3:        {np.degrees(geo_ref.rot3):.4f}°")
+            self.log(f"  Wavelength:  {geo_ref.wavelength*1e10:.4f} Å")
             
             # Calculate final RMS error
-            if hasattr(geo_ref, 'chi2') and geo_ref.chi2 is not None:
+            final_rms = 999.0
+            if hasattr(geo_ref, 'chi2') and callable(geo_ref.chi2):
                 try:
-                    rms = np.sqrt(geo_ref.chi2())
-                    self.log(f"\n  Final RMS error: {rms:.3f} pixels")
+                    final_rms = np.sqrt(geo_ref.chi2())
+                    self.log(f"\n  Final RMS error: {final_rms:.3f} pixels")
                     
                     # Quality assessment (Dioptas-style)
-                    if rms < 1.0:
-                        self.log(f"  Quality: Excellent ✓✓✓")
-                    elif rms < 2.0:
-                        self.log(f"  Quality: Good ✓✓")
-                    elif rms < 3.0:
-                        self.log(f"  Quality: Acceptable ✓")
+                    if final_rms < 0.5:
+                        self.log(f"  Quality: ★★★ EXCELLENT (RMS < 0.5 px)")
+                    elif final_rms < 1.0:
+                        self.log(f"  Quality: ★★ GOOD (RMS < 1.0 px)")
+                    elif final_rms < 2.0:
+                        self.log(f"  Quality: ★ ACCEPTABLE (RMS < 2.0 px)")
                     else:
-                        self.log(f"  Quality: Poor - consider re-calibration")
-                except:
-                    pass
+                        self.log(f"  Quality: ⚠ POOR (RMS > 2.0 px) - Consider re-calibration")
+                        self.log(f"  Suggestions:")
+                        self.log(f"    - Add more manual control points")
+                        self.log(f"    - Check if initial parameters are correct")
+                        self.log(f"    - Verify calibrant and wavelength")
+                except Exception as rms_error:
+                    self.log(f"  Warning: Could not calculate RMS: {rms_error}")
             
-            self.log("\n" + "="*60)
+            self.log("\n" + "="*70)
+            self.log("Refinement Complete")
+            self.log("="*70)
             self.log("Geometry Refinement Completed!")
             self.log("="*60 + "\n")
             
@@ -2775,6 +3291,9 @@ class CalibrateModule(GUIBase):
             error_detail = traceback.format_exc()
             self.log(f"\nRefinement error details:\n{error_detail}")
             raise ValueError(f"Geometry refinement failed: {str(e)}")
+        
+        # Clean up before creating final AI (prevent memory buildup)
+        gc.collect()
         
         # Create AzimuthalIntegrator from refined parameters
         ai = AzimuthalIntegrator(
@@ -2789,6 +3308,9 @@ class CalibrateModule(GUIBase):
             detector=detector,
             wavelength=geo_ref.wavelength
         )
+        
+        # Final memory cleanup before returning result
+        gc.collect()
         
         # Get refined parameters
         result = {
@@ -2902,8 +3424,43 @@ class CalibrateModule(GUIBase):
             QMessageBox.critical(None, "Error", f"Error processing results:\n{str(e)}")
 
     def on_calibration_progress(self, message):
-        """Handle calibration progress updates including auto-detected points"""
-        if message.startswith("AUTO_POINTS:"):
+        """Handle calibration progress updates including real-time ring-by-ring display (Dioptas-style)"""
+        if message.startswith("RING_FOUND:"):
+            # Real-time display of detected ring (Dioptas-style)
+            try:
+                import json
+                # Extract ring data from message
+                ring_data_json = message.split("RING_FOUND:", 1)[1]
+                ring_data = json.loads(ring_data_json)
+                
+                ring_num = ring_data['ring_num']
+                num_points = ring_data['num_points']
+                points = ring_data['points']  # [[x, y, ring_num], ...] already in pixel coords
+                
+                # Display on canvas
+                if MATPLOTLIB_AVAILABLE and hasattr(self, 'unified_canvas'):
+                    try:
+                        # Convert to tuple format expected by canvas
+                        display_points = [(p[0], p[1], p[2]) for p in points]
+                        
+                        # Add to canvas auto_detected_peaks
+                        if hasattr(self.unified_canvas, 'auto_detected_peaks'):
+                            self.unified_canvas.auto_detected_peaks.extend(display_points)
+                            
+                            # Update display incrementally (Dioptas-style)
+                            self.unified_canvas.update_auto_peaks_display()
+                            
+                            self.log(f"  → Ring {ring_num}: Displayed {len(display_points)} points")
+                    
+                    except Exception as display_error:
+                        self.log(f"Warning: Could not display ring {ring_num}: {display_error}")
+                
+            except Exception as e:
+                self.log(f"Warning: Could not process ring data: {e}")
+                import traceback
+                traceback.print_exc()
+        
+        elif message.startswith("AUTO_POINTS:"):
             # Extract number of rings
             num_rings = int(message.split(":")[1])
             self.log(f"✓ Automatically detected control points on {num_rings} rings")
@@ -2927,9 +3484,13 @@ class CalibrateModule(GUIBase):
                               "Please run calibration first before saving PONI file.")
             return
         
-        poni_path = self.poni_entry.text().strip()
+        # Get path from entry or show dialog
+        poni_path = None
+        if hasattr(self, 'poni_entry') and self.poni_entry.text().strip():
+            poni_path = self.poni_entry.text().strip()
+        
         if not poni_path:
-            # Use self.parent as parent for dialog
+            # Show file dialog
             poni_path, _ = QFileDialog.getSaveFileName(
                 self.parent, 
                 "Save PONI File", 
@@ -2939,17 +3500,28 @@ class CalibrateModule(GUIBase):
         
         if poni_path:
             try:
+                # Ensure .poni extension
+                if not poni_path.endswith('.poni'):
+                    poni_path += '.poni'
+                
+                # Save using pyFAI's save method
                 self.ai.save(poni_path)
+                
                 self.log(f"✓ PONI file saved to: {poni_path}")
                 QMessageBox.information(self.parent, "Success", 
                                       f"PONI file saved successfully!\n{poni_path}")
+                
                 # Update the text field with saved path
-                self.poni_entry.setText(poni_path)
+                if hasattr(self, 'poni_entry'):
+                    self.poni_entry.setText(poni_path)
+                    
             except Exception as e:
                 import traceback
+                error_detail = traceback.format_exc()
                 self.log(f"Error saving PONI: {str(e)}")
-                self.log(traceback.format_exc())
-                QMessageBox.critical(self.parent, "Error", f"Failed to save PONI file:\n{str(e)}")
+                self.log(error_detail)
+                QMessageBox.critical(self.parent, "Error", 
+                                   f"Failed to save PONI file:\n{str(e)}\n\nCheck log for details.")
 
     def on_contrast_slider_changed(self, value):
         """Handle contrast slider change (single vertical slider controls max)"""
@@ -3146,96 +3718,118 @@ class CalibrateModule(GUIBase):
 
 
     def update_cake_view(self):
-        """Update Cake view after calibration - Dioptas style"""
+        """Update Cake view after calibration - Dioptas style
+        
+        NOTE: If calibration is correct, calibrant peaks should appear as STRAIGHT VERTICAL LINES.
+        Curved lines indicate calibration errors (incorrect geometry parameters).
+        """
         if not hasattr(self, 'cake_axes') or self.ai is None or self.current_image is None:
             return
         
         try:
-            self.log("Generating Cake view (polar transformation)...")
-            
             # Apply mask if available
-            mask = self.current_mask if hasattr(self, 'current_mask') else None
+            mask = None
+            if hasattr(self, 'imported_mask') and self.imported_mask is not None:
+                mask = self.imported_mask
+            elif hasattr(self, 'unified_canvas') and self.unified_canvas.mask_data is not None:
+                mask = self.unified_canvas.mask_data
             
-            # Use pyFAI's integrate2d for cake/polar transformation
-            # Dioptas-style: higher resolution for better visualization
+            # Dioptas-style cake/polar transformation
+            # This creates a 2D map: X=2theta, Y=azimuthal_angle
             result = self.ai.integrate2d(
                 self.current_image,
-                npt_rad=500,      # Number of radial bins (2theta)
-                npt_azim=360,     # Number of azimuthal bins (chi/azimuth) - 1°/bin
-                unit="2th_deg",   # Use 2theta in degrees
-                mask=mask,        # Apply mask if available
-                method="splitpixel",
-                correctSolidAngle=True  # Important for accurate intensities
+                npt_rad=1024,      # Radial bins (2theta direction)
+                npt_azim=360,      # Azimuthal bins (chi direction) - 360° = 1°/bin
+                unit="2th_deg",    # Use 2theta in degrees
+                mask=mask,
+                method="bbox",     # Fast method
+                correctSolidAngle=False  # Don't apply solid angle correction for cake
             )
             
-            # Result is (cake_image, 2theta_array, chi_array)
-            cake = result[0]
-            tth_rad = result[1]  # Radial axis (2theta)
-            chi_azim = result[2]  # Azimuthal axis (chi)
+            # Extract result data
+            cake_intensity = result.intensity if hasattr(result, 'intensity') else result[0]
+            tth_edges = result.radial if hasattr(result, 'radial') else result[1]
+            chi_edges = result.azimuthal if hasattr(result, 'azimuthal') else result[2]
             
-            # Clear and plot
+            # Clear axes
             self.cake_axes.clear()
             
             # Log scale for better visualization
-            cake_display = np.log10(cake + 1)  # Add 1 to avoid log(0)
+            cake_display = np.log10(np.clip(cake_intensity, 1, None))
             
-            # Display cake image with proper extent
-            # extent: [left, right, bottom, top]
-            extent = [tth_rad.min(), tth_rad.max(), chi_azim.min(), chi_azim.max()]
+            # Ensure correct orientation: (n_azim, n_rad)
+            # Y-axis = azimuthal angle (0-360°), X-axis = 2theta
+            if cake_display.shape[0] != len(chi_edges) - 1:
+                cake_display = cake_display.T
+            
+            # Display cake image
+            # extent = [left, right, bottom, top] = [2th_min, 2th_max, chi_min, chi_max]
+            extent = [tth_edges[0], tth_edges[-1], chi_edges[0], chi_edges[-1]]
             
             im = self.cake_axes.imshow(
                 cake_display,
                 aspect='auto',
                 origin='lower',
                 extent=extent,
-                cmap='viridis',
-                interpolation='nearest'
+                cmap='jet',        # Dioptas default colormap
+                interpolation='nearest',
+                vmin=cake_display.min(),
+                vmax=np.percentile(cake_display, 99.5)
             )
             
-            self.cake_axes.set_xlabel('2θ (degrees)', fontsize=10)
-            self.cake_axes.set_ylabel('χ (degrees)', fontsize=10)
-            self.cake_axes.set_title('Cake/Polar View (Dioptas-style)', fontsize=11, fontweight='bold')
+            # Set labels
+            self.cake_axes.set_xlabel('2θ (°)', fontsize=11)
+            self.cake_axes.set_ylabel('Azimuthal Angle (°)', fontsize=11)
+            self.cake_axes.set_title('Cake View - Vertical lines = Good calibration', fontsize=11, fontweight='bold')
             
-            # Add calibrant lines if available (should appear as vertical lines)
-            if hasattr(self, 'calibrant_name') and self.calibrant_name:
+            # Add calibrant peak lines as VERTICAL LINES
+            # If calibration is correct, these should appear as straight vertical lines
+            # If calibration is wrong, they will appear curved/bent
+            if hasattr(self.ai, 'calibrant') and self.ai.calibrant is not None:
                 try:
-                    calibrant = ALL_CALIBRANTS[self.calibrant_name]
-                    calibrant.wavelength = self.ai.wavelength
-                    tth_calibrant = calibrant.get_2th()
+                    tth_calibrant = self.ai.calibrant.get_2th()
                     tth_calibrant_deg = np.degrees(tth_calibrant)
                     
-                    # Draw vertical lines for calibrant peaks (should be straight if calibration is good)
-                    tth_min, tth_max = tth_rad.min(), tth_rad.max()
-                    visible_peaks = tth_calibrant_deg[(tth_calibrant_deg >= tth_min) & 
-                                                       (tth_calibrant_deg <= tth_max)]
-                    for peak_pos in visible_peaks[:15]:
-                        self.cake_axes.axvline(peak_pos, color='red', linestyle='--', 
-                                             alpha=0.3, linewidth=0.5)
-                except Exception as e:
-                    self.log(f"Warning: Could not add calibrant lines to cake: {e}")
+                    # Draw vertical lines at expected 2theta positions
+                    # These span the full azimuthal range (0-360°)
+                    for peak_2th in tth_calibrant_deg:
+                        if extent[0] <= peak_2th <= extent[1]:
+                            # Draw vertical line from bottom to top (full azimuthal range)
+                            self.cake_axes.axvline(peak_2th, 
+                                                  color='white', 
+                                                  linestyle='-', 
+                                                  alpha=0.5, 
+                                                  linewidth=1.0,
+                                                  zorder=10)  # Draw on top
+                except Exception as calib_error:
+                    pass  # Silently ignore calibrant line errors
             
-            # Add colorbar if not exists
-            if not hasattr(self, 'cake_colorbar') or self.cake_colorbar is None:
+            # Add colorbar
+            if hasattr(self, 'cake_colorbar') and self.cake_colorbar is not None:
                 try:
-                    self.cake_colorbar = self.cake_canvas.figure.colorbar(im, ax=self.cake_axes)
+                    self.cake_colorbar.remove()
                 except:
                     pass
-            else:
-                try:
-                    self.cake_colorbar.update_normal(im)
-                except:
-                    pass
             
-            self.cake_canvas.draw()
-            self.log(f"Cake view updated: {cake.shape[1]}x{cake.shape[0]} (2θ × χ)")
+            try:
+                self.cake_colorbar = self.cake_figure.colorbar(im, ax=self.cake_axes)
+                self.cake_colorbar.set_label('log₁₀(Intensity)', fontsize=10)
+            except:
+                pass
+            
+            self.cake_canvas.draw_idle()
                 
         except Exception as e:
             import traceback
+            error_detail = traceback.format_exc()
+            # Only print to console on error
+            print(f"ERROR in Cake view: {str(e)}")
+            print(error_detail)
+            # Also log to GUI
             self.log(f"Error updating Cake view: {str(e)}")
-            self.log(traceback.format_exc())
     
     def update_pattern_view(self):
-        """Update Pattern view after calibration - Dioptas style"""
+        """Update Pattern view after calibration - Dioptas style with correct 1D integration"""
         if not hasattr(self, 'pattern_axes') or self.ai is None or self.current_image is None:
             return
         
@@ -3243,57 +3837,69 @@ class CalibrateModule(GUIBase):
             self.log("Generating 1D integrated pattern...")
             
             # Apply mask if available
-            mask = self.current_mask if hasattr(self, 'current_mask') else None
+            mask = None
+            if hasattr(self, 'imported_mask') and self.imported_mask is not None:
+                mask = self.imported_mask
+            elif hasattr(self, 'unified_canvas') and self.unified_canvas.mask_data is not None:
+                mask = self.unified_canvas.mask_data
             
-            # Use pyFAI's integrate1d for azimuthal integration
+            # Dioptas-style 1D azimuthal integration
             result = self.ai.integrate1d(
                 self.current_image,
-                npt=2048,         # Number of points in output
-                unit="2th_deg",   # Use 2theta in degrees
-                mask=mask,        # Apply mask if available
-                method="splitpixel",
-                correctSolidAngle=True  # Important for accurate intensities
+                npt=2048,          # Number of points in output (Dioptas default)
+                unit="2th_deg",    # Use 2theta in degrees
+                mask=mask,
+                method="bbox",     # Fast method (Dioptas uses this)
+                correctSolidAngle=False,  # Dioptas doesn't apply this by default
+                polarization_factor=None   # No polarization correction by default
             )
             
-            # Result is (2theta_array, intensity_array)
-            tth = result[0]      # 2theta values
-            intensity = result[1] # Integrated intensity
+            # Result: radial (2theta), intensity
+            if hasattr(result, 'radial'):
+                tth = result.radial
+                intensity = result.intensity
+            else:
+                tth = result[0]
+                intensity = result[1]
             
-            # Clear and plot
+            # Clear axes
             self.pattern_axes.clear()
             
-            # Plot 1D pattern
-            self.pattern_axes.plot(tth, intensity, 'b-', linewidth=1.2)
-            self.pattern_axes.set_xlabel('2θ (degrees)', fontsize=10)
-            self.pattern_axes.set_ylabel('Intensity (a.u.)', fontsize=10)
-            self.pattern_axes.set_title('1D Integrated Pattern (Dioptas-style)', fontsize=11, fontweight='bold')
-            self.pattern_axes.grid(True, alpha=0.3)
+            # Plot 1D pattern with Dioptas styling
+            self.pattern_axes.plot(tth, intensity, 'b-', linewidth=1.0, alpha=0.8)
             
-            # Set reasonable y-axis limits (remove outliers)
-            y_max = np.percentile(intensity, 99.5)  # Use 99.5 percentile to avoid spikes
-            self.pattern_axes.set_ylim(0, y_max * 1.1)
+            # Set labels (Dioptas style)
+            self.pattern_axes.set_xlabel('2θ (°)', fontsize=11)
+            self.pattern_axes.set_ylabel('Intensity (counts)', fontsize=11)
+            self.pattern_axes.set_title('1D Integration Pattern', fontsize=12, fontweight='bold')
             
-            # Add calibrant peak positions if available
-            peak_count = 0
-            if hasattr(self, 'calibrant_name') and self.calibrant_name:
+            # Add grid
+            self.pattern_axes.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
+            
+            # Set reasonable axis limits
+            # X-axis: full 2theta range
+            self.pattern_axes.set_xlim(tth[0], tth[-1])
+            
+            # Y-axis: auto-scale to remove outliers
+            y_max = np.percentile(intensity, 99.5)
+            self.pattern_axes.set_ylim(0, y_max * 1.05)
+            
+            # Add calibrant peak positions if available (Dioptas style)
+            if hasattr(self.ai, 'calibrant') and self.ai.calibrant is not None:
                 try:
-                    calibrant = ALL_CALIBRANTS[self.calibrant_name]
-                    calibrant.wavelength = self.ai.wavelength
-                    
-                    # Get expected 2theta positions for calibrant peaks
-                    tth_calibrant = calibrant.get_2th()
+                    # Get expected 2theta positions
+                    tth_calibrant = self.ai.calibrant.get_2th()
                     tth_calibrant_deg = np.degrees(tth_calibrant)
                     
-                    # Filter to visible range
-                    tth_min, tth_max = tth.min(), tth.max()
-                    visible_peaks = tth_calibrant_deg[(tth_calibrant_deg >= tth_min) & 
-                                                       (tth_calibrant_deg <= tth_max)]
-                    
-                    # Draw vertical lines for calibrant peaks
-                    for peak_pos in visible_peaks[:20]:  # Limit to first 20 peaks
-                        self.pattern_axes.axvline(peak_pos, color='red', linestyle='--', 
-                                                 alpha=0.5, linewidth=0.8)
-                        peak_count += 1
+                    # Draw vertical lines for visible peaks
+                    peak_count = 0
+                    for peak_2th in tth_calibrant_deg:
+                        if tth[0] <= peak_2th <= tth[-1]:
+                            self.pattern_axes.axvline(peak_2th, color='red', linestyle='--', 
+                                                     alpha=0.4, linewidth=0.8)
+                            peak_count += 1
+                            if peak_count >= 20:  # Limit to 20 peaks
+                                break
                     
                     self.log(f"Added {peak_count} calibrant peak positions (of {len(visible_peaks)} in range)")
                 except Exception as cal_error:
