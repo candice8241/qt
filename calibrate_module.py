@@ -286,14 +286,21 @@ class CalibrateModule(GUIBase):
             
             # Vertical contrast slider on right side (limited height)
             contrast_widget = QWidget()
-            contrast_widget.setMaximumWidth(40)
+            contrast_widget.setMaximumWidth(100)
             contrast_layout = QVBoxLayout(contrast_widget)
-            contrast_layout.setContentsMargins(0, 0, 0, 0)
+            contrast_layout.setContentsMargins(2, 2, 2, 2)
             contrast_layout.setSpacing(2)
-            
-            # Add stretch at top
+
+            # Position label at top right
+            self.position_lbl = QLabel("Position: x=0, y=0")
+            self.position_lbl.setFont(QFont('Arial', 8))
+            self.position_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.position_lbl.setStyleSheet("color: #333; padding: 2px;")
+            contrast_layout.addWidget(self.position_lbl)
+
+            # Add stretch
             contrast_layout.addStretch(1)
-            
+
             # Max label (top)
             max_lbl = QLabel("Max")
             max_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -449,11 +456,8 @@ class CalibrateModule(GUIBase):
                                        font_size=9,
                                        parent=status_frame)
 
-        self.position_lbl = QLabel("Position: x=0, y=0")
-        self.position_lbl.setFont(QFont('Arial', 9))
-
-        # Distribute buttons evenly relative to image area
-        status_layout.addStretch(1)
+        # Center buttons relative to image area with even distribution
+        status_layout.addStretch(2)
         status_layout.addWidget(auto_contrast_btn)
         status_layout.addStretch(1)
         status_layout.addWidget(reset_zoom_btn)
@@ -461,9 +465,7 @@ class CalibrateModule(GUIBase):
         status_layout.addWidget(self.calibrate_btn)
         status_layout.addStretch(1)
         status_layout.addWidget(self.refine_btn)
-        status_layout.addStretch(1)
-        status_layout.addWidget(self.position_lbl)
-        status_layout.addStretch(1)
+        status_layout.addStretch(2)
         
         left_layout.addWidget(status_frame)
         
@@ -3621,16 +3623,23 @@ class CalibrateModule(GUIBase):
         """Apply contrast from single slider"""
         vmin = 0  # Always use 0 as minimum
 
+        # Debug output
+        print(f"DEBUG: Contrast slider changed - vmin: {vmin}, vmax: {vmax}")
+
         # Apply to canvases
         if MATPLOTLIB_AVAILABLE:
             # unified_canvas is the main display canvas
             if hasattr(self, 'unified_canvas') and self.unified_canvas is not None:
+                print(f"DEBUG: Applying contrast to unified_canvas")
                 self.unified_canvas.set_contrast(vmin, vmax)
             elif hasattr(self, 'calibration_canvas'):
+                print(f"DEBUG: Applying contrast to calibration_canvas")
                 self.calibration_canvas.set_contrast(vmin, vmax)
 
             if hasattr(self, 'mask_canvas'):
                 self.mask_canvas.set_contrast(vmin, vmax)
+        else:
+            print(f"DEBUG: MATPLOTLIB_AVAILABLE is False")
     
     def auto_contrast(self):
         """Auto-adjust contrast based on image statistics"""
