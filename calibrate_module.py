@@ -873,9 +873,9 @@ class CalibrateModule(GUIBase):
         search_size_row = QHBoxLayout()
         search_size_row.addWidget(QLabel("Search Size:"))
         self.search_size_sb = QSpinBox()
-        self.search_size_sb.setMinimum(5)
+        self.search_size_sb.setMinimum(1)  # Allow smaller values
         self.search_size_sb.setMaximum(100)
-        self.search_size_sb.setValue(10)
+        self.search_size_sb.setValue(4)  # Set default to 4 per user request
         self.search_size_sb.setFixedWidth(60)
         search_size_row.addWidget(self.search_size_sb)
         search_size_row.addWidget(QLabel("pixels"))
@@ -3095,9 +3095,13 @@ class CalibrateModule(GUIBase):
                               "Please run calibration first before saving PONI file.")
             return
         
-        poni_path = self.poni_entry.text().strip()
+        # Get path from entry or show dialog
+        poni_path = None
+        if hasattr(self, 'poni_entry') and self.poni_entry.text().strip():
+            poni_path = self.poni_entry.text().strip()
+        
         if not poni_path:
-            # Use self.parent as parent for dialog
+            # Show file dialog
             poni_path, _ = QFileDialog.getSaveFileName(
                 self.parent, 
                 "Save PONI File", 
@@ -3107,17 +3111,28 @@ class CalibrateModule(GUIBase):
         
         if poni_path:
             try:
+                # Ensure .poni extension
+                if not poni_path.endswith('.poni'):
+                    poni_path += '.poni'
+                
+                # Save using pyFAI's save method
                 self.ai.save(poni_path)
+                
                 self.log(f"✓ PONI file saved to: {poni_path}")
                 QMessageBox.information(self.parent, "Success", 
                                       f"PONI file saved successfully!\n{poni_path}")
+                
                 # Update the text field with saved path
-                self.poni_entry.setText(poni_path)
+                if hasattr(self, 'poni_entry'):
+                    self.poni_entry.setText(poni_path)
+                    
             except Exception as e:
                 import traceback
+                error_detail = traceback.format_exc()
                 self.log(f"Error saving PONI: {str(e)}")
-                self.log(traceback.format_exc())
-                QMessageBox.critical(self.parent, "Error", f"Failed to save PONI file:\n{str(e)}")
+                self.log(error_detail)
+                QMessageBox.critical(self.parent, "Error", 
+                                   f"Failed to save PONI file:\n{str(e)}\n\nCheck log for details.")
 
     def on_contrast_slider_changed(self, value):
         """Handle contrast slider change (single vertical slider controls max)"""
@@ -3314,7 +3329,7 @@ class CalibrateModule(GUIBase):
 
 
     def update_cake_view(self):
-        """Update Cake view after calibration - Dioptas style"""
+        """Update Cake view after calibration - Dioptas style with correct polar transformation"""
         if not hasattr(self, 'cake_axes') or self.ai is None or self.current_image is None:
             return
         
@@ -3322,88 +3337,98 @@ class CalibrateModule(GUIBase):
             self.log("Generating Cake view (polar transformation)...")
             
             # Apply mask if available
-            mask = self.current_mask if hasattr(self, 'current_mask') else None
+            mask = None
+            if hasattr(self, 'imported_mask') and self.imported_mask is not None:
+                mask = self.imported_mask
+            elif hasattr(self, 'unified_canvas') and self.unified_canvas.mask_data is not None:
+                mask = self.unified_canvas.mask_data
             
-            # Use pyFAI's integrate2d for cake/polar transformation
-            # Dioptas-style: higher resolution for better visualization
+            # Dioptas-style cake/polar transformation
+            # Use integrate2d with proper parameters
             result = self.ai.integrate2d(
                 self.current_image,
-                npt_rad=500,      # Number of radial bins (2theta)
-                npt_azim=360,     # Number of azimuthal bins (chi/azimuth) - 1°/bin
-                unit="2th_deg",   # Use 2theta in degrees
-                mask=mask,        # Apply mask if available
-                method="splitpixel",
-                correctSolidAngle=True  # Important for accurate intensities
+                npt_rad=1024,     # Number of radial bins (2theta direction) - higher for better resolution
+                npt_azim=360,     # Number of azimuthal bins (chi/azimuth) - 1° per bin
+                unit="2th_deg",   # Use 2theta in degrees (Dioptas default)
+                mask=mask,
+                method="bbox",    # Fast method (Dioptas uses this for speed)
+                correctSolidAngle=False  # Dioptas doesn't apply this by default for cake
             )
             
-            # Result is (cake_image, 2theta_array, chi_array)
-            cake = result[0]
-            tth_rad = result[1]  # Radial axis (2theta)
-            chi_azim = result[2]  # Azimuthal axis (chi)
+            # Result: intensity, 2theta_edges, chi_edges
+            cake_intensity = result.intensity if hasattr(result, 'intensity') else result[0]
+            tth_edges = result.radial if hasattr(result, 'radial') else result[1]
+            chi_edges = result.azimuthal if hasattr(result, 'azimuthal') else result[2]
             
-            # Clear and plot
+            # Clear axes
             self.cake_axes.clear()
             
-            # Log scale for better visualization
-            cake_display = np.log10(cake + 1)  # Add 1 to avoid log(0)
+            # Log scale for better visualization (Dioptas style)
+            cake_display = np.log10(np.clip(cake_intensity, 1, None))  # Clip to avoid log(0)
             
-            # Display cake image with proper extent
-            # extent: [left, right, bottom, top]
-            extent = [tth_rad.min(), tth_rad.max(), chi_azim.min(), chi_azim.max()]
+            # Transpose for correct orientation (Dioptas has azimuth on Y, 2theta on X)
+            # cake_display should be (n_azim, n_rad) shape
+            if cake_display.shape[0] != len(chi_edges) - 1:
+                cake_display = cake_display.T
             
+            # Create extent for imshow [left, right, bottom, top]
+            extent = [tth_edges[0], tth_edges[-1], chi_edges[0], chi_edges[-1]]
+            
+            # Display cake with correct extent and orientation
             im = self.cake_axes.imshow(
                 cake_display,
                 aspect='auto',
-                origin='lower',
+                origin='lower',       # Origin at bottom-left (Dioptas style)
                 extent=extent,
-                cmap='viridis',
-                interpolation='nearest'
+                cmap='jet',          # Dioptas uses jet colormap
+                interpolation='nearest',
+                vmin=cake_display.min(),
+                vmax=np.percentile(cake_display, 99.5)  # Auto-scale to 99.5 percentile
             )
             
-            self.cake_axes.set_xlabel('2θ (degrees)', fontsize=10)
-            self.cake_axes.set_ylabel('χ (degrees)', fontsize=10)
-            self.cake_axes.set_title('Cake/Polar View (Dioptas-style)', fontsize=11, fontweight='bold')
+            # Set labels (Dioptas style)
+            self.cake_axes.set_xlabel('2θ (°)', fontsize=11)
+            self.cake_axes.set_ylabel('Azimuth (°)', fontsize=11)
+            self.cake_axes.set_title('Cake/Polar View', fontsize=12, fontweight='bold')
             
-            # Add calibrant lines if available (should appear as vertical lines)
-            if hasattr(self, 'calibrant_name') and self.calibrant_name:
+            # Add calibrant lines if available (vertical lines at expected 2theta positions)
+            if hasattr(self.ai, 'calibrant') and self.ai.calibrant is not None:
                 try:
-                    calibrant = ALL_CALIBRANTS[self.calibrant_name]
-                    calibrant.wavelength = self.ai.wavelength
-                    tth_calibrant = calibrant.get_2th()
+                    tth_calibrant = self.ai.calibrant.get_2th()
                     tth_calibrant_deg = np.degrees(tth_calibrant)
                     
-                    # Draw vertical lines for calibrant peaks (should be straight if calibration is good)
-                    tth_min, tth_max = tth_rad.min(), tth_rad.max()
-                    visible_peaks = tth_calibrant_deg[(tth_calibrant_deg >= tth_min) & 
-                                                       (tth_calibrant_deg <= tth_max)]
-                    for peak_pos in visible_peaks[:15]:
-                        self.cake_axes.axvline(peak_pos, color='red', linestyle='--', 
-                                             alpha=0.3, linewidth=0.5)
-                except Exception as e:
-                    self.log(f"Warning: Could not add calibrant lines to cake: {e}")
-            
-            # Add colorbar if not exists
-            if not hasattr(self, 'cake_colorbar') or self.cake_colorbar is None:
-                try:
-                    self.cake_colorbar = self.cake_canvas.figure.colorbar(im, ax=self.cake_axes)
-                except:
-                    pass
-            else:
-                try:
-                    self.cake_colorbar.update_normal(im)
+                    # Draw vertical lines for visible calibrant peaks
+                    for peak_2th in tth_calibrant_deg:
+                        if extent[0] <= peak_2th <= extent[1]:
+                            self.cake_axes.axvline(peak_2th, color='white', linestyle='-', 
+                                                 alpha=0.3, linewidth=0.8)
                 except:
                     pass
             
-            self.cake_canvas.draw()
-            self.log(f"Cake view updated: {cake.shape[1]}x{cake.shape[0]} (2θ × χ)")
+            # Add colorbar
+            if hasattr(self, 'cake_colorbar') and self.cake_colorbar is not None:
+                try:
+                    self.cake_colorbar.remove()
+                except:
+                    pass
+            
+            try:
+                self.cake_colorbar = self.cake_figure.colorbar(im, ax=self.cake_axes)
+                self.cake_colorbar.set_label('log10(Intensity)', fontsize=10)
+            except:
+                pass
+            
+            self.cake_canvas.draw_idle()
+            self.log(f"✓ Cake view updated: {cake_intensity.shape[1]} × {cake_intensity.shape[0]} (2θ × azimuth)")
                 
         except Exception as e:
             import traceback
+            error_detail = traceback.format_exc()
             self.log(f"Error updating Cake view: {str(e)}")
-            self.log(traceback.format_exc())
+            self.log(error_detail)
     
     def update_pattern_view(self):
-        """Update Pattern view after calibration - Dioptas style"""
+        """Update Pattern view after calibration - Dioptas style with correct 1D integration"""
         if not hasattr(self, 'pattern_axes') or self.ai is None or self.current_image is None:
             return
         
@@ -3411,57 +3436,69 @@ class CalibrateModule(GUIBase):
             self.log("Generating 1D integrated pattern...")
             
             # Apply mask if available
-            mask = self.current_mask if hasattr(self, 'current_mask') else None
+            mask = None
+            if hasattr(self, 'imported_mask') and self.imported_mask is not None:
+                mask = self.imported_mask
+            elif hasattr(self, 'unified_canvas') and self.unified_canvas.mask_data is not None:
+                mask = self.unified_canvas.mask_data
             
-            # Use pyFAI's integrate1d for azimuthal integration
+            # Dioptas-style 1D azimuthal integration
             result = self.ai.integrate1d(
                 self.current_image,
-                npt=2048,         # Number of points in output
-                unit="2th_deg",   # Use 2theta in degrees
-                mask=mask,        # Apply mask if available
-                method="splitpixel",
-                correctSolidAngle=True  # Important for accurate intensities
+                npt=2048,          # Number of points in output (Dioptas default)
+                unit="2th_deg",    # Use 2theta in degrees
+                mask=mask,
+                method="bbox",     # Fast method (Dioptas uses this)
+                correctSolidAngle=False,  # Dioptas doesn't apply this by default
+                polarization_factor=None   # No polarization correction by default
             )
             
-            # Result is (2theta_array, intensity_array)
-            tth = result[0]      # 2theta values
-            intensity = result[1] # Integrated intensity
+            # Result: radial (2theta), intensity
+            if hasattr(result, 'radial'):
+                tth = result.radial
+                intensity = result.intensity
+            else:
+                tth = result[0]
+                intensity = result[1]
             
-            # Clear and plot
+            # Clear axes
             self.pattern_axes.clear()
             
-            # Plot 1D pattern
-            self.pattern_axes.plot(tth, intensity, 'b-', linewidth=1.2)
-            self.pattern_axes.set_xlabel('2θ (degrees)', fontsize=10)
-            self.pattern_axes.set_ylabel('Intensity (a.u.)', fontsize=10)
-            self.pattern_axes.set_title('1D Integrated Pattern (Dioptas-style)', fontsize=11, fontweight='bold')
-            self.pattern_axes.grid(True, alpha=0.3)
+            # Plot 1D pattern with Dioptas styling
+            self.pattern_axes.plot(tth, intensity, 'b-', linewidth=1.0, alpha=0.8)
             
-            # Set reasonable y-axis limits (remove outliers)
-            y_max = np.percentile(intensity, 99.5)  # Use 99.5 percentile to avoid spikes
-            self.pattern_axes.set_ylim(0, y_max * 1.1)
+            # Set labels (Dioptas style)
+            self.pattern_axes.set_xlabel('2θ (°)', fontsize=11)
+            self.pattern_axes.set_ylabel('Intensity (counts)', fontsize=11)
+            self.pattern_axes.set_title('1D Integration Pattern', fontsize=12, fontweight='bold')
             
-            # Add calibrant peak positions if available
-            peak_count = 0
-            if hasattr(self, 'calibrant_name') and self.calibrant_name:
+            # Add grid
+            self.pattern_axes.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
+            
+            # Set reasonable axis limits
+            # X-axis: full 2theta range
+            self.pattern_axes.set_xlim(tth[0], tth[-1])
+            
+            # Y-axis: auto-scale to remove outliers
+            y_max = np.percentile(intensity, 99.5)
+            self.pattern_axes.set_ylim(0, y_max * 1.05)
+            
+            # Add calibrant peak positions if available (Dioptas style)
+            if hasattr(self.ai, 'calibrant') and self.ai.calibrant is not None:
                 try:
-                    calibrant = ALL_CALIBRANTS[self.calibrant_name]
-                    calibrant.wavelength = self.ai.wavelength
-                    
-                    # Get expected 2theta positions for calibrant peaks
-                    tth_calibrant = calibrant.get_2th()
+                    # Get expected 2theta positions
+                    tth_calibrant = self.ai.calibrant.get_2th()
                     tth_calibrant_deg = np.degrees(tth_calibrant)
                     
-                    # Filter to visible range
-                    tth_min, tth_max = tth.min(), tth.max()
-                    visible_peaks = tth_calibrant_deg[(tth_calibrant_deg >= tth_min) & 
-                                                       (tth_calibrant_deg <= tth_max)]
-                    
-                    # Draw vertical lines for calibrant peaks
-                    for peak_pos in visible_peaks[:20]:  # Limit to first 20 peaks
-                        self.pattern_axes.axvline(peak_pos, color='red', linestyle='--', 
-                                                 alpha=0.5, linewidth=0.8)
-                        peak_count += 1
+                    # Draw vertical lines for visible peaks
+                    peak_count = 0
+                    for peak_2th in tth_calibrant_deg:
+                        if tth[0] <= peak_2th <= tth[-1]:
+                            self.pattern_axes.axvline(peak_2th, color='red', linestyle='--', 
+                                                     alpha=0.4, linewidth=0.8)
+                            peak_count += 1
+                            if peak_count >= 20:  # Limit to 20 peaks
+                                break
                     
                     self.log(f"Added {peak_count} calibrant peak positions (of {len(visible_peaks)} in range)")
                 except Exception as cal_error:
