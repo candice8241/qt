@@ -261,9 +261,9 @@ class CalibrateModule(GUIBase):
             canvas_layout.setSpacing(2)
             
             try:
-                # Create canvas with large size for better visibility
-                # Increased per user request - maximize display area
-                self.unified_canvas = CalibrationCanvas(canvas_container, width=18, height=18, dpi=100)
+                # Create canvas with moderate size - balanced for visibility
+                # Reduced to make room for wider right panel
+                self.unified_canvas = CalibrationCanvas(canvas_container, width=14, height=14, dpi=100)
                 canvas_layout.addWidget(self.unified_canvas)
             except Exception as e:
                 # Only print errors to console
@@ -298,7 +298,7 @@ class CalibrateModule(GUIBase):
             self.contrast_slider.setMaximum(65535)
             self.contrast_slider.setValue(65535)
             self.contrast_slider.setInvertedAppearance(True)  # Max at top
-            self.contrast_slider.setFixedHeight(700)  # Increase height to match larger canvas (18x18)
+            self.contrast_slider.setFixedHeight(550)  # Match canvas height (14x14)
             self.contrast_slider.setStyleSheet("""
                 QSlider::groove:vertical {
                     width: 25px;
@@ -399,8 +399,9 @@ class CalibrateModule(GUIBase):
         
         # Status bar with display controls and Calibrate/Refine buttons
         status_frame = QFrame()
+        status_frame.setMaximumHeight(40)  # Limit status bar height
         status_layout = QHBoxLayout(status_frame)
-        status_layout.setContentsMargins(3, 2, 3, 2)
+        status_layout.setContentsMargins(3, 1, 3, 1)
         status_layout.setSpacing(3)
         
         # Display control buttons
@@ -409,8 +410,8 @@ class CalibrateModule(GUIBase):
                                         "",
                                         bg_color=self.colors['secondary'],
                                         hover_color=self.colors['primary'],
-                                        width=120, height=35,
-                                        font_size=9,
+                                        width=110, height=32,
+                                        font_size=8,
                                         parent=status_frame)
         
         reset_zoom_btn = ModernButton("Reset Zoom",
@@ -418,8 +419,8 @@ class CalibrateModule(GUIBase):
                                      "",
                                      bg_color=self.colors['secondary'],
                                      hover_color=self.colors['primary'],
-                                     width=120, height=35,
-                                     font_size=9,
+                                     width=100, height=32,
+                                     font_size=8,
                                      parent=status_frame)
         
         status_layout.addWidget(auto_contrast_btn)
@@ -431,8 +432,8 @@ class CalibrateModule(GUIBase):
                                          "",
                                          bg_color=self.colors['primary'],
                                          hover_color=self.colors['primary_hover'],
-                                         width=130, height=35,
-                                         font_size=10,
+                                         width=120, height=32,
+                                         font_size=9,
                                          parent=status_frame)
         
         self.refine_btn = ModernButton("Refine",
@@ -440,8 +441,8 @@ class CalibrateModule(GUIBase):
                                        "",
                                        bg_color=self.colors['secondary'],
                                        hover_color=self.colors['primary'],
-                                       width=130, height=35,
-                                       font_size=10,
+                                       width=100, height=32,
+                                       font_size=9,
                                        parent=status_frame)
         
         self.position_lbl = QLabel("Position: x=0, y=0")
@@ -456,18 +457,18 @@ class CalibrateModule(GUIBase):
         
         # ============== RIGHT PANEL: CONTROL WIDGET ==============
         # Use scroll area to ensure all controls are accessible
-        # Reduce width to give more space to image display
+        # Increase width for better readability
         right_scroll = QScrollArea()
         right_scroll.setWidgetResizable(True)
         right_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        right_scroll.setMinimumWidth(270)
-        right_scroll.setMaximumWidth(275)
+        right_scroll.setMinimumWidth(340)
+        right_scroll.setMaximumWidth(360)
         right_scroll.setContentsMargins(0, 0, 0, 0)
         
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
-        right_layout.setContentsMargins(2, 2, 2, 2)
-        right_layout.setSpacing(2)
+        right_layout.setContentsMargins(4, 2, 4, 2)
+        right_layout.setSpacing(3)
         
         # File loading section
         file_frame = QFrame()
@@ -475,22 +476,22 @@ class CalibrateModule(GUIBase):
         file_layout.setContentsMargins(2, 2, 2, 2)
         file_layout.setSpacing(2)
         
-        self.load_img_btn = ModernButton("Load Image",
+        self.load_img_btn = ModernButton("Load Image File",
                                          self.browse_and_load_image,
                                          "",
                                          bg_color=self.colors['secondary'],
                                          hover_color=self.colors['primary'],
-                                         width=160, height=28,
-                                         font_size=8,
+                                         width=200, height=30,
+                                         font_size=9,
                                          parent=file_frame)
         
         self.load_previous_img_btn = QPushButton("<")
-        self.load_previous_img_btn.setMaximumWidth(45)
-        self.load_previous_img_btn.setStyleSheet("padding: 4px; font-size: 9pt;")
+        self.load_previous_img_btn.setMaximumWidth(55)
+        self.load_previous_img_btn.setStyleSheet("padding: 5px; font-size: 10pt;")
         
         self.load_next_img_btn = QPushButton(">")
-        self.load_next_img_btn.setMaximumWidth(45)
-        self.load_next_img_btn.setStyleSheet("padding: 4px; font-size: 9pt;")
+        self.load_next_img_btn.setMaximumWidth(55)
+        self.load_next_img_btn.setStyleSheet("padding: 5px; font-size: 10pt;")
         
         file_layout.addWidget(self.load_img_btn)
         file_layout.addWidget(self.load_previous_img_btn)
@@ -551,22 +552,22 @@ class CalibrateModule(GUIBase):
         bottom_layout.setContentsMargins(2, 2, 2, 2)
         bottom_layout.setSpacing(2)
         
-        self.load_calibration_btn = ModernButton("Load PONI",
+        self.load_calibration_btn = ModernButton("Load Calibration",
                                                 self.load_calibration,
                                                 "",
                                                 bg_color=self.colors['secondary'],
                                                 hover_color=self.colors['primary'],
-                                                width=130, height=26,
-                                                font_size=8,
+                                                width=165, height=30,
+                                                font_size=9,
                                                 parent=bottom_frame)
         
-        self.save_calibration_btn = ModernButton("Save PONI",
+        self.save_calibration_btn = ModernButton("Save Calibration",
                                                 self.save_poni_file,
                                                 "",
                                                 bg_color=self.colors['secondary'],
                                                 hover_color=self.colors['primary'],
-                                                width=130, height=26,
-                                                font_size=8,
+                                                width=165, height=30,
+                                                font_size=9,
                                                 parent=bottom_frame)
         
         bottom_layout.addWidget(self.load_calibration_btn)
@@ -607,12 +608,12 @@ class CalibrateModule(GUIBase):
         main_splitter.setStretchFactor(0, 1)
         main_splitter.setStretchFactor(1, 0)
         
-        # Set initial splitter sizes to favor left panel
-        # Total width e.g. 1400: left gets more space, right gets 275
-        main_splitter.setSizes([1300, 275])
+        # Set initial splitter sizes - balanced layout
+        # Total width e.g. 1400: left gets 1040, right gets 360
+        main_splitter.setSizes([1000, 360])
         
         # Reduce handle width for more space
-        main_splitter.setHandleWidth(1)
+        main_splitter.setHandleWidth(2)
         
         layout.addWidget(main_splitter)
         
@@ -628,22 +629,22 @@ class CalibrateModule(GUIBase):
                 font-weight: bold;
                 font-size: 9pt;
                 border: 1px solid {self.colors['border']};
-                border-radius: 2px;
-                margin-top: 5px;
-                margin-bottom: 3px;
-                padding: 8px 3px 3px 3px;
+                border-radius: 3px;
+                margin-top: 6px;
+                margin-bottom: 4px;
+                padding: 10px 5px 5px 5px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 6px;
-                padding: 0 2px 0 2px;
+                left: 8px;
+                padding: 0 3px 0 3px;
                 color: {self.colors['text_dark']};
             }}
         """)
         detector_layout = QVBoxLayout(detector_gb)
-        detector_layout.setSpacing(3)
-        detector_layout.setContentsMargins(2, 2, 2, 2)
+        detector_layout.setSpacing(5)
+        detector_layout.setContentsMargins(4, 4, 4, 4)
         
         # Detector selection combo box
         self.detector_combo = QComboBox()
@@ -705,22 +706,22 @@ class CalibrateModule(GUIBase):
                 font-weight: bold;
                 font-size: 9pt;
                 border: 1px solid {self.colors['border']};
-                border-radius: 2px;
-                margin-top: 5px;
-                margin-bottom: 3px;
-                padding: 8px 3px 3px 3px;
+                border-radius: 3px;
+                margin-top: 6px;
+                margin-bottom: 4px;
+                padding: 10px 5px 5px 5px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 6px;
-                padding: 0 2px 0 2px;
+                left: 8px;
+                padding: 0 3px 0 3px;
                 color: {self.colors['text_dark']};
             }}
         """)
         sv_layout = QVBoxLayout(sv_gb)
-        sv_layout.setSpacing(3)
-        sv_layout.setContentsMargins(2, 2, 2, 2)
+        sv_layout.setSpacing(5)
+        sv_layout.setContentsMargins(4, 4, 4, 4)
         
         # Calibrant selection
         calib_layout = QHBoxLayout()
@@ -817,22 +818,22 @@ class CalibrateModule(GUIBase):
                 font-weight: bold;
                 font-size: 9pt;
                 border: 1px solid {self.colors['border']};
-                border-radius: 2px;
-                margin-top: 5px;
-                margin-bottom: 3px;
-                padding: 8px 3px 3px 3px;
+                border-radius: 3px;
+                margin-top: 6px;
+                margin-bottom: 4px;
+                padding: 10px 5px 5px 5px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 6px;
-                padding: 0 2px 0 2px;
+                left: 8px;
+                padding: 0 3px 0 3px;
                 color: {self.colors['text_dark']};
             }}
         """)
         peak_layout = QVBoxLayout(peak_gb)
-        peak_layout.setSpacing(3)
-        peak_layout.setContentsMargins(2, 2, 2, 2)
+        peak_layout.setSpacing(5)
+        peak_layout.setContentsMargins(4, 4, 4, 4)
         
         # Radio buttons for peak selection mode
         self.peak_mode_group = QButtonGroup()
@@ -946,22 +947,22 @@ class CalibrateModule(GUIBase):
                 font-weight: bold;
                 font-size: 9pt;
                 border: 1px solid {self.colors['border']};
-                border-radius: 2px;
-                margin-top: 5px;
-                margin-bottom: 3px;
-                padding: 8px 3px 3px 3px;
+                border-radius: 3px;
+                margin-top: 6px;
+                margin-bottom: 4px;
+                padding: 10px 5px 5px 5px;
                 background-color: {self.colors['card_bg']};
             }}
             QGroupBox::title {{
                 subcontrol-origin: margin;
-                left: 6px;
-                padding: 0 2px 0 2px;
+                left: 8px;
+                padding: 0 3px 0 3px;
                 color: {self.colors['text_dark']};
             }}
         """)
         ref_layout = QVBoxLayout(ref_gb)
-        ref_layout.setSpacing(3)
-        ref_layout.setContentsMargins(2, 2, 2, 2)
+        ref_layout.setSpacing(5)
+        ref_layout.setContentsMargins(4, 4, 4, 4)
         
         # Checkbox style
         checkbox_style = f"""
@@ -989,9 +990,9 @@ class CalibrateModule(GUIBase):
             }}
         """
         
-        # Info label - compact
-        info_label = QLabel("Select parameters to refine:")
-        info_label.setStyleSheet(f"color: {self.colors['text_dark']}; font-size: 8pt; font-weight: normal; padding: 2px 0px;")
+        # Info label
+        info_label = QLabel("Select parameters to refine during calibration:")
+        info_label.setStyleSheet(f"color: {self.colors['text_dark']}; font-size: 8pt; font-weight: normal; padding: 3px 0px;")
         info_label.setWordWrap(True)
         ref_layout.addWidget(info_label)
         
