@@ -2174,10 +2174,17 @@ class CalibrateModule(GUIBase):
 
     def browse_and_load_image(self):
         """Browse for calibration image and load it immediately"""
-        filename, _ = QFileDialog.getOpenFileName(
-            None, "Select Calibration Image", "",
-            "Image Files (*.tif *.tiff *.edf *.cbf *.mar3450 *.img *.h5 *.hdf5);;HDF5 Files (*.h5 *.hdf5);;TIFF Files (*.tif *.tiff);;EDF Files (*.edf);;All Files (*.*)"
-        )
+        # Create file dialog with proper parent to avoid flashing
+        dialog = QFileDialog(self.parent if hasattr(self, 'parent') and self.parent else None)
+        dialog.setWindowTitle("Select Calibration Image")
+        dialog.setNameFilter("Image Files (*.tif *.tiff *.edf *.cbf *.mar3450 *.img *.h5 *.hdf5);;HDF5 Files (*.h5 *.hdf5);;TIFF Files (*.tif *.tiff);;EDF Files (*.edf);;All Files (*.*)")
+        dialog.setFileMode(QFileDialog.FileMode.ExistingFile)
+        dialog.setOption(QFileDialog.Option.DontUseNativeDialog, False)  # Use native dialog for better performance
+        
+        if dialog.exec() == QFileDialog.DialogCode.Accepted:
+            filename = dialog.selectedFiles()[0]
+        else:
+            filename = None
         if filename:
             self.image_path = filename
             # Update filename display

@@ -458,6 +458,12 @@ class CalibrationCanvas(FigureCanvas):
         # Store current manual peaks before clearing
         temp_manual_peaks = self.manual_peaks.copy()
         
+        # Save current zoom state before clearing
+        current_xlim = self.axes.get_xlim()
+        current_ylim = self.axes.get_ylim()
+        has_zoom = (self.base_xlim is not None and 
+                   (current_xlim != self.base_xlim or current_ylim != self.base_ylim))
+        
         self.axes.clear()
         
         # Clear peak markers list
@@ -540,6 +546,11 @@ class CalibrationCanvas(FigureCanvas):
         if self.base_xlim is None:
             self.base_xlim = self.axes.get_xlim()
             self.base_ylim = self.axes.get_ylim()
+        
+        # Restore zoom state if it was zoomed
+        if has_zoom:
+            self.axes.set_xlim(current_xlim)
+            self.axes.set_ylim(current_ylim)
         
         # Draw theoretical calibration rings if AI is available (Dioptas-style)
         if self.ai is not None and self.show_theoretical_rings:
