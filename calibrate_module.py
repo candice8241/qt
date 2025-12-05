@@ -1799,12 +1799,8 @@ class CalibrateModule(GUIBase):
         self.automatic_peak_num_inc_cb.setStyleSheet(f"color: {self.colors['text_dark']}; font-size: 9pt;")
         card_layout.addWidget(self.automatic_peak_num_inc_cb)
         
-        # Real-time auto peak finding checkbox (Dioptas style)
-        self.auto_peak_search_cb = QCheckBox("Real-time automatic peak finding")
-        self.auto_peak_search_cb.setChecked(True)
-        self.auto_peak_search_cb.setStyleSheet(f"color: {self.colors['text_dark']}; font-size: 9pt;")
-        self.auto_peak_search_cb.stateChanged.connect(self.on_auto_peak_search_changed)
-        card_layout.addWidget(self.auto_peak_search_cb)
+        # NOTE: Real-time auto peak finding during manual selection removed per user request
+        # Auto peak finding now only happens when clicking Calibrate button
         
         # Separator
         separator = QFrame()
@@ -2300,31 +2296,6 @@ class CalibrateModule(GUIBase):
         """Update ring number display after auto-increment"""
         if hasattr(self, 'ring_num_input'):
             self.ring_num_input.setValue(ring_num)
-    
-    def on_auto_peak_search_changed(self, state):
-        """Handle real-time auto peak search checkbox change (Dioptas-style)"""
-        enabled = (state == Qt.CheckState.Checked.value)
-        
-        # Update canvas setting
-        if hasattr(self, 'unified_canvas'):
-            self.unified_canvas.show_auto_peaks = enabled
-            
-            if enabled:
-                self.log("✓ Real-time automatic peak finding ENABLED")
-                self.log("  When you click a point on a ring, the system will automatically")
-                self.log("  search for and display other peaks on the same ring (cyan circles)")
-                
-                # If there are existing manual peaks, refresh auto peaks for them
-                if hasattr(self.unified_canvas, 'manual_peaks') and self.unified_canvas.manual_peaks:
-                    self.log(f"  Refreshing auto peaks for {len(self.unified_canvas.manual_peaks)} existing manual peaks...")
-                    self.unified_canvas.refresh_auto_peaks_for_all_manual()
-            else:
-                self.log("✗ Real-time automatic peak finding DISABLED")
-                # Clear existing auto peaks
-                self.unified_canvas.clear_auto_peaks()
-                if self.current_image is not None:
-                    self.unified_canvas.display_calibration_image(self.current_image)
-            self.log(f"Ring number auto-incremented to: {ring_num}")
         # Also sync the old spinbox if it exists
         if hasattr(self, 'ring_number_spinbox'):
             self.ring_number_spinbox.setValue(ring_num)
@@ -2359,7 +2330,7 @@ class CalibrateModule(GUIBase):
             self.log("Automatic peak search mode: ENABLED")
     
     def toggle_peak_picking(self):
-        """Toggle manual peak picking mode (Dioptas-style with auto peak finding)"""
+        """Toggle manual peak picking mode"""
         self.peak_picking_mode = not self.peak_picking_mode
         
         if MATPLOTLIB_AVAILABLE and hasattr(self, 'unified_canvas'):
@@ -2375,9 +2346,8 @@ class CalibrateModule(GUIBase):
                 if hasattr(self, 'automatic_peak_num_inc_cb'):
                     self.unified_canvas.auto_increment_ring = self.automatic_peak_num_inc_cb.isChecked()
                 
-                # Set auto peak search flag
-                if hasattr(self, 'auto_peak_search_cb'):
-                    self.unified_canvas.show_auto_peaks = self.auto_peak_search_cb.isChecked()
+                # NOTE: Auto peak search removed - only manual peaks during selection
+                # Auto peak finding happens in Calibrate process
                 
                 # Set parent reference for callbacks
                 self.unified_canvas.parent_module = self
@@ -2703,10 +2673,19 @@ class CalibrateModule(GUIBase):
                                         # Convert to pixel coordinates
                                         try:
                                             # Use temp_ai to convert polar to pixel
-                                            y, x = temp_ai.calcfrom1d(np.array([tth_val]), np.array([chi_val]), shape=shape)
-                                            if 0 <= y < shape[0] and 0 <= x < shape[1]:
-                                                ring_display_points.append([float(x), float(y), ring_num])
-                                        except:
+                                            # calcfrom1d expects arrays and returns arrays
+                                            tth_array = np.array([tth_val])
+                                            chi_array = np.array([chi_val])
+                                            result = temp_ai.calcfrom1d(tth_array, chi_array, shape=shape, unit="2th_rad")
+                                            
+                                            if result is not None and len(result) == 2:
+                                                y_arr, x_arr = result
+                                                if len(y_arr) > 0 and len(x_arr) > 0:
+                                                    y, x = float(y_arr[0]), float(x_arr[0])
+                                                    if 0 <= y < shape[0] and 0 <= x < shape[1]:
+                                                        ring_display_points.append([float(x), float(y), ring_num])
+                                        except Exception as coord_error:
+                                            # Skip points that can't be converted
                                             pass
                                 
                                 # Send as progress signal (string format for thread safety)
@@ -2728,11 +2707,13 @@ class CalibrateModule(GUIBase):
                     self.log("="*70)
                     self.log(f"Peak detection complete: {num_rings} rings found")
                     self.log("="*70 + "\n")
-                    
-                    # Clean up temporary objects
+                
+                # Clean up temporary objects (outside of if block)
+                try:
                     del temp_ai
-                    del ring_display_points
-                    gc.collect()
+                except:
+                    pass
+                gc.collect()
                     
             except Exception as e:
                 import traceback

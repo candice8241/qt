@@ -669,7 +669,7 @@ class CalibrationCanvas(FigureCanvas):
             self.on_mask_click(event)
     
     def on_peak_click(self, event):
-        """Handle mouse click for peak picking with real-time auto peak finding (Dioptas-style)"""
+        """Handle mouse click for peak picking (manual mode only, no auto search)"""
         if not self.peak_picking_mode:
             return
         
@@ -693,28 +693,9 @@ class CalibrationCanvas(FigureCanvas):
                               fontweight='bold')
         self.peak_markers.append(label)
         
-        # ===== REAL-TIME AUTO PEAK FINDING (Dioptas-style) =====
-        # Automatically search for peaks on the same ring
-        if self.show_auto_peaks and self.image_data is not None:
-            print(f"[Auto Peak] Searching ring {ring_num} based on manual point at ({x:.1f}, {y:.1f})")
-            
-            # Find peaks on this ring
-            auto_peaks = self.auto_find_peaks_on_ring(x, y, ring_num)
-            
-            if auto_peaks:
-                print(f"[Auto Peak] Found {len(auto_peaks)} peaks on ring {ring_num}")
-                
-                # Add to auto_detected_peaks
-                self.auto_detected_peaks.extend(auto_peaks)
-                
-                # Display them immediately
-                for peak_x, peak_y, peak_ring in auto_peaks:
-                    marker = self.axes.plot(peak_x, peak_y, 'o', markersize=4, 
-                                          markerfacecolor='cyan', markeredgecolor='blue', 
-                                          markeredgewidth=0.5, alpha=0.7)[0]
-                    self.auto_peak_markers.append(marker)
-            else:
-                print(f"[Auto Peak] No additional peaks found on ring {ring_num}")
+        # NO AUTO PEAK FINDING - removed per user request
+        # Only manual peaks are added here
+        # Auto peak finding happens only when clicking Calibrate button
         
         self.draw_idle()
         
@@ -842,10 +823,10 @@ class CalibrationCanvas(FigureCanvas):
     
     def get_manual_control_points(self):
         """Get manually selected control points in format for calibration
-        (Dioptas-style: includes both manual and auto-detected peaks)
         
         Returns:
             list: Control points in format [[row, col, ring_num], ...]
+            Only returns MANUAL peaks (no auto-detected peaks)
         """
         if not self.manual_peaks:
             return None
@@ -853,17 +834,13 @@ class CalibrationCanvas(FigureCanvas):
         # Convert from (x, y, ring_num) to [[row, col, ring_num], ...]
         control_points = []
         
-        # Add manual peaks
+        # Add manual peaks only
         for x, y, ring_num in self.manual_peaks:
             # x corresponds to col, y corresponds to row
             control_points.append([y, x, ring_num])
         
-        # Add auto-detected peaks if enabled (Dioptas-style)
-        if self.show_auto_peaks and hasattr(self, 'auto_detected_peaks') and self.auto_detected_peaks:
-            for x, y, ring_num in self.auto_detected_peaks:
-                control_points.append([y, x, ring_num])
-            print(f"[Calibration] Total control points: {len(control_points)} "
-                  f"({len(self.manual_peaks)} manual + {len(self.auto_detected_peaks)} auto)")
+        # NO auto-detected peaks included - removed per user request
+        # Auto peak finding only happens in Calibrate process
         
         return control_points
     
@@ -878,8 +855,9 @@ class CalibrationCanvas(FigureCanvas):
                 pass
         self.peak_markers = []
         
-        # Also clear auto-detected peaks
-        self.clear_auto_peaks()
+        # Also clear auto-detected peaks (if any from Calibrate process)
+        if hasattr(self, 'clear_auto_peaks'):
+            self.clear_auto_peaks()
         
         self.draw_idle()
     
