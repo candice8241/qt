@@ -123,9 +123,7 @@ class MaskCanvas(FigureCanvas):
             self.display_image()
             return True
         except Exception as e:
-            print(f"ERROR loading image: {e}")  # Console output for errors
-            import traceback
-            traceback.print_exc()
+            print(f"ERROR loading image: {e}")  # Simplified error message
             return False
     
     def display_image(self):
@@ -443,8 +441,6 @@ class CalibrationCanvas(FigureCanvas):
                 
         except Exception as e:
             print(f"ERROR creating CalibrationCanvas: {e}")
-            import traceback
-            traceback.print_exc()
             raise
         
     def display_calibration_image(self, image_data, calibration_points=None):
@@ -608,10 +604,8 @@ class CalibrationCanvas(FigureCanvas):
                     continue
                     
         except Exception as e:
-            # If theoretical ring drawing fails, print error to console
+            # If theoretical ring drawing fails, print simplified error
             print(f"ERROR drawing theoretical rings: {e}")
-            import traceback
-            traceback.print_exc()
     
     def update_calibration_overlay(self, ai):
         """
@@ -685,6 +679,7 @@ class CalibrationCanvas(FigureCanvas):
         # Could be optimized with blitting if needed
         if self.image_data is not None:
             self.display_calibration_image(self.image_data, self.calibration_points)
+            self.draw()  # Force canvas refresh
     
     def on_unified_click(self, event):
         """Unified click handler for both peak picking and mask editing"""
@@ -982,10 +977,8 @@ class CalibrationCanvas(FigureCanvas):
             return [(x, y, ring_num) for x, y in peaks]
             
         except Exception as e:
-            # Only print errors to console
+            # Simplified error message
             print(f"ERROR in auto peak finding: {e}")
-            import traceback
-            traceback.print_exc()
             return []
     
     def update_auto_peaks_display(self):

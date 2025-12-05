@@ -16,6 +16,10 @@ Created: 2025
 NOTE: Canvas classes have been moved to calibration_canvas.py for better modularity
 """
 
+# Suppress verbose traceback in console (keep only essential error info)
+import sys
+sys.tracebacklimit = 0  # Disable full traceback in console
+
 from PyQt6.QtWidgets import (QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton,
                               QLineEdit, QTextEdit, QCheckBox, QComboBox, QGroupBox,
                               QFileDialog, QMessageBox, QFrame, QScrollArea, QSplitter,
@@ -25,14 +29,17 @@ from PyQt6.QtWidgets import (QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushBut
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
 import os
-import sys
 import numpy as np
 from gui_base import GUIBase
 from theme_module import ModernButton
 from custom_widgets import CustomSpinbox
 
-# Import Canvas classes (moved to separate file)
-from calibration_canvas import MaskCanvas, CalibrationCanvas
+# Import Canvas classes (moved to separate file) with error handling
+try:
+    from calibration_canvas import MaskCanvas, CalibrationCanvas
+except Exception as e:
+    print(f"Error importing calibration_canvas: {e}")
+    sys.exit(1)
 
 # Constants
 INT32_MAX = 2147483647  # Maximum value for 32-bit signed integer (Qt widgets use int32)
@@ -91,8 +98,8 @@ class CalibrationWorkerThread(QThread):
             self.calibration_result.emit(result)
             self.finished.emit("Calibration completed successfully")
         except Exception as e:
-            import traceback
-            error_msg = f"Error: {str(e)}\n{traceback.format_exc()}"
+            # Simplified error message without full traceback
+            error_msg = f"Calibration Error: {str(e)}"
             self.error.emit(error_msg)
 
 
@@ -269,12 +276,10 @@ class CalibrateModule(GUIBase):
                 self.unified_canvas = CalibrationCanvas(canvas_container, width=14, height=14, dpi=100)
                 canvas_layout.addWidget(self.unified_canvas)
             except Exception as e:
-                # Only print errors to console
+                # Simplified error message
                 print(f"ERROR creating CalibrationCanvas: {e}")
-                import traceback
-                traceback.print_exc()
                 # Create placeholder
-                placeholder = QLabel("Canvas initialization error.\nPlease restart or check console.")
+                placeholder = QLabel("Canvas initialization error.\nPlease restart the application.")
                 placeholder.setStyleSheet("color: red; padding: 20px;")
                 canvas_layout.addWidget(placeholder)
                 self.unified_canvas = None
@@ -426,10 +431,6 @@ class CalibrateModule(GUIBase):
                                      font_size=8,
                                      parent=status_frame)
         
-        status_layout.addWidget(auto_contrast_btn)
-        status_layout.addWidget(reset_zoom_btn)
-        status_layout.addStretch()
-        
         self.calibrate_btn = ModernButton("Calibrate",
                                          self.run_calibration,
                                          "",
@@ -438,7 +439,7 @@ class CalibrateModule(GUIBase):
                                          width=120, height=32,
                                          font_size=9,
                                          parent=status_frame)
-        
+
         self.refine_btn = ModernButton("Refine",
                                        self.refine_calibration,
                                        "",
@@ -447,13 +448,19 @@ class CalibrateModule(GUIBase):
                                        width=100, height=32,
                                        font_size=9,
                                        parent=status_frame)
-        
+
         self.position_lbl = QLabel("Position: x=0, y=0")
         self.position_lbl.setFont(QFont('Arial', 9))
-        
+
+        # Center the four main buttons horizontally
+        status_layout.addStretch()
+        status_layout.addWidget(auto_contrast_btn)
+        status_layout.addWidget(reset_zoom_btn)
         status_layout.addWidget(self.calibrate_btn)
         status_layout.addWidget(self.refine_btn)
         status_layout.addStretch()
+
+        # Position label on the right
         status_layout.addWidget(self.position_lbl)
         
         left_layout.addWidget(status_frame)
@@ -865,34 +872,103 @@ class CalibrateModule(GUIBase):
         params_grid.setVerticalSpacing(6)
         params_grid.setContentsMargins(15, 0, 0, 0)
         
+        # SpinBox style with functional arrows
+        spinbox_style = f"""
+            QSpinBox {{
+                padding: 2px 4px;
+                border: 1px solid #ccc;
+                border-radius: 2px;
+                background: #FFF8DC;
+            }}
+            QSpinBox::up-button {{
+                subcontrol-origin: border;
+                subcontrol-position: top right;
+                width: 16px;
+                border-left: 1px solid #ccc;
+                background: #f0f0f0;
+            }}
+            QSpinBox::up-button:hover {{
+                background: {self.colors['primary']};
+            }}
+            QSpinBox::up-arrow {{
+                width: 7px;
+                height: 7px;
+                image: none;
+                border-left: 3px solid transparent;
+                border-right: 3px solid transparent;
+                border-bottom: 4px solid #333;
+            }}
+            QSpinBox::down-button {{
+                subcontrol-origin: border;
+                subcontrol-position: bottom right;
+                width: 16px;
+                border-left: 1px solid #ccc;
+                background: #f0f0f0;
+            }}
+            QSpinBox::down-button:hover {{
+                background: {self.colors['primary']};
+            }}
+            QSpinBox::down-arrow {{
+                width: 7px;
+                height: 7px;
+                image: none;
+                border-left: 3px solid transparent;
+                border-right: 3px solid transparent;
+                border-top: 4px solid #333;
+            }}
+        """
+
         # Current Ring Number
         params_grid.addWidget(QLabel("Ring #:"), 0, 0)
         self.ring_number_spinbox = QSpinBox()
         self.ring_number_spinbox.setMinimum(1)
         self.ring_number_spinbox.setMaximum(50)
         self.ring_number_spinbox.setValue(1)
-        self.ring_number_spinbox.setFixedWidth(65)
-        self.ring_number_spinbox.setStyleSheet("padding: 2px 4px; border: 1px solid #ccc; border-radius: 2px; background: #FFF8DC;")
+        self.ring_number_spinbox.setFixedWidth(80)
+        self.ring_number_spinbox.setStyleSheet(spinbox_style)
         self.ring_number_spinbox.valueChanged.connect(self.on_ring_number_changed)
         params_grid.addWidget(self.ring_number_spinbox, 0, 1)
-        
+
         # Search size
         params_grid.addWidget(QLabel("Search Size:"), 1, 0)
         self.search_size_sb = QSpinBox()
         self.search_size_sb.setMinimum(1)
         self.search_size_sb.setMaximum(100)
         self.search_size_sb.setValue(1)
-        self.search_size_sb.setFixedWidth(65)
-        self.search_size_sb.setStyleSheet("padding: 2px 4px; border: 1px solid #ccc; border-radius: 2px;")
+        self.search_size_sb.setFixedWidth(80)
+        self.search_size_sb.setStyleSheet(spinbox_style.replace("background: #FFF8DC;", "background: white;"))
         params_grid.addWidget(self.search_size_sb, 1, 1)
         params_grid.addWidget(QLabel("px"), 1, 2)
         
         peak_layout.addLayout(params_grid)
         
-        # Auto increment checkbox
+        # Auto increment checkbox (styled to match radio buttons)
+        checkbox_style = f"""
+            QCheckBox {{
+                spacing: 8px;
+                padding: 6px 0px;
+                color: {self.colors['text_dark']};
+                margin-left: 0px;
+            }}
+            QCheckBox::indicator {{
+                width: 14px;
+                height: 14px;
+                border: 2px solid #999999;
+                border-radius: 3px;
+                background-color: white;
+            }}
+            QCheckBox::indicator:checked {{
+                background-color: {self.colors['primary']};
+                border: 2px solid {self.colors['primary']};
+                image: url(check.png);
+            }}
+            QCheckBox::indicator:hover {{
+                border: 2px solid {self.colors['primary']};
+            }}
+        """
         self.automatic_peak_num_inc_cb = QCheckBox("Auto-increment ring number")
         self.automatic_peak_num_inc_cb.setChecked(True)
-        self.automatic_peak_num_inc_cb.setStyleSheet(f"color: {self.colors['text_dark']}; margin-left: 15px;")
+        self.automatic_peak_num_inc_cb.setStyleSheet(checkbox_style)
         peak_layout.addWidget(self.automatic_peak_num_inc_cb)
         
         # Control buttons with modern style
@@ -3542,11 +3618,15 @@ class CalibrateModule(GUIBase):
     def apply_contrast_from_slider(self, vmax):
         """Apply contrast from single slider"""
         vmin = 0  # Always use 0 as minimum
-        
+
         # Apply to canvases
         if MATPLOTLIB_AVAILABLE:
-            if hasattr(self, 'calibration_canvas'):
+            # unified_canvas is the main display canvas
+            if hasattr(self, 'unified_canvas') and self.unified_canvas is not None:
+                self.unified_canvas.set_contrast(vmin, vmax)
+            elif hasattr(self, 'calibration_canvas'):
                 self.calibration_canvas.set_contrast(vmin, vmax)
+
             if hasattr(self, 'mask_canvas'):
                 self.mask_canvas.set_contrast(vmin, vmax)
     
