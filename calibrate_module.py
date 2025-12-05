@@ -16,23 +16,33 @@ Created: 2025
 NOTE: Canvas classes have been moved to calibration_canvas.py for better modularity
 """
 
+# Suppress verbose traceback in console (keep only essential error info)
+import sys
+sys.tracebacklimit = 0  # Disable full traceback in console
+
 from PyQt6.QtWidgets import (QWidget, QLabel, QVBoxLayout, QHBoxLayout, QPushButton,
                               QLineEdit, QTextEdit, QCheckBox, QComboBox, QGroupBox,
                               QFileDialog, QMessageBox, QFrame, QScrollArea, QSplitter,
                               QListWidget, QListWidgetItem, QSlider, QRadioButton, QButtonGroup,
                               QSpinBox, QDoubleSpinBox, QToolBox, QTabWidget, QTableWidget,
-                              QTableWidgetItem, QHeaderView, QDialog)
+                              QTableWidgetItem, QHeaderView, QDialog, QGridLayout)
 from PyQt6.QtCore import Qt, QThread, pyqtSignal, QTimer
 from PyQt6.QtGui import QFont
 import os
-import sys
 import numpy as np
 from gui_base import GUIBase
 from theme_module import ModernButton
 from custom_widgets import CustomSpinbox
 
-# Import Canvas classes (moved to separate file)
-from calibration_canvas import MaskCanvas, CalibrationCanvas
+# Import Canvas classes (moved to separate file) with error handling
+try:
+    from calibration_canvas import MaskCanvas, CalibrationCanvas
+except Exception as e:
+    print(f"Error importing calibration_canvas: {e}")
+    sys.exit(1)
+
+# Constants
+INT32_MAX = 2147483647  # Maximum value for 32-bit signed integer (Qt widgets use int32)
 
 # Import pyFAI and related libraries
 try:
@@ -88,8 +98,8 @@ class CalibrationWorkerThread(QThread):
             self.calibration_result.emit(result)
             self.finished.emit("Calibration completed successfully")
         except Exception as e:
-            import traceback
-            error_msg = f"Error: {str(e)}\n{traceback.format_exc()}"
+            # Simplified error message without full traceback
+            error_msg = f"Calibration Error: {str(e)}"
             self.error.emit(error_msg)
 
 
@@ -266,37 +276,48 @@ class CalibrateModule(GUIBase):
                 self.unified_canvas = CalibrationCanvas(canvas_container, width=14, height=14, dpi=100)
                 canvas_layout.addWidget(self.unified_canvas)
             except Exception as e:
-                # Only print errors to console
+                # Simplified error message
                 print(f"ERROR creating CalibrationCanvas: {e}")
-                import traceback
-                traceback.print_exc()
                 # Create placeholder
-                placeholder = QLabel("Canvas initialization error.\nPlease restart or check console.")
+                placeholder = QLabel("Canvas initialization error.\nPlease restart the application.")
                 placeholder.setStyleSheet("color: red; padding: 20px;")
                 canvas_layout.addWidget(placeholder)
                 self.unified_canvas = None
             
             # Vertical contrast slider on right side (limited height)
             contrast_widget = QWidget()
-            contrast_widget.setMaximumWidth(40)
+            contrast_widget.setMinimumWidth(150)
+            contrast_widget.setMaximumWidth(180)
             contrast_layout = QVBoxLayout(contrast_widget)
-            contrast_layout.setContentsMargins(0, 0, 0, 0)
-            contrast_layout.setSpacing(2)
-            
-            # Add stretch at top
+            contrast_layout.setContentsMargins(5, 5, 5, 5)
+            contrast_layout.setSpacing(3)
+
+            # Position label at top (more visible, no background)
+            self.position_lbl = QLabel("Position: x=0, y=0")
+            self.position_lbl.setFont(QFont('Arial', 10, QFont.Weight.Bold))
+            self.position_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.position_lbl.setStyleSheet("""
+                color: #333333;
+                padding: 5px;
+            """)
+            self.position_lbl.setMinimumHeight(30)
+            contrast_layout.addWidget(self.position_lbl)
+
+            # Add stretch
             contrast_layout.addStretch(1)
+
+            # Contrast percentage label (top)
+            contrast_top_lbl = QLabel("100% Contrast")
+            contrast_top_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            contrast_top_lbl.setFont(QFont('Arial', 8))
+            contrast_top_lbl.setStyleSheet("color: #555;")
+            contrast_layout.addWidget(contrast_top_lbl)
             
-            # Max label (top)
-            max_lbl = QLabel("Max")
-            max_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            max_lbl.setFont(QFont('Arial', 7))
-            contrast_layout.addWidget(max_lbl)
-            
-            # Vertical slider with fixed height
+            # Vertical slider with reasonable range (0-100 for percentage)
             self.contrast_slider = QSlider(Qt.Orientation.Vertical)
             self.contrast_slider.setMinimum(0)
-            self.contrast_slider.setMaximum(65535)
-            self.contrast_slider.setValue(65535)
+            self.contrast_slider.setMaximum(100)  # Use percentage scale
+            self.contrast_slider.setValue(100)  # Default to max
             self.contrast_slider.setInvertedAppearance(True)  # Max at top
             self.contrast_slider.setFixedHeight(550)  # Match canvas height (14x14)
             self.contrast_slider.setStyleSheet("""
@@ -323,12 +344,17 @@ class CalibrateModule(GUIBase):
             """)
             self.contrast_slider.valueChanged.connect(self.on_contrast_slider_changed)
             contrast_layout.addWidget(self.contrast_slider)
-            
-            # Min label (bottom)
-            min_lbl = QLabel("Min")
-            min_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            min_lbl.setFont(QFont('Arial', 7))
-            contrast_layout.addWidget(min_lbl)
+
+            # Store image statistics for contrast mapping
+            self.image_vmin = 0
+            self.image_vmax = 65535  # Will be updated when image is loaded
+
+            # Contrast percentage label (bottom)
+            contrast_bottom_lbl = QLabel("0% Contrast")
+            contrast_bottom_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            contrast_bottom_lbl.setFont(QFont('Arial', 8))
+            contrast_bottom_lbl.setStyleSheet("color: #555;")
+            contrast_layout.addWidget(contrast_bottom_lbl)
             
             # Add stretch at bottom
             contrast_layout.addStretch(1)
@@ -336,7 +362,54 @@ class CalibrateModule(GUIBase):
             canvas_layout.addWidget(contrast_widget)
             
             image_layout.addWidget(canvas_container)
-            
+
+            # Status bar with control buttons - inside image_layout for proper alignment
+            status_frame = QFrame()
+            status_frame.setMaximumHeight(40)
+            status_layout = QHBoxLayout(status_frame)
+            status_layout.setContentsMargins(3, 1, 3, 1)
+            status_layout.setSpacing(3)
+
+            # Display control buttons with consistent width for symmetry
+            button_width = 110
+            reset_zoom_btn = ModernButton("Reset Zoom",
+                                         self.reset_zoom,
+                                         "",
+                                         bg_color=self.colors['secondary'],
+                                         hover_color=self.colors['primary'],
+                                         width=button_width, height=32,
+                                         font_size=9,
+                                         parent=status_frame)
+
+            self.calibrate_btn = ModernButton("Calibrate",
+                                             self.run_calibration,
+                                             "",
+                                             bg_color=self.colors['primary'],
+                                             hover_color=self.colors['primary_hover'],
+                                             width=button_width, height=32,
+                                             font_size=9,
+                                             parent=status_frame)
+
+            self.refine_btn = ModernButton("Refine",
+                                           self.refine_calibration,
+                                           "",
+                                           bg_color=self.colors['secondary'],
+                                           hover_color=self.colors['primary'],
+                                           width=button_width, height=32,
+                                           font_size=9,
+                                           parent=status_frame)
+
+            # Distribute buttons evenly with space between them
+            status_layout.addStretch(2)
+            status_layout.addWidget(reset_zoom_btn)
+            status_layout.addStretch(1)
+            status_layout.addWidget(self.calibrate_btn)
+            status_layout.addStretch(1)
+            status_layout.addWidget(self.refine_btn)
+            status_layout.addStretch(2)
+
+            image_layout.addWidget(status_frame)
+
             # Keep references for compatibility
             self.calibration_canvas = self.unified_canvas
             self.mask_canvas = MaskCanvas(image_tab, width=10, height=8, dpi=100)
@@ -345,7 +418,7 @@ class CalibrateModule(GUIBase):
             no_plot_label = QLabel("Matplotlib not available")
             no_plot_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             image_layout.addWidget(no_plot_label)
-        
+
         self.display_tab_widget.addTab(image_tab, "Image")
         
         # Cake tab (Dioptas-style polar transformation)
@@ -394,66 +467,8 @@ class CalibrateModule(GUIBase):
             pattern_layout.addWidget(pattern_label)
         
         self.display_tab_widget.addTab(pattern_tab, "Pattern")
-        
+
         left_layout.addWidget(self.display_tab_widget)
-        
-        # Status bar with display controls and Calibrate/Refine buttons
-        status_frame = QFrame()
-        status_frame.setMaximumHeight(40)  # Limit status bar height
-        status_layout = QHBoxLayout(status_frame)
-        status_layout.setContentsMargins(3, 1, 3, 1)
-        status_layout.setSpacing(3)
-        
-        # Display control buttons
-        auto_contrast_btn = ModernButton("Auto Contrast",
-                                        self.auto_contrast,
-                                        "",
-                                        bg_color=self.colors['secondary'],
-                                        hover_color=self.colors['primary'],
-                                        width=110, height=32,
-                                        font_size=8,
-                                        parent=status_frame)
-        
-        reset_zoom_btn = ModernButton("Reset Zoom",
-                                     self.reset_zoom,
-                                     "",
-                                     bg_color=self.colors['secondary'],
-                                     hover_color=self.colors['primary'],
-                                     width=100, height=32,
-                                     font_size=8,
-                                     parent=status_frame)
-        
-        status_layout.addWidget(auto_contrast_btn)
-        status_layout.addWidget(reset_zoom_btn)
-        status_layout.addStretch()
-        
-        self.calibrate_btn = ModernButton("Calibrate",
-                                         self.run_calibration,
-                                         "",
-                                         bg_color=self.colors['primary'],
-                                         hover_color=self.colors['primary_hover'],
-                                         width=120, height=32,
-                                         font_size=9,
-                                         parent=status_frame)
-        
-        self.refine_btn = ModernButton("Refine",
-                                       self.refine_calibration,
-                                       "",
-                                       bg_color=self.colors['secondary'],
-                                       hover_color=self.colors['primary'],
-                                       width=100, height=32,
-                                       font_size=9,
-                                       parent=status_frame)
-        
-        self.position_lbl = QLabel("Position: x=0, y=0")
-        self.position_lbl.setFont(QFont('Arial', 9))
-        
-        status_layout.addWidget(self.calibrate_btn)
-        status_layout.addWidget(self.refine_btn)
-        status_layout.addStretch()
-        status_layout.addWidget(self.position_lbl)
-        
-        left_layout.addWidget(status_frame)
         
         # ============== RIGHT PANEL: CONTROL WIDGET ==============
         # Use scroll area to ensure all controls are accessible
@@ -862,34 +877,103 @@ class CalibrateModule(GUIBase):
         params_grid.setVerticalSpacing(6)
         params_grid.setContentsMargins(15, 0, 0, 0)
         
+        # SpinBox style with functional arrows
+        spinbox_style = f"""
+            QSpinBox {{
+                padding: 2px 4px;
+                border: 1px solid #ccc;
+                border-radius: 2px;
+                background: #FFF8DC;
+            }}
+            QSpinBox::up-button {{
+                subcontrol-origin: border;
+                subcontrol-position: top right;
+                width: 16px;
+                border-left: 1px solid #ccc;
+                background: #f0f0f0;
+            }}
+            QSpinBox::up-button:hover {{
+                background: {self.colors['primary']};
+            }}
+            QSpinBox::up-arrow {{
+                width: 7px;
+                height: 7px;
+                image: none;
+                border-left: 3px solid transparent;
+                border-right: 3px solid transparent;
+                border-bottom: 4px solid #333;
+            }}
+            QSpinBox::down-button {{
+                subcontrol-origin: border;
+                subcontrol-position: bottom right;
+                width: 16px;
+                border-left: 1px solid #ccc;
+                background: #f0f0f0;
+            }}
+            QSpinBox::down-button:hover {{
+                background: {self.colors['primary']};
+            }}
+            QSpinBox::down-arrow {{
+                width: 7px;
+                height: 7px;
+                image: none;
+                border-left: 3px solid transparent;
+                border-right: 3px solid transparent;
+                border-top: 4px solid #333;
+            }}
+        """
+
         # Current Ring Number
         params_grid.addWidget(QLabel("Ring #:"), 0, 0)
         self.ring_number_spinbox = QSpinBox()
         self.ring_number_spinbox.setMinimum(1)
         self.ring_number_spinbox.setMaximum(50)
         self.ring_number_spinbox.setValue(1)
-        self.ring_number_spinbox.setFixedWidth(65)
-        self.ring_number_spinbox.setStyleSheet("padding: 2px 4px; border: 1px solid #ccc; border-radius: 2px; background: #FFF8DC;")
+        self.ring_number_spinbox.setFixedWidth(80)
+        self.ring_number_spinbox.setStyleSheet(spinbox_style)
         self.ring_number_spinbox.valueChanged.connect(self.on_ring_number_changed)
         params_grid.addWidget(self.ring_number_spinbox, 0, 1)
-        
+
         # Search size
         params_grid.addWidget(QLabel("Search Size:"), 1, 0)
         self.search_size_sb = QSpinBox()
         self.search_size_sb.setMinimum(1)
         self.search_size_sb.setMaximum(100)
         self.search_size_sb.setValue(1)
-        self.search_size_sb.setFixedWidth(65)
-        self.search_size_sb.setStyleSheet("padding: 2px 4px; border: 1px solid #ccc; border-radius: 2px;")
+        self.search_size_sb.setFixedWidth(80)
+        self.search_size_sb.setStyleSheet(spinbox_style.replace("background: #FFF8DC;", "background: white;"))
         params_grid.addWidget(self.search_size_sb, 1, 1)
         params_grid.addWidget(QLabel("px"), 1, 2)
         
         peak_layout.addLayout(params_grid)
         
-        # Auto increment checkbox
+        # Auto increment checkbox (styled to match radio buttons)
+        checkbox_style = f"""
+            QCheckBox {{
+                spacing: 8px;
+                padding: 6px 0px;
+                color: {self.colors['text_dark']};
+                margin-left: 0px;
+            }}
+            QCheckBox::indicator {{
+                width: 14px;
+                height: 14px;
+                border: 2px solid #999999;
+                border-radius: 3px;
+                background-color: white;
+            }}
+            QCheckBox::indicator:checked {{
+                background-color: {self.colors['primary']};
+                border: 2px solid {self.colors['primary']};
+                image: url(check.png);
+            }}
+            QCheckBox::indicator:hover {{
+                border: 2px solid {self.colors['primary']};
+            }}
+        """
         self.automatic_peak_num_inc_cb = QCheckBox("Auto-increment ring number")
         self.automatic_peak_num_inc_cb.setChecked(True)
-        self.automatic_peak_num_inc_cb.setStyleSheet(f"color: {self.colors['text_dark']}; margin-left: 15px;")
+        self.automatic_peak_num_inc_cb.setStyleSheet(checkbox_style)
         peak_layout.addWidget(self.automatic_peak_num_inc_cb)
         
         # Control buttons with modern style
@@ -2220,15 +2304,24 @@ class CalibrateModule(GUIBase):
                 self.unified_canvas.parent_module = self
                 
                 # Initialize contrast settings (auto-contrast on load)
+                # Use conservative percentiles and limit to reasonable range
                 vmin = float(np.percentile(self.current_image, 1))
-                vmax = float(np.percentile(self.current_image, 99))
+                vmax = float(np.percentile(self.current_image, 95))  # Use 95% instead of 99% to avoid outliers
+
+                # Limit vmax to prevent overflow issues (max 1 million for reasonable contrast)
+                vmax = min(vmax, 1000000)
+
+                # Store image statistics for contrast mapping
+                self.image_vmin = vmin
+                self.image_vmax = vmax
+
+                # Apply initial contrast
                 self.unified_canvas.contrast_min = vmin
                 self.unified_canvas.contrast_max = vmax
-                
-                # Update slider to match
+
+                # Set slider to 100% (full contrast)
                 if hasattr(self, 'contrast_slider'):
-                    self.contrast_slider.setMaximum(int(np.max(self.current_image)))
-                    self.contrast_slider.setValue(int(vmax))
+                    self.contrast_slider.setValue(100)
                 
                 # Display image immediately with forced update
                 self.unified_canvas.display_calibration_image(self.current_image)
@@ -3535,14 +3628,25 @@ class CalibrateModule(GUIBase):
         self._contrast_timer.timeout.connect(lambda: self.apply_contrast_from_slider(value))
         self._contrast_timer.start(50)  # 50ms delay
     
-    def apply_contrast_from_slider(self, vmax):
-        """Apply contrast from single slider"""
-        vmin = 0  # Always use 0 as minimum
-        
+    def apply_contrast_from_slider(self, slider_value):
+        """Apply contrast from slider (0-100 percentage scale)"""
+        # Map slider percentage to actual image value range
+        if not hasattr(self, 'image_vmin') or not hasattr(self, 'image_vmax'):
+            return
+
+        # Calculate actual vmax based on slider percentage
+        percentage = slider_value / 100.0
+        vmin = self.image_vmin
+        vmax = self.image_vmin + (self.image_vmax - self.image_vmin) * percentage
+
         # Apply to canvases
         if MATPLOTLIB_AVAILABLE:
-            if hasattr(self, 'calibration_canvas'):
+            # unified_canvas is the main display canvas
+            if hasattr(self, 'unified_canvas') and self.unified_canvas is not None:
+                self.unified_canvas.set_contrast(vmin, vmax)
+            elif hasattr(self, 'calibration_canvas'):
                 self.calibration_canvas.set_contrast(vmin, vmax)
+
             if hasattr(self, 'mask_canvas'):
                 self.mask_canvas.set_contrast(vmin, vmax)
     
@@ -3555,13 +3659,14 @@ class CalibrateModule(GUIBase):
             # Calculate percentiles for auto-contrast
             vmin = np.percentile(self.current_image, 1)
             vmax = np.percentile(self.current_image, 99)
-            
-            # Update slider
+
+            # Update slider (clamp to prevent overflow)
             if hasattr(self, 'contrast_slider'):
-                self.contrast_slider.setValue(int(vmax))
-            
+                clamped_vmax = min(int(vmax), INT32_MAX)
+                self.contrast_slider.setValue(clamped_vmax)
+
             # Apply
-            self.apply_contrast_from_slider(int(vmax))
+            self.apply_contrast_from_slider(min(int(vmax), INT32_MAX))
             self.log(f"Auto-contrast applied: 0 - {vmax:.0f}")
         except Exception as e:
             self.log(f"Auto-contrast failed: {str(e)}")

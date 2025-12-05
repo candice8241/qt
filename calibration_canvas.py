@@ -123,9 +123,7 @@ class MaskCanvas(FigureCanvas):
             self.display_image()
             return True
         except Exception as e:
-            print(f"ERROR loading image: {e}")  # Console output for errors
-            import traceback
-            traceback.print_exc()
+            print(f"ERROR loading image: {e}")  # Simplified error message
             return False
     
     def display_image(self):
@@ -443,8 +441,6 @@ class CalibrationCanvas(FigureCanvas):
                 
         except Exception as e:
             print(f"ERROR creating CalibrationCanvas: {e}")
-            import traceback
-            traceback.print_exc()
             raise
         
     def display_calibration_image(self, image_data, calibration_points=None):
@@ -469,13 +465,20 @@ class CalibrationCanvas(FigureCanvas):
         
         # Apply contrast settings
         if self.contrast_min is not None and self.contrast_max is not None:
+            # Clip image data to contrast range
             display_data = np.clip(image_data, self.contrast_min, self.contrast_max)
-            vmin, vmax = np.log10(self.contrast_min + 1), np.log10(self.contrast_max + 1)
+            # Apply log10 transformation
+            log_data = np.log10(display_data + 1)
+            # Set display range based on clipped values (in log space)
+            vmin = np.log10(self.contrast_min + 1)
+            vmax = np.log10(self.contrast_max + 1)
         else:
+            # No contrast adjustment, use full range
             display_data = image_data
+            log_data = np.log10(display_data + 1)
             vmin, vmax = None, None
-        
-        self.axes.imshow(np.log10(display_data + 1), cmap='viridis', origin='lower',
+
+        self.axes.imshow(log_data, cmap='viridis', origin='lower',
                         vmin=vmin, vmax=vmax, interpolation='nearest')
         
         # Store calibration points for later updates
@@ -608,10 +611,8 @@ class CalibrationCanvas(FigureCanvas):
                     continue
                     
         except Exception as e:
-            # If theoretical ring drawing fails, print error to console
+            # If theoretical ring drawing fails, print simplified error
             print(f"ERROR drawing theoretical rings: {e}")
-            import traceback
-            traceback.print_exc()
     
     def update_calibration_overlay(self, ai):
         """
@@ -674,17 +675,18 @@ class CalibrationCanvas(FigureCanvas):
         """Set contrast limits"""
         self.contrast_min = vmin
         self.contrast_max = vmax
-        
-        # Update contrast without full redraw
-        if hasattr(self, '_last_image_data') and self._last_image_data is not None:
+
+        # Update contrast if image is loaded
+        if hasattr(self, 'image_data') and self.image_data is not None:
             self.update_image_contrast()
-    
+
     def update_image_contrast(self):
         """Update image contrast without full redraw"""
         # For now, just redraw the whole image
         # Could be optimized with blitting if needed
         if self.image_data is not None:
             self.display_calibration_image(self.image_data, self.calibration_points)
+            self.draw()  # Force canvas refresh
     
     def on_unified_click(self, event):
         """Unified click handler for both peak picking and mask editing"""
@@ -777,17 +779,24 @@ class CalibrationCanvas(FigureCanvas):
             self.display_calibration_image(self.image_data, self.calibration_points)
     
     def on_mouse_move(self, event):
-        """Handle mouse move for mask preview"""
+        """Handle mouse move for mask preview and position display"""
+        # Update position label if canvas has parent module
+        if event.inaxes == self.axes and hasattr(self, 'parent_module') and self.parent_module is not None:
+            if hasattr(self.parent_module, 'position_lbl'):
+                x, y = int(event.xdata), int(event.ydata)
+                self.parent_module.position_lbl.setText(f"Position: x={x}, y={y}")
+
+        # Handle mask drawing preview
         if not self.drawing or self.start_point is None:
             return
-        
+
         if event.inaxes != self.axes:
             return
-        
+
         # Remove old preview
         if self.preview_patch is not None:
             self.preview_patch.remove()
-        
+
         # Draw preview shape
         if self.mask_mode == 'rectangle':
             x0, y0 = self.start_point
@@ -800,10 +809,10 @@ class CalibrationCanvas(FigureCanvas):
             radius = np.sqrt((event.xdata - x0)**2 + (event.ydata - y0)**2)
             self.preview_patch = Circle((x0, y0), radius,
                                        fill=False, edgecolor='yellow', linewidth=2)
-        
+
         if self.preview_patch is not None:
             self.axes.add_patch(self.preview_patch)
-        
+
         self.draw_idle()
     
     def apply_rectangle_mask(self, start, end):
@@ -982,10 +991,8 @@ class CalibrationCanvas(FigureCanvas):
             return [(x, y, ring_num) for x, y in peaks]
             
         except Exception as e:
-            # Only print errors to console
+            # Simplified error message
             print(f"ERROR in auto peak finding: {e}")
-            import traceback
-            traceback.print_exc()
             return []
     
     def update_auto_peaks_display(self):
