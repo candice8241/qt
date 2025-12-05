@@ -364,8 +364,8 @@ class CalibrationCanvas(FigureCanvas):
             self.manual_peaks = []  # List of (x, y, ring_num)
             self.peak_markers = []  # List of matplotlib artists
             
-            # Ring number for peak picking (starts from 0)
-            self.current_ring_num = 0
+            # Ring number for peak picking (starts from 1 per user request)
+            self.current_ring_num = 1
             self.auto_increment_ring = False
             self.parent_module = None
             

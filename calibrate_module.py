@@ -148,6 +148,9 @@ class CalibrateModule(GUIBase):
         # Mask from mask module
         self.imported_mask = None
         self.mask_module_reference = None
+        
+        # Initialize use_mask_cb early to avoid AttributeError
+        self.use_mask_cb = None
 
     def _init_variables(self):
         """Initialize all variables"""
@@ -842,9 +845,9 @@ class CalibrateModule(GUIBase):
         ring_num_row = QHBoxLayout()
         ring_num_row.addWidget(QLabel("Current Ring #:"))
         self.ring_number_spinbox = QSpinBox()
-        self.ring_number_spinbox.setMinimum(0)
+        self.ring_number_spinbox.setMinimum(1)  # Start from 1 per user request
         self.ring_number_spinbox.setMaximum(50)
-        self.ring_number_spinbox.setValue(0)  # Default to ring 0
+        self.ring_number_spinbox.setValue(1)  # Default to ring 1
         self.ring_number_spinbox.setFixedWidth(60)
         self.ring_number_spinbox.setStyleSheet("""
             QSpinBox {
@@ -1769,9 +1772,9 @@ class CalibrateModule(GUIBase):
         
         # Use SpinBox for ring number (unified name: ring_num_input)
         self.ring_num_input = QSpinBox()
-        self.ring_num_input.setMinimum(0)
+        self.ring_num_input.setMinimum(1)  # Start from 1 per user request
         self.ring_num_input.setMaximum(50)
-        self.ring_num_input.setValue(0)  # Default to ring 0
+        self.ring_num_input.setValue(1)  # Default to ring 1
         self.ring_num_input.setFixedWidth(50)
         self.ring_num_input.setStyleSheet(f"""
             QSpinBox {{
@@ -2371,19 +2374,19 @@ class CalibrateModule(GUIBase):
     
     
     def clear_manual_peaks(self):
-        """Clear manually selected peaks and reset ring number to 0"""
+        """Clear manually selected peaks and reset ring number to 1"""
         if MATPLOTLIB_AVAILABLE and hasattr(self, 'unified_canvas'):
             self.unified_canvas.clear_manual_peaks()
             self.update_peak_count()
-            # Reset ring number to 0
+            # Reset ring number to 1 (per user request)
             if hasattr(self, 'ring_num_input'):
-                self.ring_num_input.setValue(0)
+                self.ring_num_input.setValue(1)
             if hasattr(self, 'ring_number_spinbox'):
-                self.ring_number_spinbox.setValue(0)
+                self.ring_number_spinbox.setValue(1)
             # Reset canvas ring number
             if hasattr(self, 'unified_canvas'):
-                self.unified_canvas.current_ring_num = 0
-            self.log("Cleared all manual peaks and reset ring number to 0")
+                self.unified_canvas.current_ring_num = 1
+            self.log("Cleared all manual peaks and reset ring number to 1")
     
     def update_peak_count(self):
         """Update peak count display"""
@@ -2465,7 +2468,7 @@ class CalibrateModule(GUIBase):
             
             # Get mask - use imported mask if "use mask" is checked
             mask = None
-            if self.use_mask_cb.isChecked() and self.imported_mask is not None:
+            if hasattr(self, 'use_mask_cb') and self.use_mask_cb is not None and self.use_mask_cb.isChecked() and self.imported_mask is not None:
                 mask = self.imported_mask
                 self.log(f"Using imported mask with {np.sum(mask)} masked pixels")
             elif MATPLOTLIB_AVAILABLE and hasattr(self, 'unified_canvas'):
