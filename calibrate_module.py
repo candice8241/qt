@@ -468,39 +468,59 @@ class CalibrationCanvas(FigureCanvas):
     """Canvas for displaying calibration results"""
     
     def __init__(self, parent=None, width=6, height=6, dpi=100):
-        self.fig = Figure(figsize=(width, height), dpi=dpi)
-        self.axes = self.fig.add_subplot(111)
-        super().__init__(self.fig)
-        self.setParent(parent)
-        
-        # Zoom and contrast settings
-        self.zoom_level = 1.0
-        self.contrast_min = None
-        self.contrast_max = None
-        self.base_xlim = None
-        self.base_ylim = None
-        
-        # Tool modes
-        self.peak_picking_mode = False
-        self.mask_editing_mode = False
-        self.manual_peaks = []  # List of (x, y, ring_num)
-        self.peak_markers = []  # List of matplotlib artists
-        
-        # Mask editing state
-        self.mask_data = None
-        self.image_data = None
-        self.mask_mode = 'rectangle'  # rectangle, circle
-        self.mask_value = True  # True = mask, False = unmask
-        self.drawing = False
-        self.start_point = None
-        self.preview_patch = None
-        self._last_mouse_pos = None
-        
-        # Connect events
-        self.mpl_connect('scroll_event', self.on_scroll)
-        self.mpl_connect('button_press_event', self.on_unified_click)
-        self.mpl_connect('button_release_event', self.on_mouse_release)
-        self.mpl_connect('motion_notify_event', self.on_mouse_move)
+        try:
+            # Use smaller DPI to reduce memory usage
+            actual_dpi = min(dpi, 80)
+            
+            self.fig = Figure(figsize=(width, height), dpi=actual_dpi)
+            self.axes = self.fig.add_subplot(111)
+            super().__init__(self.fig)
+            self.setParent(parent)
+            
+            # Zoom and contrast settings
+            self.zoom_level = 1.0
+            self.contrast_min = None
+            self.contrast_max = None
+            self.base_xlim = None
+            self.base_ylim = None
+            
+            # Tool modes
+            self.peak_picking_mode = False
+            self.mask_editing_mode = False
+            self.manual_peaks = []  # List of (x, y, ring_num)
+            self.peak_markers = []  # List of matplotlib artists
+            
+            # Mask editing state
+            self.mask_data = None
+            self.image_data = None
+            self.mask_mode = 'rectangle'  # rectangle, circle
+            self.mask_value = True  # True = mask, False = unmask
+            self.drawing = False
+            self.start_point = None
+            self.preview_patch = None
+            self._last_mouse_pos = None
+            
+            # Ring display properties (fixed, Dioptas style)
+            self.show_rings = True  # Always show rings
+            self.num_rings_display = 50  # Show all available rings (Dioptas default)
+            self.ring_alpha = 1.0  # Full opacity (Dioptas default)
+            self.ring_color = 'red'  # Red color (Dioptas default)
+            self.calibration_points = None  # Store calibration points
+            
+            # Connect events with error handling
+            try:
+                self.mpl_connect('scroll_event', self.on_scroll)
+                self.mpl_connect('button_press_event', self.on_unified_click)
+                self.mpl_connect('button_release_event', self.on_mouse_release)
+                self.mpl_connect('motion_notify_event', self.on_mouse_move)
+            except Exception as e:
+                print(f"Warning: Could not connect canvas events: {e}")
+                
+        except Exception as e:
+            print(f"ERROR creating CalibrationCanvas: {e}")
+            import traceback
+            traceback.print_exc()
+            raise
         
     def display_calibration_image(self, image_data, calibration_points=None):
         """Display calibration image with detected points"""
@@ -533,12 +553,21 @@ class CalibrationCanvas(FigureCanvas):
         self.axes.imshow(np.log10(display_data + 1), cmap='viridis', origin='lower',
                         vmin=vmin, vmax=vmax, interpolation='nearest')
         
+        # Store calibration points for later updates
         if calibration_points is not None:
-            # Plot calibration rings
-            for ring in calibration_points:
-                if len(ring) > 0:
-                    ring = np.array(ring)
-                    self.axes.plot(ring[:, 1], ring[:, 0], 'r.', markersize=2)
+            self.calibration_points = calibration_points
+            
+            # Plot calibration rings (with display control)
+            if self.show_rings:
+                # Limit number of rings displayed
+                rings_to_display = min(len(self.calibration_points), self.num_rings_display)
+                for i, ring in enumerate(self.calibration_points[:rings_to_display]):
+                    if len(ring) > 0:
+                        ring = np.array(ring)
+                        self.axes.plot(ring[:, 1], ring[:, 0], '.', 
+                                     color=self.ring_color,
+                                     markersize=2,
+                                     alpha=self.ring_alpha)
         
         # Restore manual peaks
         if temp_manual_peaks:
@@ -656,12 +685,21 @@ class CalibrationCanvas(FigureCanvas):
             x, y = event.xdata, event.ydata
             
             # Get ring number from parent
-            ring_num = 0
-            if hasattr(self, 'parent_module'):
-                try:
-                    ring_num = int(self.parent_module.ring_number_entry.text())
-                except (ValueError, AttributeError):
-                    ring_num = 0
+            # Get ring number from parent (support both main UI and compact UI)
+            ring_num = 1  # Default to ring 1
+            if hasattr(self, 'parent_module') and self.parent_module is not None:
+                # Try main UI spinbox first
+                if hasattr(self.parent_module, 'ring_number_spinbox'):
+                    try:
+                        ring_num = self.parent_module.ring_number_spinbox.value()
+                    except:
+                        ring_num = 1
+                # Fall back to compact UI entry
+                elif hasattr(self.parent_module, 'ring_number_entry'):
+                    try:
+                        ring_num = int(self.parent_module.ring_number_entry.text())
+                    except (ValueError, AttributeError):
+                        ring_num = 1
             
             # Add peak
             self.manual_peaks.append((x, y, ring_num))
@@ -680,15 +718,32 @@ class CalibrationCanvas(FigureCanvas):
             # Use draw_idle() instead of immediate draw for better performance
             self.draw_idle()
             
-            # Auto-increment ring number for next peak
-            if hasattr(self, 'parent_module'):
+            # Auto-increment ring number for next peak (Dioptas style)
+            if hasattr(self, 'parent_module') and self.parent_module is not None:
                 self.parent_module.update_peak_count()
-                # Auto increment ring number (start from 1, not 0)
-                try:
+                
+                # Check if auto increment is enabled
+                auto_inc = False
+                if hasattr(self.parent_module, 'automatic_peak_num_inc_cb'):
+                    try:
+                        auto_inc = self.parent_module.automatic_peak_num_inc_cb.isChecked()
+                    except:
+                        auto_inc = False
+                
+                if auto_inc:
                     next_ring_num = ring_num + 1
-                    self.parent_module.ring_number_entry.setText(str(next_ring_num))
-                except (ValueError, AttributeError):
-                    pass
+                    # Update main UI spinbox
+                    if hasattr(self.parent_module, 'ring_number_spinbox'):
+                        try:
+                            self.parent_module.ring_number_spinbox.setValue(next_ring_num)
+                        except:
+                            pass
+                    # Update compact UI entry
+                    elif hasattr(self.parent_module, 'ring_number_entry'):
+                        try:
+                            self.parent_module.ring_number_entry.setText(str(next_ring_num))
+                        except:
+                            pass
         
         # Mask editing mode
         elif self.mask_editing_mode and event.button == 1:
@@ -1041,16 +1096,26 @@ class CalibrateModule(GUIBase):
         if hasattr(self, '_ui_initialized') and self._ui_initialized:
             return
         
+        # Mark as initializing to prevent re-entry
+        if hasattr(self, '_ui_initializing') and self._ui_initializing:
+            print("WARNING: setup_ui already initializing, skipping...")
+            return
+        
+        self._ui_initializing = True
+        
         layout = self.parent.layout()
         if layout is None:
             layout = QVBoxLayout(self.parent)
             layout.setContentsMargins(0, 0, 0, 0)
         else:
-            # Clear existing items
+            # Clear existing items carefully
             while layout.count():
                 item = layout.takeAt(0)
                 if item.widget():
-                    item.widget().deleteLater()
+                    try:
+                        item.widget().deleteLater()
+                    except:
+                        pass
 
         # Main horizontal splitter: Display (left) + Control (right)
         main_splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -1075,8 +1140,21 @@ class CalibrateModule(GUIBase):
             canvas_layout.setContentsMargins(0, 0, 0, 0)
             canvas_layout.setSpacing(5)
             
-            self.unified_canvas = CalibrationCanvas(canvas_container, width=10, height=8, dpi=100)
-            canvas_layout.addWidget(self.unified_canvas)
+            try:
+                # Create canvas with reduced size to prevent memory issues
+                # Using smaller dimensions and DPI
+                self.unified_canvas = CalibrationCanvas(canvas_container, width=8, height=6, dpi=80)
+                canvas_layout.addWidget(self.unified_canvas)
+                print("✅ CalibrationCanvas created successfully")
+            except Exception as e:
+                print(f"❌ Error creating CalibrationCanvas: {e}")
+                import traceback
+                traceback.print_exc()
+                # Create placeholder
+                placeholder = QLabel("Canvas initialization error.\nPlease restart or check console.")
+                placeholder.setStyleSheet("color: red; padding: 20px;")
+                canvas_layout.addWidget(placeholder)
+                self.unified_canvas = None
             
             # Vertical contrast slider on right side (limited height)
             contrast_widget = QWidget()
@@ -1279,28 +1357,6 @@ class CalibrateModule(GUIBase):
         self.filename_txt.setPlaceholderText("No file loaded")
         right_layout.addWidget(self.filename_txt)
         
-        # Dioptas launcher button
-        try:
-            from dioptas_interface import create_dioptas_launcher_button
-            dioptas_btn = create_dioptas_launcher_button(
-                self.parent,
-                current_image_getter=lambda: self.current_image if hasattr(self, 'current_image') else None
-            )
-            dioptas_btn.setToolTip("Launch Dioptas for advanced calibration")
-            right_layout.addWidget(dioptas_btn)
-        except ImportError:
-            # Fallback: simple button
-            dioptas_btn = ModernButton("🔬 Open Dioptas",
-                                      lambda: self.launch_dioptas_simple(),
-                                      "",
-                                      bg_color='#2196F3',
-                                      hover_color='#1976D2',
-                                      width=280, height=35,
-                                      font_size=10,
-                                      parent=right_widget)
-            dioptas_btn.setToolTip("Launch Dioptas (simple mode)")
-            right_layout.addWidget(dioptas_btn)
-        
         # Toolbox for parameters (Dioptas style)
         self.toolbox = QToolBox()
         self.toolbox.setStyleSheet("QToolBox::tab { font-weight: bold; }")
@@ -1363,13 +1419,6 @@ class CalibrateModule(GUIBase):
         
         right_layout.addWidget(bottom_frame)
         
-        # Log output at bottom (compact)
-        self.log_output = QTextEdit()
-        self.log_output.setMaximumHeight(80)
-        self.log_output.setReadOnly(True)
-        self.log_output.setFont(QFont('Courier', 7))
-        right_layout.addWidget(self.log_output)
-        
         # Set scroll area content
         right_scroll.setWidget(right_widget)
         
@@ -1383,8 +1432,33 @@ class CalibrateModule(GUIBase):
         
         layout.addWidget(main_splitter)
         
+        # Log output at bottom of entire interface (larger font)
+        log_label = QLabel("📋 Log Output:")
+        log_label.setFont(QFont('Arial', 11, QFont.Weight.Bold))
+        log_label.setStyleSheet(f"color: {self.colors['text_dark']}; padding: 5px;")
+        layout.addWidget(log_label)
+        
+        self.log_output = QTextEdit()
+        self.log_output.setMaximumHeight(150)  # Increased from 80
+        self.log_output.setMinimumHeight(100)
+        self.log_output.setReadOnly(True)
+        self.log_output.setFont(QFont('Consolas', 10))  # Increased from Courier 7
+        self.log_output.setStyleSheet(f"""
+            QTextEdit {{
+                background-color: #f8f9fa;
+                border: 2px solid {self.colors['border']};
+                border-radius: 5px;
+                padding: 5px;
+                color: #2c3e50;
+            }}
+        """)
+        layout.addWidget(self.log_output)
+        
         # Mark UI as initialized
         self._ui_initialized = True
+        self._ui_initializing = False
+        
+        print("✅ Calibrate UI initialized successfully")
 
     def setup_detector_groupbox(self, parent_layout):
         """Setup Detector GroupBox (Dioptas style)"""
@@ -1641,60 +1715,55 @@ class CalibrateModule(GUIBase):
         self.peak_mode_group.addButton(self.select_peak_rb, 1)
         peak_layout.addWidget(self.select_peak_rb)
         
-        # Peak number and search size
-        peak_params_layout = QHBoxLayout()
-        peak_params_layout.addWidget(QLabel("Peak #:"))
-        self.peak_num_sb = QSpinBox()
-        self.peak_num_sb.setMinimum(0)
-        self.peak_num_sb.setMaximum(50)
-        self.peak_num_sb.setValue(0)
-        self.peak_num_sb.setFixedWidth(60)
-        peak_params_layout.addWidget(self.peak_num_sb)
+        # Current Ring Number (Dioptas style)
+        ring_num_row = QHBoxLayout()
+        ring_num_row.addWidget(QLabel("Current Ring #:"))
+        self.ring_number_spinbox = QSpinBox()
+        self.ring_number_spinbox.setMinimum(0)
+        self.ring_number_spinbox.setMaximum(50)
+        self.ring_number_spinbox.setValue(1)  # Default to ring 1
+        self.ring_number_spinbox.setFixedWidth(60)
+        self.ring_number_spinbox.setStyleSheet("""
+            QSpinBox {
+                background-color: #FFF8DC;
+                font-weight: bold;
+                padding: 3px;
+            }
+        """)
+        ring_num_row.addWidget(self.ring_number_spinbox)
+        ring_num_row.addStretch()
+        peak_layout.addLayout(ring_num_row)
         
-        peak_params_layout.addWidget(QLabel("Size:"))
+        # Auto increment checkbox (Dioptas style)
+        self.automatic_peak_num_inc_cb = QCheckBox("Automatic increase ring number")
+        self.automatic_peak_num_inc_cb.setChecked(True)
+        self.automatic_peak_num_inc_cb.setStyleSheet(f"color: {self.colors['text_dark']};")
+        peak_layout.addWidget(self.automatic_peak_num_inc_cb)
+        
+        # Peak search size
+        search_size_row = QHBoxLayout()
+        search_size_row.addWidget(QLabel("Search Size:"))
         self.search_size_sb = QSpinBox()
         self.search_size_sb.setMinimum(5)
         self.search_size_sb.setMaximum(100)
         self.search_size_sb.setValue(10)
         self.search_size_sb.setFixedWidth(60)
-        peak_params_layout.addWidget(self.search_size_sb)
-        peak_params_layout.addStretch()
-        
-        peak_layout.addLayout(peak_params_layout)
-        
-        # Auto increment checkbox
-        self.automatic_peak_num_inc_cb = QCheckBox("Auto increment peak number")
-        self.automatic_peak_num_inc_cb.setChecked(True)
-        peak_layout.addWidget(self.automatic_peak_num_inc_cb)
+        search_size_row.addWidget(self.search_size_sb)
+        search_size_row.addWidget(QLabel("pixels"))
+        search_size_row.addStretch()
+        peak_layout.addLayout(search_size_row)
         
         # Clear and Undo buttons
         btn_layout = QHBoxLayout()
-        
-        # Toggle peaks table button
-        self.toggle_peaks_table_btn = QPushButton("Show Peaks ▼")
-        self.toggle_peaks_table_btn.setStyleSheet("""
-            QPushButton {
-                background-color: #4CAF50;
-                color: white;
-                border: none;
-                padding: 5px 10px;
-                border-radius: 3px;
-                font-weight: bold;
-            }
-            QPushButton:hover {
-                background-color: #45a049;
-            }
-        """)
-        self.toggle_peaks_table_btn.clicked.connect(self.toggle_peaks_table)
-        btn_layout.addWidget(self.toggle_peaks_table_btn)
         
         self.clear_peaks_btn = QPushButton("Clear Peaks")
         self.clear_peaks_btn.setStyleSheet("padding: 5px;")
         self.clear_peaks_btn.clicked.connect(self.clear_manual_peaks)
         btn_layout.addWidget(self.clear_peaks_btn)
         
-        self.undo_peaks_btn = QPushButton("Undo")
+        self.undo_peaks_btn = QPushButton("Undo Last")
         self.undo_peaks_btn.setStyleSheet("padding: 5px;")
+        self.undo_peaks_btn.clicked.connect(self.undo_last_peak)
         btn_layout.addWidget(self.undo_peaks_btn)
         
         peak_layout.addLayout(btn_layout)
@@ -1704,65 +1773,6 @@ class CalibrateModule(GUIBase):
         self.peak_count_label.setFont(QFont('Arial', 8))
         self.peak_count_label.setStyleSheet("color: blue; padding: 3px;")
         peak_layout.addWidget(self.peak_count_label)
-        
-        # Control points table (initially hidden)
-        self.peaks_table_frame = QFrame()
-        self.peaks_table_frame.setVisible(False)
-        peaks_table_layout = QVBoxLayout(self.peaks_table_frame)
-        peaks_table_layout.setContentsMargins(0, 5, 0, 0)
-        
-        # Instructions
-        instructions = QLabel("Double-click Ring # to edit. Click Delete to remove.")
-        instructions.setStyleSheet("color: gray; font-size: 8pt; padding: 3px;")
-        instructions.setWordWrap(True)
-        peaks_table_layout.addWidget(instructions)
-        
-        # Table
-        self.peaks_table = QTableWidget()
-        self.peaks_table.setColumnCount(5)
-        self.peaks_table.setHorizontalHeaderLabels(['#', 'X', 'Y', 'Ring #', 'Delete'])
-        self.peaks_table.setMaximumHeight(200)
-        self.peaks_table.setMinimumHeight(100)
-        
-        # Table styling
-        self.peaks_table.setAlternatingRowColors(True)
-        self.peaks_table.setStyleSheet("""
-            QTableWidget {
-                gridline-color: #d0d0d0;
-                selection-background-color: #e3f2fd;
-                font-size: 8pt;
-            }
-            QTableWidget::item {
-                padding: 2px;
-            }
-            QHeaderView::section {
-                background-color: #f5f5f5;
-                padding: 3px;
-                border: 1px solid #d0d0d0;
-                font-weight: bold;
-                font-size: 8pt;
-            }
-        """)
-        
-        # Column widths
-        header = self.peaks_table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-        
-        # Connect cell changed signal
-        self.peaks_table.cellChanged.connect(self.on_peaks_table_cell_changed)
-        
-        peaks_table_layout.addWidget(self.peaks_table)
-        
-        # Summary label
-        self.peaks_summary_label = QLabel()
-        self.peaks_summary_label.setStyleSheet("font-size: 8pt; padding: 3px; color: blue;")
-        peaks_table_layout.addWidget(self.peaks_summary_label)
-        
-        peak_layout.addWidget(self.peaks_table_frame)
         
         parent_layout.addWidget(peak_gb)
     
@@ -2145,7 +2155,7 @@ class CalibrateModule(GUIBase):
         parent_layout.addWidget(card)
 
     def setup_calibrant_section_compact(self, parent_layout):
-        """Setup compact calibrant selection section"""
+        """Setup compact calibrant selection section - Dioptas style"""
         card = self.create_card_frame(self.parent)
         card_layout = QVBoxLayout(card)
         card_layout.setSpacing(5)
@@ -2165,6 +2175,17 @@ class CalibrateModule(GUIBase):
         self.calibrant_combo.currentTextChanged.connect(self.on_calibrant_changed)
         card_layout.addWidget(self.calibrant_combo)
         
+        # Load custom calibrant button
+        load_cal_btn = ModernButton("Load Custom",
+                                   self.load_custom_calibrant,
+                                   "📂",
+                                   bg_color=self.colors['secondary'],
+                                   hover_color=self.colors['primary'],
+                                   width=120, height=24,
+                                   font_size=8,
+                                   parent=card)
+        card_layout.addWidget(load_cal_btn)
+        
         # Wavelength
         wl_label = QLabel("λ (Å):")
         wl_label.setFont(QFont('Arial', 8))
@@ -2172,12 +2193,25 @@ class CalibrateModule(GUIBase):
         
         self.wavelength_entry = QLineEdit(str(self.wavelength))
         self.wavelength_entry.setPlaceholderText("Wavelength")
+        self.wavelength_entry.textChanged.connect(self.on_wavelength_changed)
         card_layout.addWidget(self.wavelength_entry)
         
         parent_layout.addWidget(card)
+        
+        # Update calibrant info for default
+        if not hasattr(self, 'calibrant_info_text'):
+            # For compact version, we don't show the info text, but still update the calibrant object
+            self.calibrant = None
+            if PYFAI_AVAILABLE:
+                try:
+                    calibrant_name = self.calibrant_combo.currentText()
+                    if calibrant_name in ALL_CALIBRANTS:
+                        self.calibrant = ALL_CALIBRANTS[calibrant_name]
+                except:
+                    pass
     
     def setup_calibrant_section(self, parent_layout):
-        """Setup calibrant selection section"""
+        """Setup calibrant selection section - Dioptas style"""
         card = self.create_card_frame(self.parent)
         card_layout = QVBoxLayout(card)
         
@@ -2186,10 +2220,15 @@ class CalibrateModule(GUIBase):
         title.setStyleSheet(f"color: {self.colors['text_dark']}; background: {self.colors['card_bg']};")
         card_layout.addWidget(title)
         
-        # Calibrant selection
+        # Calibrant selection row
+        cal_row = QFrame()
+        cal_row_layout = QHBoxLayout(cal_row)
+        cal_row_layout.setContentsMargins(0, 5, 0, 5)
+        
         cal_label = QLabel("Calibrant:")
         cal_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        card_layout.addWidget(cal_label)
+        cal_label.setFixedWidth(80)
+        cal_row_layout.addWidget(cal_label)
         
         self.calibrant_combo = QComboBox()
         if PYFAI_AVAILABLE:
@@ -2201,18 +2240,61 @@ class CalibrateModule(GUIBase):
             self.calibrant_combo.addItems(["LaB6", "CeO2", "Si", "Al2O3"])
         
         self.calibrant_combo.currentTextChanged.connect(self.on_calibrant_changed)
-        card_layout.addWidget(self.calibrant_combo)
+        cal_row_layout.addWidget(self.calibrant_combo)
         
-        # Wavelength
+        card_layout.addWidget(cal_row)
+        
+        # Load custom calibrant button
+        load_cal_btn = ModernButton("Load Custom Calibrant",
+                                   self.load_custom_calibrant,
+                                   "📂",
+                                   bg_color=self.colors['secondary'],
+                                   hover_color=self.colors['primary'],
+                                   width=180, height=28,
+                                   font_size=9,
+                                   parent=card)
+        card_layout.addWidget(load_cal_btn)
+        
+        # Calibrant information display (d-spacings)
+        info_label = QLabel("D-spacings (Å):")
+        info_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
+        card_layout.addWidget(info_label)
+        
+        self.calibrant_info_text = QTextEdit()
+        self.calibrant_info_text.setReadOnly(True)
+        self.calibrant_info_text.setMaximumHeight(80)
+        self.calibrant_info_text.setFont(QFont('Courier', 8))
+        self.calibrant_info_text.setStyleSheet("""
+            QTextEdit {
+                background-color: #f9f9f9;
+                border: 1px solid #ddd;
+                border-radius: 3px;
+                padding: 3px;
+            }
+        """)
+        card_layout.addWidget(self.calibrant_info_text)
+        
+        # Wavelength row
+        wl_row = QFrame()
+        wl_row_layout = QHBoxLayout(wl_row)
+        wl_row_layout.setContentsMargins(0, 5, 0, 5)
+        
         wl_label = QLabel("Wavelength (Å):")
         wl_label.setFont(QFont('Arial', 9, QFont.Weight.Bold))
-        card_layout.addWidget(wl_label)
+        wl_label.setFixedWidth(120)
+        wl_row_layout.addWidget(wl_label)
         
         self.wavelength_entry = QLineEdit(str(self.wavelength))
-        self.wavelength_entry.setPlaceholderText("Enter wavelength in Angstroms")
-        card_layout.addWidget(self.wavelength_entry)
+        self.wavelength_entry.setPlaceholderText("Enter wavelength")
+        self.wavelength_entry.textChanged.connect(self.on_wavelength_changed)
+        wl_row_layout.addWidget(self.wavelength_entry)
+        
+        card_layout.addWidget(wl_row)
         
         parent_layout.addWidget(card)
+        
+        # Update calibrant info display for default calibrant
+        self.update_calibrant_info()
 
     def setup_detector_section_compact(self, parent_layout):
         """Setup compact detector parameters section"""
@@ -2505,44 +2587,6 @@ class CalibrateModule(GUIBase):
         title.setStyleSheet(f"color: {self.colors['text_dark']}; background: {self.colors['card_bg']};")
         card_layout.addWidget(title)
         
-        # Dioptas launcher button
-        try:
-            from dioptas_interface import create_dioptas_launcher_button
-            dioptas_btn = create_dioptas_launcher_button(
-                self.parent,
-                current_image_getter=lambda: self.current_image if hasattr(self, 'current_image') else None
-            )
-            dioptas_btn.setToolTip("Launch Dioptas for advanced calibration")
-            card_layout.addWidget(dioptas_btn)
-            
-            # Add a separator
-            separator = QFrame()
-            separator.setFrameShape(QFrame.Shape.HLine)
-            separator.setFrameShadow(QFrame.Shadow.Sunken)
-            card_layout.addWidget(separator)
-        except ImportError as e:
-            # Fallback: simple button if dioptas_interface not available
-            try:
-                import subprocess
-                dioptas_btn = ModernButton("🔬 Open Dioptas",
-                                          lambda: self.launch_dioptas_simple(),
-                                          "",
-                                          bg_color='#2196F3',
-                                          hover_color='#1976D2',
-                                          width=150, height=35,
-                                          font_size=10,
-                                          parent=card)
-                dioptas_btn.setToolTip("Launch Dioptas (simple mode)")
-                card_layout.addWidget(dioptas_btn)
-                
-                # Add a separator
-                separator = QFrame()
-                separator.setFrameShape(QFrame.Shape.HLine)
-                separator.setFrameShadow(QFrame.Shadow.Sunken)
-                card_layout.addWidget(separator)
-            except Exception:
-                pass  # Skip if can't create button
-        
         # Manual peak selection button
         pick_peaks_btn = ModernButton("📍 Manual Peak Selection",
                                      self.toggle_peak_picking,
@@ -2613,6 +2657,12 @@ class CalibrateModule(GUIBase):
         
         ring_layout.addStretch()
         card_layout.addWidget(ring_frame)
+        
+        # Auto increment checkbox (Dioptas style)
+        self.automatic_peak_num_inc_cb = QCheckBox("Automatic increase ring number")
+        self.automatic_peak_num_inc_cb.setChecked(True)
+        self.automatic_peak_num_inc_cb.setStyleSheet(f"color: {self.colors['text_dark']}; font-size: 9pt;")
+        card_layout.addWidget(self.automatic_peak_num_inc_cb)
         
         # Separator
         separator = QFrame()
@@ -2864,6 +2914,86 @@ class CalibrateModule(GUIBase):
         """Handle calibrant selection change"""
         self.calibrant_name = calibrant_name
         self.log(f"Calibrant changed to: {calibrant_name}")
+        self.update_calibrant_info()
+    
+    def on_wavelength_changed(self, text):
+        """Handle wavelength change"""
+        try:
+            self.wavelength = float(text)
+            self.log(f"Wavelength set to: {self.wavelength} Å")
+        except ValueError:
+            pass
+    
+    def load_custom_calibrant(self):
+        """Load custom calibrant from .D file (Dioptas style)"""
+        file_path, _ = QFileDialog.getOpenFileName(
+            self.parent,
+            "Load Custom Calibrant",
+            "",
+            "Calibrant Files (*.D *.d);;All Files (*.*)"
+        )
+        
+        if file_path and PYFAI_AVAILABLE:
+            try:
+                # Load calibrant from file
+                calibrant = Calibrant(filename=file_path)
+                
+                # Add to combo box if not already there
+                calibrant_name = os.path.splitext(os.path.basename(file_path))[0]
+                
+                # Check if already in list
+                index = self.calibrant_combo.findText(calibrant_name)
+                if index == -1:
+                    self.calibrant_combo.addItem(calibrant_name)
+                    self.calibrant_combo.setCurrentText(calibrant_name)
+                else:
+                    self.calibrant_combo.setCurrentIndex(index)
+                
+                # Store custom calibrant
+                self.calibrant = calibrant
+                self.calibrant_name = calibrant_name
+                
+                self.log(f"✅ Loaded custom calibrant: {calibrant_name}")
+                self.update_calibrant_info()
+                
+            except Exception as e:
+                QMessageBox.critical(
+                    self.parent,
+                    "Error Loading Calibrant",
+                    f"Failed to load calibrant file:\n{str(e)}"
+                )
+                self.log(f"❌ Error loading calibrant: {str(e)}")
+    
+    def update_calibrant_info(self):
+        """Update calibrant information display with d-spacings"""
+        if not PYFAI_AVAILABLE:
+            return
+        
+        try:
+            # Get current calibrant
+            if self.calibrant is None:
+                calibrant_name = self.calibrant_combo.currentText()
+                if calibrant_name in ALL_CALIBRANTS:
+                    self.calibrant = ALL_CALIBRANTS[calibrant_name]
+                else:
+                    return
+            
+            # Get d-spacings
+            dspacing = self.calibrant.get_dSpacing()
+            
+            if dspacing is not None and len(dspacing) > 0:
+                # Display first 10 d-spacings
+                info_text = ", ".join([f"{d:.4f}" for d in dspacing[:10]])
+                if len(dspacing) > 10:
+                    info_text += f"... ({len(dspacing)} total rings)"
+                
+                self.calibrant_info_text.setText(info_text)
+            else:
+                self.calibrant_info_text.setText("No d-spacing data available")
+                
+        except Exception as e:
+            self.calibrant_info_text.setText(f"Error: {str(e)}")
+            self.log(f"Warning: Could not load calibrant info: {str(e)}")
 
     def on_detector_changed(self, detector_name):
         """Handle detector selection change"""
@@ -3059,165 +3189,27 @@ class CalibrateModule(GUIBase):
                 """)
                 self.log("Peak picking mode: DISABLED")
     
-    def toggle_peaks_table(self):
-        """Toggle peaks table visibility"""
-        if not hasattr(self, 'peaks_table_frame'):
+    def undo_last_peak(self):
+        """Undo the last manually selected peak"""
+        if not hasattr(self, 'unified_canvas') or self.unified_canvas is None:
             return
         
-        is_visible = self.peaks_table_frame.isVisible()
-        self.peaks_table_frame.setVisible(not is_visible)
+        if len(self.unified_canvas.manual_peaks) == 0:
+            self.log("No peaks to undo")
+            return
         
-        # Update button text
-        if not is_visible:
-            self.toggle_peaks_table_btn.setText("Hide Peaks ▲")
-            self.update_peaks_table()
-        else:
-            self.toggle_peaks_table_btn.setText("Show Peaks ▼")
+        # Remove the last peak
+        removed_peak = self.unified_canvas.manual_peaks.pop()
+        self.log(f"Removed peak at ({removed_peak[0]:.1f}, {removed_peak[1]:.1f}), Ring #{removed_peak[2]}")
+        
+        # Update peak count
+        if hasattr(self, 'peak_count_label'):
+            self.peak_count_label.setText(f"Peaks: {len(self.unified_canvas.manual_peaks)}")
+        
+        # Redraw image
+        if self.current_image is not None:
+            self.unified_canvas.display_calibration_image(self.current_image)
     
-    def update_peaks_table(self):
-        """Update the peaks table with current control points"""
-        if not hasattr(self, 'peaks_table') or not hasattr(self, 'calibration_canvas'):
-            return
-        
-        # Disconnect signal to avoid triggering during update
-        self.peaks_table.cellChanged.disconnect(self.on_peaks_table_cell_changed)
-        
-        manual_peaks = self.calibration_canvas.manual_peaks
-        self.peaks_table.setRowCount(len(manual_peaks))
-        
-        for i, (x, y, ring_num) in enumerate(manual_peaks):
-            # Index
-            idx_item = QTableWidgetItem(str(i + 1))
-            idx_item.setFlags(idx_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            idx_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.peaks_table.setItem(i, 0, idx_item)
-            
-            # X coordinate
-            x_item = QTableWidgetItem(f"{x:.1f}")
-            x_item.setFlags(x_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            x_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.peaks_table.setItem(i, 1, x_item)
-            
-            # Y coordinate
-            y_item = QTableWidgetItem(f"{y:.1f}")
-            y_item.setFlags(y_item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-            y_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.peaks_table.setItem(i, 2, y_item)
-            
-            # Ring number (editable)
-            ring_item = QTableWidgetItem(str(ring_num))
-            ring_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            ring_item.setBackground(Qt.GlobalColor.yellow)
-            font = ring_item.font()
-            font.setBold(True)
-            ring_item.setFont(font)
-            self.peaks_table.setItem(i, 3, ring_item)
-            
-            # Delete button
-            delete_btn = QPushButton("✕")
-            delete_btn.setStyleSheet("""
-                QPushButton {
-                    background-color: #ff6b6b;
-                    color: white;
-                    border: none;
-                    padding: 2px 5px;
-                    border-radius: 3px;
-                    font-weight: bold;
-                }
-                QPushButton:hover {
-                    background-color: #ff5252;
-                }
-            """)
-            delete_btn.setMaximumWidth(30)
-            delete_btn.clicked.connect(lambda checked, row=i: self.delete_peak_from_table(row))
-            self.peaks_table.setCellWidget(i, 4, delete_btn)
-        
-        # Reconnect signal
-        self.peaks_table.cellChanged.connect(self.on_peaks_table_cell_changed)
-        
-        # Update summary
-        self.update_peaks_summary()
-    
-    def on_peaks_table_cell_changed(self, row, col):
-        """Handle cell value change in peaks table"""
-        if col != 3:  # Only Ring # column is editable
-            return
-        
-        try:
-            new_ring = int(self.peaks_table.item(row, col).text())
-            if new_ring < 0:
-                raise ValueError("Ring number must be >= 0")
-            
-            # Update manual_peaks
-            if hasattr(self, 'calibration_canvas'):
-                x, y, _ = self.calibration_canvas.manual_peaks[row]
-                self.calibration_canvas.manual_peaks[row] = (x, y, new_ring)
-                
-                # Highlight changed cell
-                self.peaks_table.item(row, col).setBackground(Qt.GlobalColor.green)
-                
-                # Update display
-                self.calibration_canvas.display_calibration_image(
-                    self.calibration_canvas._last_image_data,
-                    self.calibration_canvas._last_calib_points
-                )
-                
-                # Update summary
-                self.update_peaks_summary()
-                
-                self.log(f"Updated point #{row + 1}: Ring # changed to {new_ring}")
-        
-        except ValueError as e:
-            QMessageBox.warning(self.parent, "Invalid Input", 
-                              f"Please enter a valid ring number (integer >= 0).\nError: {e}")
-            # Restore original value
-            if hasattr(self, 'calibration_canvas') and row < len(self.calibration_canvas.manual_peaks):
-                x, y, ring_num = self.calibration_canvas.manual_peaks[row]
-                self.peaks_table.item(row, col).setText(str(ring_num))
-    
-    def delete_peak_from_table(self, row):
-        """Delete a peak from the control points list"""
-        if not hasattr(self, 'calibration_canvas'):
-            return
-        
-        if row < 0 or row >= len(self.calibration_canvas.manual_peaks):
-            return
-        
-        # Remove from list
-        del self.calibration_canvas.manual_peaks[row]
-        
-        # Update display
-        self.calibration_canvas.display_calibration_image(
-            self.calibration_canvas._last_image_data,
-            self.calibration_canvas._last_calib_points
-        )
-        
-        # Update table and count
-        self.update_peaks_table()
-        self.update_peak_count()
-        
-        self.log(f"Deleted point #{row + 1}")
-    
-    def update_peaks_summary(self):
-        """Update peaks summary label"""
-        if not hasattr(self, 'peaks_summary_label') or not hasattr(self, 'calibration_canvas'):
-            return
-        
-        manual_peaks = self.calibration_canvas.manual_peaks
-        if not manual_peaks:
-            self.peaks_summary_label.setText("No control points")
-            return
-        
-        # Count points per ring
-        from collections import Counter
-        ring_counts = Counter([ring for _, _, ring in manual_peaks])
-        
-        summary_parts = [f"Total: {len(manual_peaks)}"]
-        for ring_num in sorted(ring_counts.keys()):
-            count = ring_counts[ring_num]
-            summary_parts.append(f"Ring {ring_num}: {count}")
-        
-        self.peaks_summary_label.setText(" | ".join(summary_parts))
     
     def clear_manual_peaks(self):
         """Clear manually selected peaks"""
@@ -3228,45 +3220,11 @@ class CalibrateModule(GUIBase):
     
     def update_peak_count(self):
         """Update peak count display"""
-        if hasattr(self, 'peak_count_label') and hasattr(self, 'calibration_canvas'):
-            count = len(self.calibration_canvas.manual_peaks)
+        if hasattr(self, 'peak_count_label') and hasattr(self, 'unified_canvas'):
+            count = len(self.unified_canvas.manual_peaks)
             self.peak_count_label.setText(f"Peaks: {count}")
-        
-        # Also update peaks table if it's visible
-        if hasattr(self, 'peaks_table_frame') and self.peaks_table_frame.isVisible():
-            self.update_peaks_table()
     
 
-    def launch_dioptas_simple(self):
-        """Simple launcher for Dioptas"""
-        import subprocess
-        try:
-            # Try to launch dioptas command
-            subprocess.Popen(['dioptas'], 
-                           stdout=subprocess.DEVNULL,
-                           stderr=subprocess.DEVNULL)
-            QMessageBox.information(
-                self.parent,
-                "Dioptas Launched",
-                "Dioptas has been launched in a separate window.\n\n"
-                "Note: For advanced features like automatic image loading,\n"
-                "make sure dioptas_interface.py is in the same directory."
-            )
-        except FileNotFoundError:
-            QMessageBox.warning(
-                self.parent,
-                "Dioptas Not Found",
-                "Dioptas is not installed or not in PATH.\n\n"
-                "To install Dioptas:\n"
-                "  pip install dioptas\n\n"
-                "Then restart the program."
-            )
-        except Exception as e:
-            QMessageBox.critical(
-                self.parent,
-                "Launch Error",
-                f"Failed to launch Dioptas:\n{str(e)}"
-            )
     
     def run_calibration(self):
         """Run detector calibration"""
@@ -3460,24 +3418,81 @@ class CalibrateModule(GUIBase):
             raise ValueError(f"Not enough control points: {len(geo_ref.data) if hasattr(geo_ref, 'data') and geo_ref.data is not None else 0}. "
                            "Need at least 3 points. Use Manual Peak Selection to add more peaks.")
         
-        # Refine geometry (Dioptas-style, in stages for better convergence)
+        # Refine geometry (Conservative approach: NO rotation refinement by default)
+        # This avoids unrealistic tilt angles that can occur with limited data
         try:
             self.log("\nStarting geometry refinement...")
+            self.log(f"Number of control points: {len(geo_ref.data)}")
             
-            # Stage 1: Refine basic geometry (distance, beam center)
-            # Fix wavelength and rotations initially
-            self.log("  Stage 1: Refining distance and beam center...")
-            geo_ref.refine2(fix=["wavelength", "rot1", "rot2", "rot3"])
-            self.log(f"    Distance: {geo_ref.dist*1000:.2f} mm")
+            # Count rings
+            ring_nums = set()
+            for point in geo_ref.data:
+                if len(point) > 0:
+                    ring_nums.add(point[0])
+            self.log(f"Number of rings: {len(ring_nums)}")
+            
+            # Stage 1: Refine distance only (most sensitive parameter)
+            # Fix everything else for initial convergence
+            self.log("\n  Stage 1: Refining distance only...")
+            geo_ref.refine2(fix=["wavelength", "poni1", "poni2", "rot1", "rot2", "rot3"])
+            stage1_distance = geo_ref.dist
+            self.log(f"    Distance: {stage1_distance*1000:.2f} mm")
+            
+            # Stage 2: Refine beam center ONLY (keep distance from Stage 1)
+            # Distance is already correct from Stage 1, only optimize beam center
+            self.log("\n  Stage 2: Refining beam center only (keeping Stage 1 distance)...")
+            geo_ref.refine2(fix=["wavelength", "dist", "rot1", "rot2", "rot3"])
+            self.log(f"    Distance: {geo_ref.dist*1000:.2f} mm (unchanged)")
             self.log(f"    Beam center: ({geo_ref.poni2*1000:.2f}, {geo_ref.poni1*1000:.2f}) mm")
             
-            # Stage 2: Add rotation refinement
-            self.log("  Stage 2: Refining with rotations...")
-            geo_ref.refine2(fix=["wavelength"])
-            self.log(f"    Rotations: rot1={np.degrees(geo_ref.rot1):.3f}°, "
-                    f"rot2={np.degrees(geo_ref.rot2):.3f}°, rot3={np.degrees(geo_ref.rot3):.3f}°")
+            # Stage 3: SKIP rotation refinement by default
+            # Rotation refinement is DISABLED to avoid unrealistic angles
+            # In most cases, detector is nearly perpendicular to beam (rot1≈0, rot2≈0, rot3≈0)
+            self.log("\n  Stage 3: Rotation refinement DISABLED")
+            self.log(f"    Detector assumed perpendicular to beam (rot1=0°, rot2=0°, rot3=0°)")
+            self.log(f"    This is the safest and most common configuration.")
             
-            self.log("  Refinement completed successfully!")
+            # Optional: Only refine rotations if EXCELLENT data (strict criteria)
+            # Uncomment the block below if you want to enable rotation refinement for very high quality data
+            """
+            if len(ring_nums) >= 8 and len(geo_ref.data) >= 100:
+                self.log("\n  [OPTIONAL] Stage 3b: High-quality data detected, attempting rotation refinement...")
+                try:
+                    # Save current state
+                    dist_backup = geo_ref.dist
+                    poni1_backup = geo_ref.poni1
+                    poni2_backup = geo_ref.poni2
+                    
+                    # Try rotation refinement
+                    geo_ref.refine2(fix=["wavelength"])
+                    
+                    rot1_deg = np.degrees(geo_ref.rot1)
+                    rot2_deg = np.degrees(geo_ref.rot2)
+                    rot3_deg = np.degrees(geo_ref.rot3)
+                    
+                    # Check if result is reasonable
+                    if abs(rot1_deg) > 5 or abs(rot2_deg) > 5 or abs(rot3_deg) > 5:
+                        self.log(f"    Warning: Unrealistic rotations detected!")
+                        self.log(f"    rot1={rot1_deg:.3f}°, rot2={rot2_deg:.3f}°, rot3={rot3_deg:.3f}°")
+                        self.log(f"    Reverting to zero rotations (perpendicular detector)")
+                        # Revert
+                        geo_ref.rot1 = 0.0
+                        geo_ref.rot2 = 0.0
+                        geo_ref.rot3 = 0.0
+                        geo_ref.dist = dist_backup
+                        geo_ref.poni1 = poni1_backup
+                        geo_ref.poni2 = poni2_backup
+                    else:
+                        self.log(f"    Rotations accepted: rot1={rot1_deg:.4f}°, rot2={rot2_deg:.4f}°, rot3={rot3_deg:.4f}°")
+                except Exception as rot_error:
+                    self.log(f"    Rotation refinement failed: {rot_error}")
+                    self.log(f"    Keeping rotations at zero")
+                    geo_ref.rot1 = 0.0
+                    geo_ref.rot2 = 0.0
+                    geo_ref.rot3 = 0.0
+            """
+            
+            self.log("\n  Refinement completed successfully!")
             
         except Exception as e:
             import traceback
@@ -3537,10 +3552,15 @@ class CalibrateModule(GUIBase):
             
             # Display calibration result
             if MATPLOTLIB_AVAILABLE:
-                # Get control points for visualization
+                # Get control points for visualization from geo_ref.data
                 try:
-                    rings = self.geo_ref.get_control_points()
-                    self.calibration_canvas.display_calibration_image(self.current_image, rings)
+                    # geo_ref.data contains the control points in pyFAI format
+                    # Convert to format expected by display_calibration_image
+                    if hasattr(self.geo_ref, 'data') and self.geo_ref.data is not None:
+                        rings = self.geo_ref.data
+                        self.calibration_canvas.display_calibration_image(self.current_image, rings)
+                    else:
+                        self.calibration_canvas.display_calibration_image(self.current_image)
                     self.switch_display_tab("result")
                 except Exception as viz_error:
                     self.log(f"Warning: Could not display rings: {viz_error}")
@@ -3794,43 +3814,52 @@ class CalibrateModule(GUIBase):
             return
         
         try:
-            from cake_pattern_utils import create_cake_image, plot_cake_with_rings
+            self.log("Generating Cake view (polar transformation)...")
             
-            self.log("Generating Cake view...")
-            
-            # Create cake image
-            cake, tth_array, chi_array = create_cake_image(
-                self.ai, 
+            # Use pyFAI's integrate2d for cake/polar transformation
+            # num_chi: number of azimuthal bins (360 for 1 degree resolution)
+            # num_2theta: number of radial bins
+            result = self.ai.integrate2d(
                 self.current_image,
-                num_chi=360,
-                num_2theta=500
+                npt_rad=500,      # Number of radial bins (2theta)
+                npt_azim=360,     # Number of azimuthal bins (chi/azimuth)
+                unit="2th_deg",   # Use 2theta in degrees
+                method="splitpixel"
             )
             
-            if cake is not None:
-                # Get calibrant for ring overlay
-                calibrant = None
-                wavelength = None
-                if hasattr(self, 'calibrant_name'):
-                    try:
-                        calibrant = ALL_CALIBRANTS[self.calibrant_name]
-                        wavelength = self.ai.wavelength
-                    except:
-                        pass
-                
-                # Plot cake with rings
-                plot_cake_with_rings(
-                    self.cake_axes,
-                    cake,
-                    tth_array,
-                    chi_array,
-                    calibrant=calibrant,
-                    wavelength=wavelength
-                )
-                
-                self.cake_canvas.draw()
-                self.log("Cake view updated successfully")
+            # Result is (cake_image, 2theta_array, chi_array)
+            cake = result[0]
+            tth_rad = result[1]  # Radial axis (2theta)
+            chi_azim = result[2]  # Azimuthal axis (chi)
+            
+            # Clear and plot
+            self.cake_axes.clear()
+            
+            # Display cake image with proper extent
+            # extent: [left, right, bottom, top]
+            extent = [tth_rad.min(), tth_rad.max(), chi_azim.min(), chi_azim.max()]
+            
+            im = self.cake_axes.imshow(
+                cake,
+                aspect='auto',
+                origin='lower',
+                extent=extent,
+                cmap='viridis',
+                interpolation='nearest'
+            )
+            
+            self.cake_axes.set_xlabel('2θ (degrees)', fontsize=10)
+            self.cake_axes.set_ylabel('χ (degrees)', fontsize=10)
+            self.cake_axes.set_title('Cake/Polar View', fontsize=11, fontweight='bold')
+            
+            # Add colorbar if not exists
+            if not hasattr(self, 'cake_colorbar') or self.cake_colorbar is None:
+                self.cake_colorbar = self.cake_canvas.figure.colorbar(im, ax=self.cake_axes)
             else:
-                self.log("Failed to generate Cake view")
+                self.cake_colorbar.update_normal(im)
+            
+            self.cake_canvas.draw()
+            self.log(f"Cake view updated: {cake.shape[1]}x{cake.shape[0]} (2θ × χ)")
                 
         except Exception as e:
             import traceback
@@ -3843,42 +3872,57 @@ class CalibrateModule(GUIBase):
             return
         
         try:
-            from cake_pattern_utils import create_pattern, plot_pattern_with_peaks
+            self.log("Generating 1D integrated pattern...")
             
-            self.log("Generating 1D pattern...")
-            
-            # Create 1D integrated pattern
-            tth, intensity = create_pattern(
-                self.ai,
+            # Use pyFAI's integrate1d for azimuthal integration
+            result = self.ai.integrate1d(
                 self.current_image,
-                num_points=2048,
-                unit="2th_deg"
+                npt=2048,         # Number of points in output
+                unit="2th_deg",   # Use 2theta in degrees
+                method="splitpixel"
             )
             
-            if tth is not None and intensity is not None:
-                # Get calibrant for peak overlay
-                calibrant = None
-                wavelength = None
-                if hasattr(self, 'calibrant_name'):
-                    try:
-                        calibrant = ALL_CALIBRANTS[self.calibrant_name]
-                        wavelength = self.ai.wavelength
-                    except:
-                        pass
-                
-                # Plot pattern with peaks
-                plot_pattern_with_peaks(
-                    self.pattern_axes,
-                    tth,
-                    intensity,
-                    calibrant=calibrant,
-                    wavelength=wavelength
-                )
-                
-                self.pattern_canvas.draw()
-                self.log("Pattern view updated successfully")
-            else:
-                self.log("Failed to generate Pattern view")
+            # Result is (2theta_array, intensity_array)
+            tth = result[0]      # 2theta values
+            intensity = result[1] # Integrated intensity
+            
+            # Clear and plot
+            self.pattern_axes.clear()
+            
+            # Plot 1D pattern
+            self.pattern_axes.plot(tth, intensity, 'b-', linewidth=1)
+            self.pattern_axes.set_xlabel('2θ (degrees)', fontsize=10)
+            self.pattern_axes.set_ylabel('Intensity (a.u.)', fontsize=10)
+            self.pattern_axes.set_title('1D Integrated Pattern', fontsize=11, fontweight='bold')
+            self.pattern_axes.grid(True, alpha=0.3)
+            
+            # Add calibrant peak positions if available
+            if hasattr(self, 'calibrant_name') and self.calibrant_name:
+                try:
+                    calibrant = ALL_CALIBRANTS[self.calibrant_name]
+                    calibrant.wavelength = self.ai.wavelength
+                    
+                    # Get expected 2theta positions for calibrant peaks
+                    tth_calibrant = calibrant.get_2th()
+                    tth_calibrant_deg = np.degrees(tth_calibrant)
+                    
+                    # Filter to visible range
+                    tth_min, tth_max = tth.min(), tth.max()
+                    visible_peaks = tth_calibrant_deg[(tth_calibrant_deg >= tth_min) & 
+                                                       (tth_calibrant_deg <= tth_max)]
+                    
+                    # Draw vertical lines for calibrant peaks
+                    y_max = intensity.max()
+                    for peak_pos in visible_peaks[:20]:  # Limit to first 20 peaks
+                        self.pattern_axes.axvline(peak_pos, color='red', linestyle='--', 
+                                                 alpha=0.5, linewidth=0.8)
+                    
+                    self.log(f"Added {len(visible_peaks)} calibrant peak positions")
+                except Exception as cal_error:
+                    self.log(f"Could not add calibrant peaks: {cal_error}")
+            
+            self.pattern_canvas.draw()
+            self.log(f"Pattern view updated: {len(tth)} points from {tth.min():.2f}° to {tth.max():.2f}°")
                 
         except Exception as e:
             import traceback
