@@ -241,9 +241,9 @@ class CalibrateModule(GUIBase):
             canvas_layout.setSpacing(5)
             
             try:
-                # Create canvas with reduced size to prevent memory issues
-                # Using smaller dimensions and DPI
-                self.unified_canvas = CalibrationCanvas(canvas_container, width=8, height=6, dpi=80)
+                # Create canvas with enlarged size for better visibility
+                # Using larger dimensions for better user experience
+                self.unified_canvas = CalibrationCanvas(canvas_container, width=10, height=10, dpi=100)
                 canvas_layout.addWidget(self.unified_canvas)
                 print("✅ CalibrationCanvas created successfully")
             except Exception as e:
@@ -278,7 +278,29 @@ class CalibrateModule(GUIBase):
             self.contrast_slider.setMaximum(65535)
             self.contrast_slider.setValue(65535)
             self.contrast_slider.setInvertedAppearance(True)  # Max at top
-            self.contrast_slider.setFixedHeight(300)  # Limit height
+            self.contrast_slider.setFixedHeight(400)  # Increase height to match larger canvas
+            self.contrast_slider.setStyleSheet("""
+                QSlider::groove:vertical {
+                    width: 25px;
+                    background: #E0E0E0;
+                    border: 1px solid #BDBDBD;
+                    border-radius: 4px;
+                }
+                QSlider::handle:vertical {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 #5C9FD6, stop:1 #4A90E2);
+                    border: 2px solid #2E5C8A;
+                    height: 25px;
+                    width: 25px;
+                    margin: 0 -13px;
+                    border-radius: 4px;  /* Square with slightly rounded corners */
+                }
+                QSlider::handle:vertical:hover {
+                    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+                        stop:0 #6BB0E7, stop:1 #5BA1D3);
+                    border: 2px solid #1E4C7A;
+                }
+            """)
             self.contrast_slider.valueChanged.connect(self.on_contrast_slider_changed)
             contrast_layout.addWidget(self.contrast_slider)
             
@@ -469,7 +491,8 @@ class CalibrateModule(GUIBase):
         self.setup_detector_groupbox(calib_params_layout)
         self.setup_start_values_groupbox(calib_params_layout)
         self.setup_peak_selection_groupbox(calib_params_layout)
-        self.setup_refinement_options_groupbox(calib_params_layout)
+        # Refinement options hidden per user request
+        # self.setup_refinement_options_groupbox(calib_params_layout)
         
         calib_params_layout.addStretch()
         
@@ -2069,6 +2092,10 @@ class CalibrateModule(GUIBase):
         if not PYFAI_AVAILABLE:
             return
         
+        # Ensure calibrant_info_text exists
+        if not hasattr(self, 'calibrant_info_text'):
+            return
+        
         try:
             # Get current calibrant
             if self.calibrant is None:
@@ -2092,7 +2119,8 @@ class CalibrateModule(GUIBase):
                 self.calibrant_info_text.setText("No d-spacing data available")
                 
         except Exception as e:
-            self.calibrant_info_text.setText(f"Error: {str(e)}")
+            if hasattr(self, 'calibrant_info_text'):
+                self.calibrant_info_text.setText(f"Error: {str(e)}")
             self.log(f"Warning: Could not load calibrant info: {str(e)}")
 
     def on_detector_changed(self, detector_name):
@@ -2243,6 +2271,12 @@ class CalibrateModule(GUIBase):
         self.mask_module_reference = mask_module
         self.log("Mask module reference set")
 
+    def update_ring_number_display(self, ring_num):
+        """Update ring number display after auto-increment"""
+        if hasattr(self, 'ring_num_input'):
+            self.ring_num_input.setValue(ring_num)
+            self.log(f"Ring number auto-incremented to: {ring_num}")
+    
     def on_peak_mode_changed(self):
         """Handle peak selection mode change"""
         if hasattr(self, 'select_peak_rb') and self.select_peak_rb.isChecked():
@@ -2250,6 +2284,14 @@ class CalibrateModule(GUIBase):
             self.peak_picking_mode = True
             if MATPLOTLIB_AVAILABLE and hasattr(self, 'unified_canvas'):
                 self.unified_canvas.peak_picking_mode = True
+                # Set canvas ring number from spin box
+                if hasattr(self, 'ring_num_input'):
+                    self.unified_canvas.current_ring_num = self.ring_num_input.value()
+                # Set auto-increment flag from checkbox
+                if hasattr(self, 'automatic_peak_num_inc_cb'):
+                    self.unified_canvas.auto_increment_ring = self.automatic_peak_num_inc_cb.isChecked()
+                # Set parent module reference
+                self.unified_canvas.parent_module = self
                 # Update canvas title
                 if self.current_image is not None:
                     self.unified_canvas.display_calibration_image(self.current_image)
@@ -2420,6 +2462,7 @@ class CalibrateModule(GUIBase):
             )
             worker.finished.connect(self.on_calibration_finished)
             worker.error.connect(self.on_calibration_error)
+            worker.progress.connect(self.on_calibration_progress)
             worker.calibration_result.connect(self.on_calibration_result)
             
             self.running_threads.append(worker)
@@ -2511,7 +2554,15 @@ class CalibrateModule(GUIBase):
         # Extract control points (only if not using manual peaks)
         if manual_control_points is None or len(manual_control_points) == 0:
             try:
+                self.log("Extracting control points automatically...")
                 geo_ref.extract_cp(max_rings=10, pts_per_deg=1.0)
+                
+                # Display detected points in real-time (Dioptas-style)
+                if hasattr(geo_ref, 'data') and geo_ref.data is not None:
+                    self.log(f"Found {len(geo_ref.data)} rings with control points")
+                    # Signal to display points (will be processed in main thread)
+                    self.progress.emit(f"AUTO_POINTS:{len(geo_ref.data)}")
+                    
             except Exception as e:
                 raise ValueError(f"Failed to extract control points: {str(e)}. "
                                "Please check image quality or use Manual Peak Selection.")
@@ -2822,6 +2873,15 @@ class CalibrateModule(GUIBase):
             self.log(error_msg)
             QMessageBox.critical(None, "Error", f"Error processing results:\n{str(e)}")
 
+    def on_calibration_progress(self, message):
+        """Handle calibration progress updates including auto-detected points"""
+        if message.startswith("AUTO_POINTS:"):
+            # Extract number of rings
+            num_rings = int(message.split(":")[1])
+            self.log(f"✓ Automatically detected control points on {num_rings} rings")
+        else:
+            self.log(message)
+    
     def on_calibration_finished(self, message):
         """Handle calibration completion"""
         self.log(message)

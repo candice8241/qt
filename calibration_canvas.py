@@ -667,6 +667,13 @@ class CalibrationCanvas(FigureCanvas):
         self.peak_markers.append(label)
         
         self.draw_idle()
+        
+        # Auto-increment ring number if enabled
+        if hasattr(self, 'auto_increment_ring') and self.auto_increment_ring:
+            self.current_ring_num = ring_num + 1
+            # Notify parent to update ring number input
+            if hasattr(self, 'parent_module'):
+                self.parent_module.update_ring_number_display(self.current_ring_num)
     
     def on_mask_click(self, event):
         """Handle mouse press for mask drawing"""
