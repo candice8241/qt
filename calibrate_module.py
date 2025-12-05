@@ -267,12 +267,12 @@ class CalibrateModule(GUIBase):
             # Horizontal layout for canvas and contrast slider
             canvas_container = QWidget()
             canvas_layout = QHBoxLayout(canvas_container)
-            canvas_layout.setContentsMargins(2, 2, 2, 2)
-            canvas_layout.setSpacing(2)
+            canvas_layout.setContentsMargins(0, 0, 0, 0)
+            canvas_layout.setSpacing(1)
             
             try:
                 # Create canvas with larger size for better visibility
-                self.unified_canvas = CalibrationCanvas(canvas_container, width=22, height=22, dpi=100)
+                self.unified_canvas = CalibrationCanvas(canvas_container, width=24, height=24, dpi=100)
                 canvas_layout.addWidget(self.unified_canvas)
             except Exception as e:
                 # Simplified error message
@@ -288,8 +288,8 @@ class CalibrateModule(GUIBase):
             right_panel_widget.setMinimumWidth(200)
             right_panel_widget.setMaximumWidth(220)
             right_panel_layout = QVBoxLayout(right_panel_widget)
-            right_panel_layout.setContentsMargins(5, 5, 5, 5)
-            right_panel_layout.setSpacing(8)
+            right_panel_layout.setContentsMargins(2, 2, 2, 2)
+            right_panel_layout.setSpacing(5)
 
             # Position label at top (more visible, no background)
             self.position_lbl = QLabel("Position: x=0, y=0")
